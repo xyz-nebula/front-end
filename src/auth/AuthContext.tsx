@@ -6,6 +6,7 @@ import {
   parseStoredTokens,
   readStoredSession,
   removeStoredTokens,
+  removeStoredTokensIfRefreshTokenMatches,
   writeStoredTokens,
 } from '@/auth/storage'
 import { AuthContext, type AuthContextValue } from '@/auth/useAuth'
@@ -20,6 +21,8 @@ interface ClearSessionOptions {
   removeStored?: boolean
   requestedByLogout?: boolean
 }
+
+const AUTH_REFRESH_LOCK_NAME = `${AUTH_STORAGE_KEY}.refresh`
 
 function isDefinitiveAuthError(error: unknown) {
   return isApiError(error)
@@ -36,6 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
   const [showMemorySessionNotice, setShowMemorySessionNotice] = useState(false)
   const tokensRef = useRef<AuthTokens | null>(initialSession.tokens)
+  const persistenceRef = useRef<SessionPersistence>(
+    initialSession.storageAvailable ? 'persistent' : 'memory',
+  )
   const sessionVersionRef = useRef(0)
   const refreshOperationRef = useRef<RefreshOperation | null>(null)
   const didBootstrapRef = useRef(false)
@@ -46,7 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!wasPersisted) removeStoredTokens()
     sessionVersionRef.current += 1
     tokensRef.current = tokens
-    setPersistence(wasPersisted ? 'persistent' : 'memory')
+    const nextPersistence = wasPersisted ? 'persistent' : 'memory'
+    persistenceRef.current = nextPersistence
+    setPersistence(nextPersistence)
     if (wasPersisted) {
       memoryNoticeShownRef.current = false
       setShowMemorySessionNotice(false)
@@ -62,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const adoptExternalSession = useCallback((tokens: AuthTokens) => {
     sessionVersionRef.current += 1
     tokensRef.current = tokens
+    persistenceRef.current = 'persistent'
     setPersistence('persistent')
     memoryNoticeShownRef.current = false
     setShowMemorySessionNotice(false)
@@ -72,7 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearSession = useCallback((options: ClearSessionOptions = {}) => {
     sessionVersionRef.current += 1
     tokensRef.current = null
-    if (options.removeStored !== false && !removeStoredTokens()) setPersistence('memory')
+    if (options.removeStored !== false && !removeStoredTokens()) {
+      persistenceRef.current = 'memory'
+      setPersistence('memory')
+    }
     memoryNoticeShownRef.current = false
     setShowMemorySessionNotice(false)
     setLogoutRequested(options.requestedByLogout ?? false)
@@ -87,8 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshToken = tokensRef.current?.refreshToken
     if (!refreshToken) return Promise.reject(new ApiError(401, 'Сессия не найдена.'))
 
-    const promise = authApi.refresh(refreshToken)
-      .then((tokens) => {
+    const performRefresh = () => authApi.refresh(refreshToken)
+      .then((tokens): AuthTokens => {
         if (sessionVersionRef.current !== version || tokensRef.current?.refreshToken !== refreshToken) {
           const currentTokens = tokensRef.current
           if (currentTokens) return currentTokens
@@ -97,15 +109,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         saveSession(tokens)
         return tokens
       })
-      .catch((error: unknown) => {
+      .catch((error: unknown): AuthTokens => {
         if (sessionVersionRef.current !== version) {
           const currentTokens = tokensRef.current
           if (currentTokens) return currentTokens
           throw error
         }
-        if (isDefinitiveAuthError(error)) clearSession()
+        if (isDefinitiveAuthError(error)) {
+          const removalResult = removeStoredTokensIfRefreshTokenMatches(refreshToken)
+          if (removalResult === 'changed') {
+            const externalSession = readStoredSession()
+            if (externalSession.tokens) {
+              adoptExternalSession(externalSession.tokens)
+              return externalSession.tokens
+            }
+          }
+
+          clearSession({ removeStored: false })
+        }
         throw error
       })
+
+    const runCoordinatedRefresh = async (): Promise<AuthTokens> => {
+      if (persistenceRef.current !== 'persistent' || !('locks' in navigator)) {
+        return performRefresh()
+      }
+
+      return navigator.locks.request(AUTH_REFRESH_LOCK_NAME, async () => {
+        if (sessionVersionRef.current !== version || tokensRef.current?.refreshToken !== refreshToken) {
+          const currentTokens = tokensRef.current
+          if (currentTokens) return currentTokens
+          throw new ApiError(401, 'Сессия уже завершена.')
+        }
+
+        const storedSession = readStoredSession()
+        if (!storedSession.storageAvailable) {
+          persistenceRef.current = 'memory'
+          setPersistence('memory')
+          return performRefresh()
+        }
+
+        if (!storedSession.tokens) {
+          clearSession({ removeStored: false })
+          throw new ApiError(401, 'Сессия уже завершена.')
+        }
+
+        if (storedSession.tokens.refreshToken !== refreshToken) {
+          adoptExternalSession(storedSession.tokens)
+          return storedSession.tokens
+        }
+
+        return performRefresh()
+      })
+    }
+
+    const promise = runCoordinatedRefresh()
       .finally(() => {
         if (refreshOperationRef.current === operation) refreshOperationRef.current = null
       })
@@ -113,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const operation: RefreshOperation = { version, promise }
     refreshOperationRef.current = operation
     return promise
-  }, [clearSession, saveSession])
+  }, [adoptExternalSession, clearSession, saveSession])
 
   const restoreSession = useCallback(async () => {
     if (!tokensRef.current) {

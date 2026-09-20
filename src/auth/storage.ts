@@ -7,6 +7,8 @@ export interface StoredSessionResult {
   storageAvailable: boolean
 }
 
+export type ConditionalTokenRemovalResult = 'removed' | 'changed' | 'missing' | 'unavailable'
+
 function isAuthTokens(value: unknown): value is AuthTokens {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Record<string, unknown>
@@ -63,5 +65,22 @@ export function removeStoredTokens(): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+export function removeStoredTokensIfRefreshTokenMatches(
+  expectedRefreshToken: string,
+): ConditionalTokenRemovalResult {
+  try {
+    const serialized = window.localStorage.getItem(AUTH_STORAGE_KEY)
+    if (!serialized) return 'missing'
+
+    const tokens = parseStoredTokens(serialized)
+    if (!tokens || tokens.refreshToken !== expectedRefreshToken) return 'changed'
+
+    window.localStorage.removeItem(AUTH_STORAGE_KEY)
+    return 'removed'
+  } catch {
+    return 'unavailable'
   }
 }

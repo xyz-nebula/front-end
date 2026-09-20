@@ -1,4 +1,4 @@
-import type { BrowserContext, Page, Route } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
 
 import {
   artifactsDir,
@@ -297,6 +297,43 @@ test('synchronizes login, token rotation, and logout between tabs', async ({ pag
   await expect(otherPage).toHaveURL(/\/login$/)
 })
 
+test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, context }) => {
+  await page.goto('/login')
+  await page.evaluate(({ key, value }) => {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  }, {
+    key: storageKey,
+    value: { accessToken: 'shared-access', refreshToken: 'shared-refresh' },
+  })
+
+  let refreshRequests = 0
+  await context.route('**/api/v1/auth/token/refresh', async (route) => {
+    refreshRequests += 1
+    if (refreshRequests > 1) {
+      await json(route, 403, { detail: 'Refresh token already rotated' })
+      return
+    }
+
+    await delay(200)
+    await json(route, 200, {
+      access_token: 'rotated-access',
+      refresh_token: 'rotated-refresh',
+    })
+  })
+
+  const otherPage = await context.newPage()
+  await Promise.all([
+    page.goto('/home'),
+    otherPage.goto('/home'),
+  ])
+
+  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect(otherPage.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect.poll(() => readStoredTokens(page)).toContain('rotated-refresh')
+  await expect.poll(() => readStoredTokens(otherPage)).toContain('rotated-refresh')
+  expect(refreshRequests).toBe(1)
+})
+
 test('does not let a stale refresh overwrite a newer cross-tab session', async ({ page, context }) => {
   await seedSession(page, 'old-access', 'old-refresh')
   let releaseRefresh = () => undefined
@@ -313,21 +350,23 @@ test('does not let a stale refresh overwrite a newer cross-tab session', async (
   await page.goto('/home')
   await refreshStarted
 
-  const otherPage = await createRefreshingTab(context)
-  await expect(otherPage).toHaveURL(/\/home$/)
-  await expect(page).toHaveURL(/\/home$/)
-
-  releaseRefresh()
-  await expect.poll(() => readStoredTokens(page)).toContain('newer-refresh')
-  expect(await readStoredTokens(page)).not.toContain('stale-refresh')
-})
-
-async function createRefreshingTab(context: BrowserContext) {
-  const page = await context.newPage()
-  await page.route('**/api/v1/auth/token/refresh', (route) => json(route, 200, {
+  const otherPage = await context.newPage()
+  await otherPage.addInitScript(({ key, value }) => {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  }, {
+    key: storageKey,
+    value: { accessToken: 'newer-access', refreshToken: 'newer-refresh' },
+  })
+  await otherPage.route('**/api/v1/auth/token/refresh', (route) => json(route, 200, {
     access_token: 'newer-access',
     refresh_token: 'newer-refresh',
   }))
-  await page.goto('/home')
-  return page
-}
+  await otherPage.goto('/home')
+  await expect.poll(() => readStoredTokens(page)).toContain('newer-refresh')
+
+  releaseRefresh()
+  await expect(page).toHaveURL(/\/home$/)
+  await expect(otherPage).toHaveURL(/\/home$/)
+  await expect.poll(() => readStoredTokens(page)).toContain('newer-refresh')
+  expect(await readStoredTokens(page)).not.toContain('stale-refresh')
+})

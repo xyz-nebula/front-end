@@ -197,6 +197,7 @@ async function run() {
     await rm(artifactsDir, { recursive: true, force: true })
     await mkdir(artifactsDir, { recursive: true })
 
+    process.env.API_PROXY_TARGET ??= 'http://127.0.0.1:9'
     process.env.VITE_API_TIMEOUT_MS ??= '600'
 
     const port = await getAvailablePort()
