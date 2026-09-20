@@ -357,154 +357,6 @@
   from { opacity: 0; transform: translateY(18px) scale(0.98); }
 }
 
-.arena-scene__cards {
-  position: absolute;
-  z-index: 3;
-  inset: 0;
-}
-
-.arena-scene-card {
-  position: absolute;
-  display: flex;
-  min-height: 74px;
-  align-items: center;
-  gap: 13px;
-  padding: 11px 16px;
-  border: 1px solid rgba(91, 126, 174, 0.14);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 14px 34px rgba(30, 66, 115, 0.1);
-  backdrop-filter: blur(12px);
-  animation: arena-card-float 5.5s ease-in-out infinite;
-}
-
-@keyframes arena-card-float {
-  50% { transform: translateY(-5px); }
-}
-
-.arena-scene-card__icon {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  flex: none;
-  place-items: center;
-  border-radius: 9px;
-}
-
-.arena-scene-card__icon svg {
-  width: 26px;
-  height: 26px;
-  fill: currentColor;
-}
-
-.arena-scene-card--blue .arena-scene-card__icon {
-  color: #1162bd;
-  background: #e7f1ff;
-}
-
-.arena-scene-card--red .arena-scene-card__icon {
-  color: #d72a34;
-  background: #ffe9eb;
-}
-
-.arena-scene-card--amber .arena-scene-card__icon {
-  color: #f3a525;
-  background: #fff3df;
-}
-
-.arena-scene-card__copy {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.arena-scene-card__copy small {
-  color: #5d76a1;
-  font-size: 12px;
-  line-height: 1.1;
-}
-
-.arena-scene-card__copy strong {
-  color: #10182b;
-  font-size: 14px;
-  line-height: 1.18;
-  font-weight: 700;
-}
-
-.arena-scene-card__chevron {
-  margin-left: auto;
-  color: #1e70d2;
-  font-size: 29px;
-  line-height: 1;
-  font-weight: 300;
-}
-
-.arena-scene-card--case {
-  top: 26px;
-  left: 19%;
-  width: 300px;
-}
-
-.arena-scene-card--role {
-  top: 25px;
-  right: 1%;
-  width: 235px;
-  animation-delay: -1s;
-}
-
-.arena-scene-card--timer {
-  top: 143px;
-  left: 48%;
-  min-height: 58px;
-  padding: 7px 16px;
-  animation-delay: -2.3s;
-}
-
-.arena-scene-card--timer .arena-scene-card__icon {
-  width: 34px;
-  height: 34px;
-  background: transparent;
-}
-
-.arena-scene-card--timer .arena-scene-card__icon svg {
-  width: 28px;
-  height: 28px;
-}
-
-.arena-scene-card--timer .arena-scene-card__copy strong {
-  font-size: 17px;
-}
-
-.arena-scene-card--secret {
-  top: 374px;
-  right: -1%;
-  width: 235px;
-  animation-delay: -3.4s;
-}
-
-.arena-scene-card--goal {
-  bottom: 88px;
-  left: 16%;
-  width: 300px;
-  animation-delay: -1.7s;
-}
-
-.arena-scene-card--opponent {
-  right: 1%;
-  bottom: 135px;
-  width: 200px;
-  min-height: 64px;
-  animation-delay: -2.8s;
-}
-
-.arena-scene-card--opponent .arena-scene-card__icon {
-  width: 40px;
-  height: 40px;
-  background: transparent;
-}
-
 /* Feature strip */
 .arena-benefits {
   position: absolute;
@@ -679,10 +531,6 @@
     width: 68vw;
   }
 
-  .arena-scene-card--secret,
-  .arena-scene-card--opponent {
-    right: 3%;
-  }
 }
 
 @media (max-width: 980px) {
@@ -707,16 +555,6 @@
     right: -120px;
     width: 68vw;
     height: 600px;
-  }
-
-  .arena-scene-card--case {
-    left: 5%;
-  }
-
-  .arena-scene-card--role,
-  .arena-scene-card--goal,
-  .arena-scene-card--opponent {
-    display: none;
   }
 
   .arena-benefits {
@@ -908,83 +746,6 @@
 
   @keyframes arena-scene-in-mobile {
     from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.98); }
-  }
-
-  .arena-scene-card {
-    min-height: 59px;
-    gap: 9px;
-    padding: 8px 10px;
-    border-radius: 10px;
-    box-shadow: 0 10px 24px rgba(30, 66, 115, 0.1);
-  }
-
-  .arena-scene-card__icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-  }
-
-  .arena-scene-card__icon svg {
-    width: 22px;
-    height: 22px;
-  }
-
-  .arena-scene-card__copy small {
-    font-size: 10px;
-  }
-
-  .arena-scene-card__copy strong {
-    font-size: 12px;
-  }
-
-  .arena-scene-card__chevron {
-    display: none;
-  }
-
-  .arena-scene-card--case {
-    top: 4px;
-    left: 3%;
-    display: flex;
-    width: 48%;
-  }
-
-  .arena-scene-card--role {
-    top: 7px;
-    right: 3%;
-    display: flex;
-    width: 38%;
-  }
-
-  .arena-scene-card--timer {
-    top: 88px;
-    left: 0;
-    min-height: 52px;
-    padding: 5px 8px;
-  }
-
-  .arena-scene-card--timer .arena-scene-card__icon {
-    width: 29px;
-    height: 29px;
-  }
-
-  .arena-scene-card--timer .arena-scene-card__icon svg {
-    width: 24px;
-    height: 24px;
-  }
-
-  .arena-scene-card--timer .arena-scene-card__copy strong {
-    font-size: 15px;
-  }
-
-  .arena-scene-card--secret {
-    top: 84px;
-    right: 0;
-    width: 43%;
-  }
-
-  .arena-scene-card--goal,
-  .arena-scene-card--opponent {
-    display: none;
   }
 
   .arena-benefits {

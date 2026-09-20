@@ -25,6 +25,7 @@ test('landing renders the redesigned hero and section framework', async ({ page 
   await expect(page.getByRole('heading', { level: 1, name: 'Тренируй переговоры как стратегическую игру' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Начать поединок' })).toHaveAttribute('href', '/home')
   await expect(page.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/home')
+  await expect(page.locator('.arena-scene-card')).toHaveCount(0)
   for (const heading of sectionHeadings) {
     await expect(page.getByRole('heading', { level: 2, name: heading })).toBeAttached()
   }
@@ -36,6 +37,11 @@ test('landing renders the redesigned hero and section framework', async ({ page 
   await expect(page.getByRole('heading', { level: 1, name: 'Тренируй переговоры как стратегическую игру' })).toBeVisible()
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/landing-mobile.png`)
+
+  await page.setViewportSize({ width: 360, height: 800 })
+  await page.goto('/')
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/landing-mobile-narrow.png`)
 
   await page.locator('#problem').scrollIntoViewIfNeeded()
   await expect(page.getByRole('heading', { level: 2, name: sectionHeadings[0] })).toBeVisible()
