@@ -39,7 +39,7 @@ export function LandingPage() {
             <p className="hero__statement">Ошибайся здесь, <span>а не в жизни.</span></p>
             <p className="hero__description">Безопасное пространство, где можно пробовать, ошибаться и становиться увереннее перед важным разговором.</p>
             <div className="hero__actions">
-              <AppButton to="/home" icon={<ArrowIcon />}>Начать тренировку</AppButton>
+              <AppButton to="/auth" icon={<ArrowIcon />}>Начать тренировку</AppButton>
               <a className="text-link" href="#how-it-works">Как это работает <ArrowIcon direction="down" /></a>
             </div>
           </div>
@@ -103,7 +103,7 @@ export function LandingPage() {
           <Reveal className="page-shell final-cta">
             <p className="eyebrow eyebrow--light">Следующий разговор может пройти иначе</p>
             <h2>Сначала — <span>на Арене.</span><br />Потом — уверенно в жизни.</h2>
-            <AppButton to="/home" variant="light" icon={<ArrowIcon />}>Выбрать тренировку</AppButton>
+            <AppButton to="/auth" variant="light" icon={<ArrowIcon />}>Выбрать тренировку</AppButton>
             <div className="final-cta__rings" aria-hidden="true"><span /><span /><span /></div>
           </Reveal>
         </section>

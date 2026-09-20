@@ -25,9 +25,9 @@ export function LandingHeader() {
         <Logo />
         <nav className={`landing-nav ${isOpen ? 'is-open' : ''}`} aria-label="Основная навигация">
           {navLinks.map((link) => <a key={link.href} href={link.href} onClick={() => setIsOpen(false)}>{link.label}</a>)}
-          <AppButton to="/home" className="landing-nav__cta">Начать тренировку</AppButton>
+          <AppButton to="/auth" className="landing-nav__cta">Начать тренировку</AppButton>
         </nav>
-        <AppButton to="/home" className="landing-header__cta">Начать тренировку</AppButton>
+        <AppButton to="/auth" className="landing-header__cta">Начать тренировку</AppButton>
         <button className={`menu-toggle ${isOpen ? 'is-open' : ''}`} type="button" aria-label={isOpen ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={isOpen} onClick={() => setIsOpen((value) => !value)}>
           <span /><span />
         </button>

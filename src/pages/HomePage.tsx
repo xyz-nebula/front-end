@@ -1,5 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react'
 
+import { useAuth } from '@/auth/useAuth'
+import { TotpModal } from '@/components/auth/TotpModal'
 import { CaseCard } from '@/components/home/CaseCard'
 import { CaseIcon } from '@/components/home/CaseIcon'
 import { TrainingModal } from '@/components/home/TrainingModal'
@@ -10,13 +12,22 @@ import { caseCategories, recentTrainings, trainingCases } from '@/mocks/cases'
 import type { CaseCategory, TrainingCase } from '@/types/case'
 
 export function HomePage() {
+  const { logout } = useAuth()
   const [category, setCategory] = useState<CaseCategory>('Все')
   const [selectedCase, setSelectedCase] = useState<TrainingCase | null>(null)
+  const [isSecurityOpen, setIsSecurityOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const recommendedCase = trainingCases[0]
   const visibleCases = useMemo(
     () => category === 'Все' ? trainingCases : trainingCases.filter((item) => item.category === category),
     [category],
   )
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    await logout().catch(() => undefined)
+  }
 
   return (
     <div className="app-home">
@@ -24,15 +35,16 @@ export function HomePage() {
         <div className="app-shell app-header__inner">
           <Logo />
           <nav aria-label="Навигация приложения"><a className="is-active" href="#cases">Тренировки</a><a href="#progress">Мой прогресс</a></nav>
-          <div className="app-header__profile">
-            <div className="avatar">АК</div><span>Алексей</span>
+          <div className="app-header__actions">
+            <button type="button" onClick={() => setIsSecurityOpen(true)}><span className="app-header__shield" aria-hidden="true">✦</span><span>2FA</span></button>
+            <button type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>{isLoggingOut ? 'Выходим…' : 'Выйти'}</button>
           </div>
         </div>
       </header>
 
       <main className="app-shell home-main">
         <section className="welcome-section">
-          <div><p>Доброе утро, Алексей <span>✦</span></p><h1>Какой разговор<br />потренируем сегодня?</h1></div>
+          <div><p>Добро пожаловать на Арену <span>✦</span></p><h1>Какой разговор<br />потренируем сегодня?</h1></div>
           <AppButton type="button" icon={<ArrowIcon />} onClick={() => setSelectedCase(recommendedCase)}>Начать тренировку</AppButton>
         </section>
 
@@ -83,6 +95,7 @@ export function HomePage() {
 
       <footer className="app-home__footer"><div className="app-shell"><Logo /><span>Тренируйся сегодня — говори увереннее завтра.</span><span>Прототип · 2026</span></div></footer>
       {selectedCase && <TrainingModal item={selectedCase} onClose={() => setSelectedCase(null)} />}
+      {isSecurityOpen && <TotpModal onClose={() => setIsSecurityOpen(false)} />}
     </div>
   )
 }
