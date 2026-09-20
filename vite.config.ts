@@ -15,10 +15,9 @@ export default defineConfig({
     host: '127.0.0.1',
     proxy: {
       '/api': {
-        target: 'https://api.nebula.tx0.su',
+        target: 'https://nebula.tx0.su',
         changeOrigin: true,
         secure: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },
