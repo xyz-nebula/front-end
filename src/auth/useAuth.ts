@@ -5,12 +5,17 @@ import type {
   AuthRegisterRequest,
   AuthRegisterResponse,
   AuthStatus,
+  SessionPersistence,
   TotpEnrollResponse,
 } from '@/types/auth'
 
 export interface AuthContextValue {
   status: AuthStatus
   logoutRequested: boolean
+  persistence: SessionPersistence
+  showMemorySessionNotice: boolean
+  dismissMemorySessionNotice: () => void
+  retrySession: () => Promise<void>
   register: (payload: AuthRegisterRequest) => Promise<AuthRegisterResponse>
   activate: (code: string) => Promise<void>
   login: (payload: AuthLoginRequest) => Promise<void>

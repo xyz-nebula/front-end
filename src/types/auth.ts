@@ -27,4 +27,6 @@ export interface TotpEnrollResponse {
   otpauth_url: string
 }
 
-export type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated' | 'signing-out'
+export type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated' | 'signing-out' | 'restore-error'
+
+export type SessionPersistence = 'persistent' | 'memory'

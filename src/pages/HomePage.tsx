@@ -12,7 +12,7 @@ import { caseCategories, recentTrainings, trainingCases } from '@/mocks/cases'
 import type { CaseCategory, TrainingCase } from '@/types/case'
 
 export function HomePage() {
-  const { logout } = useAuth()
+  const { dismissMemorySessionNotice, logout, showMemorySessionNotice } = useAuth()
   const [category, setCategory] = useState<CaseCategory>('Все')
   const [selectedCase, setSelectedCase] = useState<TrainingCase | null>(null)
   const [isSecurityOpen, setIsSecurityOpen] = useState(false)
@@ -43,6 +43,13 @@ export function HomePage() {
       </header>
 
       <main className="app-shell home-main">
+        {showMemorySessionNotice && (
+          <div className="memory-session-notice" role="status">
+            <span aria-hidden="true">!</span>
+            <p><strong>Сессия действует только в этой вкладке.</strong> После перезагрузки потребуется войти снова.</p>
+            <button type="button" onClick={dismissMemorySessionNotice} aria-label="Закрыть уведомление">×</button>
+          </div>
+        )}
         <section className="welcome-section">
           <div><p>Добро пожаловать на Арену <span>✦</span></p><h1>Какой разговор<br />потренируем сегодня?</h1></div>
           <AppButton type="button" icon={<ArrowIcon />} onClick={() => setSelectedCase(recommendedCase)}>Начать тренировку</AppButton>

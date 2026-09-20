@@ -2,6 +2,11 @@ import type { AuthTokens } from '@/types/auth'
 
 export const AUTH_STORAGE_KEY = 'arena.auth.tokens.v1'
 
+export interface StoredSessionResult {
+  tokens: AuthTokens | null
+  storageAvailable: boolean
+}
+
 function isAuthTokens(value: unknown): value is AuthTokens {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Record<string, unknown>
@@ -11,24 +16,52 @@ function isAuthTokens(value: unknown): value is AuthTokens {
     && candidate.refreshToken.length > 0
 }
 
-export function readStoredTokens(): AuthTokens | null {
+export function parseStoredTokens(serialized: string | null): AuthTokens | null {
+  if (!serialized) return null
   try {
-    const serialized = window.localStorage.getItem(AUTH_STORAGE_KEY)
-    if (!serialized) return null
     const parsed: unknown = JSON.parse(serialized)
     if (isAuthTokens(parsed)) return parsed
   } catch {
-    // A damaged or inaccessible storage entry is treated as a signed-out session.
+    // Invalid external data is ignored and never promoted to an in-memory session.
   }
 
-  window.localStorage.removeItem(AUTH_STORAGE_KEY)
   return null
 }
 
-export function writeStoredTokens(tokens: AuthTokens) {
-  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(tokens))
+export function readStoredSession(): StoredSessionResult {
+  let serialized: string | null
+  try {
+    serialized = window.localStorage.getItem(AUTH_STORAGE_KEY)
+  } catch {
+    return { tokens: null, storageAvailable: false }
+  }
+
+  if (!serialized) return { tokens: null, storageAvailable: true }
+  const tokens = parseStoredTokens(serialized)
+  if (tokens) return { tokens, storageAvailable: true }
+
+  try {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY)
+    return { tokens: null, storageAvailable: true }
+  } catch {
+    return { tokens: null, storageAvailable: false }
+  }
 }
 
-export function removeStoredTokens() {
-  window.localStorage.removeItem(AUTH_STORAGE_KEY)
+export function writeStoredTokens(tokens: AuthTokens): boolean {
+  try {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(tokens))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function removeStoredTokens(): boolean {
+  try {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY)
+    return true
+  } catch {
+    return false
+  }
 }

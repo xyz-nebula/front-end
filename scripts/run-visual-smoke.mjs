@@ -197,6 +197,8 @@ async function run() {
     await rm(artifactsDir, { recursive: true, force: true })
     await mkdir(artifactsDir, { recursive: true })
 
+    process.env.VITE_API_TIMEOUT_MS ??= '600'
+
     const port = await getAvailablePort()
     server = await createServer({
       root: projectRoot,
