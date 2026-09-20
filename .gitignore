@@ -4,6 +4,11 @@ node_modules/
 # Build output
 dist/
 
+# Visual test output
+artifacts/
+test-results/
+playwright-report/
+
 # Local environment files
 .env
 .env.*

@@ -5,10 +5,19 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist'] },
   {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['**/*.{ts,tsx}'],
+    ignores: ['dist', 'artifacts', 'test-results', 'playwright-report'],
+  },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ['scripts/**/*.mjs', 'playwright.config.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}', 'tests/visual/**/*.ts'],
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.browser,
