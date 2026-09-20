@@ -8,13 +8,30 @@ import {
 
 const sectionHeadings = [
   'Переговоры — навык, который нельзя натренировать только по книге',
-  'Как работает Арена — 4 этапа',
+  'От кейса до новой стратегии — за один цикл',
   'AI-оппонент, который действительно ведёт переговоры',
   'Глубокая подготовка + AI-тренер',
   'Независимое судейство и персональный разбор',
   'Реальные кейсы и разные переговорные ситуации',
   'Методология и развитие навыка',
   'Для команд и компаний + финальный CTA',
+]
+
+const howItWorksSteps = [
+  'Выбери кейс и роль',
+  'Подготовь стратегию',
+  'Проведи поединок',
+  'Получи разбор',
+]
+
+const howItWorksViewports = [
+  { width: 1440, height: 1000, screenshot: 'landing-how-it-works-desktop.png' },
+  { width: 1220, height: 1000 },
+  { width: 981, height: 1000 },
+  { width: 980, height: 1000 },
+  { width: 768, height: 900, screenshot: 'landing-how-it-works-tablet.png' },
+  { width: 390, height: 844, screenshot: 'landing-how-it-works-mobile.png' },
+  { width: 360, height: 800, screenshot: 'landing-how-it-works-mobile-narrow.png' },
 ]
 
 test('landing renders the redesigned hero, problem section and section framework', async ({ page }) => {
@@ -48,6 +65,21 @@ test('landing renders the redesigned hero, problem section and section framework
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/landing-problem-desktop.png`)
 
+  await page.locator('#how-it-works').evaluate((element) => {
+    window.scrollTo(0, (element as HTMLElement).offsetTop)
+  })
+  await expect(page.locator('section#how-it-works')).toHaveAttribute('aria-labelledby', 'how-it-works-title')
+  const howItWorksList = page.getByRole('list', { name: 'Четыре этапа тренировки на Арене' })
+  for (const step of howItWorksSteps) {
+    await expect(howItWorksList.getByRole('heading', { level: 3, name: step })).toBeVisible()
+  }
+  await expect(page.locator('#how-it-works .arena-placeholder__card')).toHaveCount(0)
+  await expectNoHorizontalOverflow(page)
+  await page.locator('#how-it-works').screenshot({
+    path: `${artifactsDir}/landing-how-it-works-desktop.png`,
+    animations: 'disabled',
+  })
+
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1, name: 'Тренируй переговоры как стратегическую игру' })).toBeVisible()
@@ -67,6 +99,19 @@ test('landing renders the redesigned hero, problem section and section framework
   await expect(practiceCycle.getByText('Повтор', { exact: true })).toBeVisible()
   await captureScreenshot(page, `${artifactsDir}/landing-problem-mobile-cycle.png`)
 
+  await page.locator('#how-it-works').evaluate((element) => {
+    window.scrollTo(0, (element as HTMLElement).offsetTop)
+  })
+  await expect(page.getByRole('heading', { level: 2, name: sectionHeadings[1] })).toBeVisible()
+  for (const step of howItWorksSteps) {
+    await expect(howItWorksList.getByRole('heading', { level: 3, name: step })).toBeAttached()
+  }
+  await expectNoHorizontalOverflow(page)
+  await page.locator('#how-it-works').screenshot({
+    path: `${artifactsDir}/landing-how-it-works-mobile.png`,
+    animations: 'disabled',
+  })
+
   await page.setViewportSize({ width: 360, height: 800 })
   await page.goto('/')
   await expectNoHorizontalOverflow(page)
@@ -78,6 +123,82 @@ test('landing renders the redesigned hero, problem section and section framework
   await expect(page.getByRole('heading', { level: 2, name: sectionHeadings[0] })).toBeVisible()
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/landing-problem-mobile-narrow.png`)
+
+  await page.locator('#how-it-works').evaluate((element) => {
+    window.scrollTo(0, (element as HTMLElement).offsetTop)
+  })
+  await expect(page.getByRole('heading', { level: 2, name: sectionHeadings[1] })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await page.locator('#how-it-works').screenshot({
+    path: `${artifactsDir}/landing-how-it-works-mobile-narrow.png`,
+    animations: 'disabled',
+  })
+})
+
+test('how it works keeps every illustration inside its visual area', async ({ page }) => {
+  test.setTimeout(45_000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+
+  for (const viewport of howItWorksViewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+    await page.goto('/')
+
+    const section = page.locator('#how-it-works')
+    const images = section.locator('.arena-how-step__image')
+    await expect(images).toHaveCount(howItWorksSteps.length)
+    await expect
+      .poll(() =>
+        images.evaluateAll((elements) =>
+          elements.every((element) => {
+            const image = element as HTMLImageElement
+            return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0
+          }),
+        ),
+      )
+      .toBe(true)
+
+    const imageBounds = await images.evaluateAll((elements) =>
+      elements.map((element) => {
+        const image = element as HTMLImageElement
+        const visual = image.closest('.arena-how-step__visual')
+
+        if (!(visual instanceof HTMLElement)) {
+          throw new Error('How-it-works image is missing its visual container')
+        }
+
+        const imageRect = image.getBoundingClientRect()
+        const visualRect = visual.getBoundingClientRect()
+
+        return {
+          imageLeft: imageRect.left,
+          imageTop: imageRect.top,
+          imageRight: imageRect.right,
+          imageBottom: imageRect.bottom,
+          visualLeft: visualRect.left,
+          visualTop: visualRect.top,
+          visualRight: visualRect.right,
+          visualBottom: visualRect.bottom,
+        }
+      }),
+    )
+
+    for (const [index, bounds] of imageBounds.entries()) {
+      const label = `${viewport.width}px, ${howItWorksSteps[index]}`
+      expect(bounds.imageLeft, `${label}: left edge`).toBeGreaterThanOrEqual(bounds.visualLeft - 1)
+      expect(bounds.imageTop, `${label}: top edge`).toBeGreaterThanOrEqual(bounds.visualTop - 1)
+      expect(bounds.imageRight, `${label}: right edge`).toBeLessThanOrEqual(bounds.visualRight + 1)
+      expect(bounds.imageBottom, `${label}: bottom edge`).toBeLessThanOrEqual(bounds.visualBottom + 1)
+    }
+
+    await expectNoHorizontalOverflow(page)
+
+    if (viewport.screenshot) {
+      await section.screenshot({
+        path: `${artifactsDir}/${viewport.screenshot}`,
+        animations: 'disabled',
+      })
+    }
+  }
 })
 
 test('mobile navigation opens and closes accessibly', async ({ page }) => {

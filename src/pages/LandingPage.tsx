@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 
 import { HeroScene } from '@/components/landing/HeroScene'
+import { HowItWorksSection } from '@/components/landing/HowItWorksSection'
 import { LandingHeader } from '@/components/landing/LandingHeader'
 import { ProblemSection } from '@/components/landing/ProblemSection'
 import '@/styles/landing.css'
@@ -46,7 +47,6 @@ const benefits: Array<{ icon: BenefitIconName; text: string }> = [
 ]
 
 const futureSections = [
-  { number: '03', id: 'how-it-works', title: 'Как работает Арена — 4 этапа' },
   { number: '04', id: 'ai-opponent', title: 'AI-оппонент, который действительно ведёт переговоры' },
   { number: '05', id: 'preparation', title: 'Глубокая подготовка + AI-тренер' },
   { number: '06', id: 'review', title: 'Независимое судейство и персональный разбор' },
@@ -99,6 +99,8 @@ export function LandingPage() {
         </section>
 
         <ProblemSection />
+
+        <HowItWorksSection />
 
         <div className="arena-future-sections">
           {futureSections.map((section, index) => (
