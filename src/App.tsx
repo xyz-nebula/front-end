@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
 
-import { GuestRoute, ProtectedRoute } from '@/components/auth/RouteGate'
+import { ActivationRoute, GuestRoute, ProtectedRoute } from '@/components/auth/RouteGate'
 import { ActivatePage } from '@/pages/ActivatePage'
 import { AuthChoicePage } from '@/pages/AuthChoicePage'
 import { LandingPage } from '@/pages/LandingPage'
@@ -29,7 +29,7 @@ export function App() {
         <Route path="/auth" element={<GuestRoute><AuthChoicePage /></GuestRoute>} />
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
         <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
-        <Route path="/activate" element={<GuestRoute><ActivatePage /></GuestRoute>} />
+        <Route path="/activate" element={<ActivationRoute><ActivatePage /></ActivationRoute>} />
         <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

@@ -78,11 +78,9 @@ test('times out login and activation without leaving forms loading', async ({ pa
 
   await page.unroute('**/api/v1/auth/login')
   await page.route('**/api/v1/auth/register/activate', delayedResponse)
-  await page.goto('/activate')
-  await page.getByLabel('Код активации').fill(uuidV7)
-  await page.getByRole('button', { name: 'Активировать аккаунт' }).click()
+  await page.goto(`/activate?code=${uuidV7}`)
   await expect(page.getByRole('alert')).toContainText('Сервер не ответил вовремя')
-  await expect(page.getByRole('button', { name: 'Активировать аккаунт' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Попробовать снова' })).toBeEnabled()
 })
 
 test('keeps tokens after a transient bootstrap failure and recovers on retry', async ({ page }) => {
@@ -233,7 +231,7 @@ test('uses a one-tab memory session when localStorage is unavailable', async ({ 
   await expect(page).toHaveURL(/\/login$/)
 })
 
-test('accepts UUIDv7 activation codes and blocks malformed UUIDs', async ({ page }) => {
+test('accepts UUIDv7 activation links and blocks missing or malformed codes', async ({ page }) => {
   let activationRequests = 0
   let activationPayload: unknown
   await page.route('**/api/v1/auth/register/activate', async (route) => {
@@ -243,16 +241,50 @@ test('accepts UUIDv7 activation codes and blocks malformed UUIDs', async ({ page
   })
 
   await page.goto('/activate')
-  await page.getByLabel('Код активации').fill('01890f47-6c12-7cc4-z6a0-23d21a4b8c12')
-  await page.getByRole('button', { name: 'Активировать аккаунт' }).click()
-  await expect(page.getByText('Введите код в формате UUID из письма.')).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('В ссылке нет кода активации')
   expect(activationRequests).toBe(0)
 
-  await page.getByLabel('Код активации').fill(uuidV7)
-  await page.getByRole('button', { name: 'Активировать аккаунт' }).click()
-  await expect(page).toHaveURL(/\/home$/)
+  await page.goto('/activate?code=01890f47-6c12-7cc4-z6a0-23d21a4b8c12')
+  await expect(page.getByRole('alert')).toContainText('неверный формат')
+  expect(activationRequests).toBe(0)
+
+  await page.goto(`/activate?code=${uuidV7}`)
+  await expect(page.getByRole('heading', { name: 'Аккаунт активирован' })).toBeVisible()
   expect(activationRequests).toBe(1)
   expect(activationPayload).toEqual({ code: uuidV7 })
+
+  await page.getByRole('link', { name: 'Перейти в приложение' }).click()
+  await expect(page).toHaveURL(/\/home$/)
+})
+
+test('recovers from activation validation and network errors on retry', async ({ page }) => {
+  let activationRequests = 0
+  await page.route('**/api/v1/auth/register/activate', async (route) => {
+    activationRequests += 1
+    if (activationRequests === 1) {
+      await json(route, 422, {
+        detail: [{ loc: ['body', 'code'], msg: 'Ссылка активации истекла', type: 'value_error' }],
+      })
+      return
+    }
+    if (activationRequests === 2) {
+      await route.abort('failed')
+      return
+    }
+    await json(route, 200, apiTokens)
+  })
+
+  await page.goto(`/activate?code=${uuidV7}`)
+  await expect(page.getByRole('alert')).toContainText('Ссылка активации истекла')
+  await expect(page.getByRole('button', { name: 'Попробовать снова' })).toBeEnabled()
+
+  await page.getByRole('button', { name: 'Попробовать снова' }).click()
+  await expect(page.getByRole('alert')).toContainText('Не удалось связаться с сервером')
+  await expect(page.getByRole('button', { name: 'Попробовать снова' })).toBeEnabled()
+
+  await page.getByRole('button', { name: 'Попробовать снова' }).click()
+  await expect(page.getByRole('heading', { name: 'Аккаунт активирован' })).toBeVisible()
+  expect(activationRequests).toBe(3)
 })
 
 test('synchronizes login, token rotation, and logout between tabs', async ({ page, context }) => {

@@ -65,9 +65,8 @@ test('auth entry screens render on desktop and mobile', async ({ page }) => {
   await captureScreenshot(page, `${artifactsDir}/login-mobile.png`)
 })
 
-test('registers and activates an account with a manually entered code', async ({ page }) => {
+test('shows the email confirmation screen after registration', async ({ page }) => {
   let registerPayload: unknown
-  let activatePayload: unknown
 
   await page.route('**/api/v1/auth/register', async (route) => {
     registerPayload = JSON.parse(route.request().postData() ?? 'null') as unknown
@@ -76,11 +75,6 @@ test('registers and activates an account with a manually entered code', async ({
       status: 'pending_activation',
     })
   })
-  await page.route('**/api/v1/auth/register/activate', async (route) => {
-    activatePayload = JSON.parse(route.request().postData() ?? 'null') as unknown
-    await json(route, 200, tokens)
-  })
-
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
@@ -90,7 +84,9 @@ test('registers and activates an account with a manually entered code', async ({
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
 
   await expect(page).toHaveURL(/\/activate$/)
+  await expect(page.getByRole('heading', { name: 'Проверьте почту' })).toBeVisible()
   await expect(page.getByText(/irina@example.com/)).toBeVisible()
+  await expect(page.getByLabel('Код активации')).toHaveCount(0)
   expect(registerPayload).toEqual({
     email: 'irina@example.com',
     username: 'irina.pet',
@@ -98,15 +94,31 @@ test('registers and activates an account with a manually entered code', async ({
     last_name: 'Петрова',
     password: 'strong-password',
   })
-
-  await page.getByLabel('Код активации').fill(activationCode)
-  await page.getByRole('button', { name: 'Активировать аккаунт' }).click()
-  await expect(page).toHaveURL(/\/home$/)
-  expect(activatePayload).toEqual({ code: activationCode })
-  expect(await page.evaluate((key) => window.localStorage.getItem(key), storageKey)).toContain('refresh-token')
 })
 
 test('activates from a link only once in React strict mode', async ({ page }) => {
+  let activationRequests = 0
+  let activationPayload: unknown
+  await page.route('**/api/v1/auth/register/activate', async (route) => {
+    activationRequests += 1
+    activationPayload = JSON.parse(route.request().postData() ?? 'null') as unknown
+    await json(route, 200, tokens)
+  })
+
+  await page.goto(`/activate?code=${activationCode}`)
+  await expect(page.getByRole('heading', { name: 'Аккаунт активирован' })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/activate\\?code=${activationCode}$`))
+  expect(activationRequests).toBe(1)
+  expect(activationPayload).toEqual({ code: activationCode })
+  expect(await page.evaluate((key) => window.localStorage.getItem(key), storageKey)).toContain('refresh-token')
+
+  await page.getByRole('link', { name: 'Перейти в приложение' }).click()
+  await expect(page).toHaveURL(/\/home$/)
+})
+
+test('does not replace an existing session from an activation link', async ({ page }) => {
+  await seedSession(page)
+  await mockSuccessfulBootstrap(page)
   let activationRequests = 0
   await page.route('**/api/v1/auth/register/activate', async (route) => {
     activationRequests += 1
@@ -114,8 +126,54 @@ test('activates from a link only once in React strict mode', async ({ page }) =>
   })
 
   await page.goto(`/activate?code=${activationCode}`)
+
   await expect(page).toHaveURL(/\/home$/)
-  expect(activationRequests).toBe(1)
+  expect(activationRequests).toBe(0)
+  expect(await page.evaluate((key) => window.localStorage.getItem(key), storageKey)).toContain('fresh-refresh')
+})
+
+test('activation loading, success, and error states render on desktop and mobile', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.route('**/api/v1/auth/register/activate', (route) => json(route, 422, {
+    detail: [{ loc: ['body', 'code'], msg: 'Ссылка истекла или уже была использована', type: 'value_error' }],
+  }))
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`/activate?code=${activationCode}`)
+  await expect(page.getByRole('alert')).toContainText('Ссылка истекла')
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/activation-error-desktop.png`)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/activation-error-mobile.png`)
+
+  await page.unroute('**/api/v1/auth/register/activate')
+  await page.goto('/login')
+  let releaseActivation = () => undefined
+  const activationReleased = new Promise<void>((resolve) => { releaseActivation = resolve })
+  await page.route('**/api/v1/auth/register/activate', async (route) => {
+    await activationReleased
+    await json(route, 200, tokens)
+  })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`/activate?code=${activationCode}`)
+  await expect(page.getByRole('heading', { name: 'Активируем аккаунт' })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/activation-loading-desktop.png`)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/activation-loading-mobile.png`)
+
+  releaseActivation()
+  await expect(page.getByRole('heading', { name: 'Аккаунт активирован' })).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/activation-success-mobile.png`)
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/activation-success-desktop.png`)
 })
 
 test('returns to a protected route after password login and logs out locally', async ({ page }) => {

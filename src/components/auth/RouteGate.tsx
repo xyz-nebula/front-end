@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 
 import { useAuth } from '@/auth/useAuth'
@@ -52,5 +52,18 @@ export function GuestRoute({ children }: { children: ReactNode }) {
   if (status === 'booting' || status === 'signing-out') return <SessionLoading />
   if (status === 'restore-error') return <SessionRecovery />
   if (status === 'authenticated') return <Navigate to="/home" replace />
+  return children
+}
+
+export function ActivationRoute({ children }: { children: ReactNode }) {
+  const { status } = useAuth()
+  const [enteredWithoutSession, setEnteredWithoutSession] = useState(status === 'unauthenticated')
+
+  if (status === 'unauthenticated' && !enteredWithoutSession) setEnteredWithoutSession(true)
+  if (status === 'booting' || status === 'signing-out') return <SessionLoading />
+  if (status === 'restore-error') return <SessionRecovery />
+  if (status === 'authenticated' && !enteredWithoutSession) {
+    return <Navigate to="/home" replace />
+  }
   return children
 }
