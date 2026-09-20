@@ -7,7 +7,7 @@ import {
 } from './helpers'
 
 const sectionHeadings = [
-  'Проблема — почему обычной практики недостаточно',
+  'Переговоры — навык, который нельзя натренировать только по книге',
   'Как работает Арена — 4 этапа',
   'AI-оппонент, который действительно ведёт переговоры',
   'Глубокая подготовка + AI-тренер',
@@ -17,7 +17,7 @@ const sectionHeadings = [
   'Для команд и компаний + финальный CTA',
 ]
 
-test('landing renders the redesigned hero and section framework', async ({ page }) => {
+test('landing renders the redesigned hero, problem section and section framework', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
 
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -32,20 +32,52 @@ test('landing renders the redesigned hero and section framework', async ({ page 
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/landing-desktop.png`)
 
+  await page.setViewportSize({ width: 1440, height: 1100 })
+  await page.locator('#problem').evaluate((element) => {
+    window.scrollTo(0, (element as HTMLElement).offsetTop)
+  })
+  await expect(page.getByRole('heading', { level: 2, name: sectionHeadings[0] })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 3, name: 'Мало практики' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 3, name: 'Ошибки имеют последствия' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 3, name: 'Нет цикла повторения' })).toBeVisible()
+  const practiceCycle = page.getByRole('list', { name: 'Цикл развития навыка переговоров' })
+  for (const step of ['Попытка', 'Обратная связь', 'Изменение стратегии', 'Повтор']) {
+    await expect(practiceCycle.getByText(step, { exact: true })).toBeVisible()
+  }
+  await expect(page.locator('#problem .arena-placeholder__card')).toHaveCount(0)
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/landing-problem-desktop.png`)
+
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1, name: 'Тренируй переговоры как стратегическую игру' })).toBeVisible()
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/landing-mobile.png`)
 
+  await page.locator('#problem').evaluate((element) => {
+    window.scrollTo(0, (element as HTMLElement).offsetTop)
+  })
+  await expect(page.getByRole('heading', { level: 2, name: sectionHeadings[0] })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/landing-problem-mobile.png`)
+
+  await page.locator('.arena-problem__conclusion').evaluate((element) => {
+    window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY - 28)
+  })
+  await expect(practiceCycle.getByText('Повтор', { exact: true })).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/landing-problem-mobile-cycle.png`)
+
   await page.setViewportSize({ width: 360, height: 800 })
   await page.goto('/')
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/landing-mobile-narrow.png`)
 
-  await page.locator('#problem').scrollIntoViewIfNeeded()
+  await page.locator('#problem').evaluate((element) => {
+    window.scrollTo(0, (element as HTMLElement).offsetTop)
+  })
   await expect(page.getByRole('heading', { level: 2, name: sectionHeadings[0] })).toBeVisible()
-  await captureScreenshot(page, `${artifactsDir}/landing-section-placeholder.png`)
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/landing-problem-mobile-narrow.png`)
 })
 
 test('mobile navigation opens and closes accessibly', async ({ page }) => {

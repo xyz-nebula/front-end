@@ -404,6 +404,275 @@
   fill: currentColor;
 }
 
+/* Problem section */
+.arena-problem {
+  position: relative;
+  min-height: 970px;
+  padding: 34px 0 38px;
+  scroll-margin-top: 24px;
+  background:
+    radial-gradient(circle at 9% 17%, rgba(218, 232, 252, 0.52), transparent 18%),
+    radial-gradient(circle at 91% 16%, rgba(222, 233, 250, 0.48), transparent 18%),
+    linear-gradient(180deg, #f8fbff 0%, #ffffff 39%, #f9fbfe 100%);
+  overflow: hidden;
+}
+
+.arena-problem::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.52;
+  background-image:
+    linear-gradient(30deg, rgba(56, 109, 179, 0.035) 12%, transparent 12.5%, transparent 87%, rgba(56, 109, 179, 0.035) 87.5%),
+    linear-gradient(150deg, rgba(56, 109, 179, 0.035) 12%, transparent 12.5%, transparent 87%, rgba(56, 109, 179, 0.035) 87.5%);
+  background-position: -110px -90px, -110px -90px;
+  background-size: 110px 192px;
+  mask-image: linear-gradient(90deg, #000, transparent 20%, transparent 80%, #000);
+  pointer-events: none;
+}
+
+.arena-problem__layout {
+  position: relative;
+  z-index: 2;
+}
+
+.arena-problem__header {
+  text-align: center;
+}
+
+.arena-problem__eyebrow {
+  margin: 0;
+  color: var(--arena-blue);
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 780;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.arena-problem h2 {
+  max-width: 890px;
+  margin: 18px auto 0;
+  font-size: clamp(42px, 3.55vw, 56px);
+  line-height: 0.98;
+  font-weight: 790;
+  letter-spacing: -0.058em;
+}
+
+.arena-problem__intro {
+  margin: 18px auto 0;
+  color: #667fa6;
+  font-size: 18px;
+  line-height: 1.42;
+  font-weight: 430;
+}
+
+.arena-problem__cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.arena-problem-card {
+  min-width: 0;
+  min-height: 488px;
+  border: 1px solid rgba(215, 226, 241, 0.82);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 55px rgba(34, 76, 132, 0.075);
+  overflow: hidden;
+  transition: box-shadow 240ms ease, transform 240ms ease;
+}
+
+.arena-problem-card:hover {
+  box-shadow: 0 22px 62px rgba(34, 76, 132, 0.12);
+  transform: translateY(-3px);
+}
+
+.arena-problem-card__visual {
+  position: relative;
+  height: 266px;
+  background:
+    radial-gradient(ellipse at 50% 72%, rgba(218, 229, 245, 0.62), transparent 55%),
+    linear-gradient(180deg, rgba(249, 252, 255, 0.35), rgba(244, 248, 253, 0.75));
+  overflow: hidden;
+}
+
+.arena-problem-card__image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 116%;
+  max-width: none;
+  transform: translate(-50%, -49%);
+  filter: drop-shadow(0 18px 18px rgba(44, 75, 119, 0.09));
+}
+
+.arena-problem-card__image--practice {
+  width: 120%;
+  transform: translate(-50%, -47%);
+}
+
+.arena-problem-card__image--mistake {
+  width: 118%;
+  transform: translate(-50%, -47%);
+}
+
+.arena-problem-card__image--cycle {
+  width: 111%;
+  transform: translate(-50%, -49%);
+}
+
+.arena-problem-card__copy {
+  padding: 0 24px 25px;
+}
+
+.arena-problem-card h3 {
+  margin: 0;
+  font-size: 25px;
+  line-height: 1.1;
+  font-weight: 760;
+  letter-spacing: -0.038em;
+}
+
+.arena-problem-card__subtitle {
+  min-height: 45px;
+  margin: 7px 0 0;
+  color: #6982ac;
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 510;
+}
+
+.arena-problem-card__description {
+  margin: 15px 0 0;
+  color: #52698d;
+  font-size: 15.5px;
+  line-height: 1.38;
+}
+
+.arena-problem__conclusion {
+  margin-top: 28px;
+  text-align: center;
+}
+
+.arena-problem__conclusion > p {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.22;
+  font-weight: 730;
+  letter-spacing: -0.03em;
+}
+
+.arena-problem__steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  margin: 13px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.arena-problem__steps li {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.arena-problem__step {
+  display: inline-flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 0 19px;
+  border: 1px solid #e3ebf5;
+  border-radius: 12px;
+  color: #12294f;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 28px rgba(46, 83, 133, 0.065);
+  font-size: 14px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+.arena-problem__step svg {
+  width: 27px;
+  height: 27px;
+  flex: none;
+  color: #086ff0;
+}
+
+.arena-problem__step-arrow {
+  width: 31px;
+  height: 18px;
+  flex: none;
+  color: #78adf4;
+}
+
+.arena-problem__cube {
+  --cube-top: #5aa9ff;
+  --cube-left: #0b68dc;
+  --cube-right: #277ff1;
+  position: absolute;
+  z-index: 1;
+  top: 50px;
+  width: 86px;
+  height: 100px;
+  filter: drop-shadow(0 20px 25px rgba(30, 91, 174, 0.16));
+  pointer-events: none;
+}
+
+.arena-problem__cube i {
+  position: absolute;
+  display: block;
+}
+
+.arena-problem__cube i:first-child {
+  top: 0;
+  left: 0;
+  width: 86px;
+  height: 50px;
+  background: linear-gradient(135deg, var(--cube-top), color-mix(in srgb, var(--cube-top), #ffffff 14%));
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.arena-problem__cube i:nth-child(2) {
+  top: 25px;
+  left: 0;
+  width: 43px;
+  height: 75px;
+  background: linear-gradient(140deg, var(--cube-left), color-mix(in srgb, var(--cube-left), #ffffff 9%));
+  clip-path: polygon(0 0, 100% 33.333%, 100% 100%, 0 66.667%);
+}
+
+.arena-problem__cube i:last-child {
+  top: 25px;
+  left: 43px;
+  width: 43px;
+  height: 75px;
+  background: linear-gradient(220deg, var(--cube-right), color-mix(in srgb, var(--cube-right), #000000 8%));
+  clip-path: polygon(0 33.333%, 100% 0, 100% 66.667%, 0 100%);
+}
+
+.arena-problem__cube--left {
+  left: max(42px, calc(50% - 770px));
+}
+
+.arena-problem__cube--right {
+  --cube-top: #ff6864;
+  --cube-left: #df202d;
+  --cube-right: #f33c43;
+  top: 112px;
+  right: max(38px, calc(50% - 770px));
+  width: 72px;
+  height: 84px;
+  transform: scale(0.88);
+  filter: drop-shadow(0 20px 25px rgba(190, 36, 47, 0.14));
+}
+
 /* Temporary section framework */
 .arena-future-sections {
   border-top: 1px solid #e7edf5;
@@ -531,6 +800,36 @@
     width: 68vw;
   }
 
+  .arena-problem-card__visual {
+    height: 242px;
+  }
+
+  .arena-problem-card h3 {
+    font-size: 22px;
+  }
+
+  .arena-problem-card__subtitle {
+    font-size: 15.5px;
+  }
+
+  .arena-problem-card__description {
+    font-size: 14.5px;
+  }
+
+  .arena-problem__steps,
+  .arena-problem__steps li {
+    gap: 8px;
+  }
+
+  .arena-problem__step {
+    gap: 10px;
+    padding-inline: 14px;
+  }
+
+  .arena-problem__step-arrow {
+    width: 25px;
+  }
+
 }
 
 @media (max-width: 980px) {
@@ -559,6 +858,97 @@
 
   .arena-benefits {
     width: 600px;
+  }
+
+  .arena-problem {
+    min-height: 0;
+    padding: 72px 0 64px;
+  }
+
+  .arena-problem__header br {
+    display: none;
+  }
+
+  .arena-problem h2 {
+    max-width: 720px;
+    font-size: clamp(42px, 5.7vw, 54px);
+  }
+
+  .arena-problem__intro {
+    max-width: 720px;
+  }
+
+  .arena-problem__cards {
+    grid-template-columns: 1fr;
+    margin-top: 36px;
+  }
+
+  .arena-problem-card {
+    display: grid;
+    min-height: 300px;
+    grid-template-columns: minmax(310px, 0.9fr) 1.1fr;
+  }
+
+  .arena-problem-card__visual {
+    height: 100%;
+    min-height: 300px;
+  }
+
+  .arena-problem-card__image {
+    width: 135%;
+  }
+
+  .arena-problem-card__image--practice {
+    width: 143%;
+  }
+
+  .arena-problem-card__image--mistake {
+    width: 140%;
+  }
+
+  .arena-problem-card__image--cycle {
+    width: 132%;
+  }
+
+  .arena-problem-card__copy {
+    align-self: center;
+    padding: 30px 30px 30px 22px;
+  }
+
+  .arena-problem-card h3 {
+    font-size: 27px;
+  }
+
+  .arena-problem-card__subtitle {
+    min-height: 0;
+    font-size: 17px;
+  }
+
+  .arena-problem-card__description {
+    font-size: 15.5px;
+  }
+
+  .arena-problem__conclusion {
+    margin-top: 40px;
+  }
+
+  .arena-problem__steps {
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+
+  .arena-problem__cube {
+    opacity: 0.42;
+    transform: scale(0.72);
+  }
+
+  .arena-problem__cube--left {
+    left: -16px;
+  }
+
+  .arena-problem__cube--right {
+    right: -10px;
+    transform: scale(0.64);
   }
 
   .arena-placeholder__layout {
@@ -783,6 +1173,117 @@
     height: 29px;
   }
 
+  .arena-problem {
+    padding: 66px 0 60px;
+    scroll-margin-top: 78px;
+  }
+
+  .arena-problem__cube {
+    display: none;
+  }
+
+  .arena-problem__eyebrow {
+    font-size: 13px;
+  }
+
+  .arena-problem h2 {
+    margin-top: 14px;
+    font-size: clamp(36px, 9.4vw, 48px);
+    line-height: 1.02;
+  }
+
+  .arena-problem__intro {
+    margin-top: 16px;
+    font-size: 16px;
+    line-height: 1.45;
+  }
+
+  .arena-problem__cards {
+    gap: 16px;
+    margin-top: 30px;
+  }
+
+  .arena-problem-card {
+    display: block;
+    min-height: 0;
+    border-radius: 20px;
+  }
+
+  .arena-problem-card__visual {
+    height: 230px;
+    min-height: 0;
+  }
+
+  .arena-problem-card__image {
+    width: 119%;
+  }
+
+  .arena-problem-card__image--practice {
+    width: 126%;
+  }
+
+  .arena-problem-card__image--mistake {
+    width: 123%;
+  }
+
+  .arena-problem-card__image--cycle {
+    width: 116%;
+  }
+
+  .arena-problem-card__copy {
+    padding: 0 22px 25px;
+  }
+
+  .arena-problem-card h3 {
+    font-size: 25px;
+  }
+
+  .arena-problem-card__subtitle {
+    font-size: 16px;
+  }
+
+  .arena-problem-card__description {
+    margin-top: 15px;
+    font-size: 15px;
+    line-height: 1.44;
+  }
+
+  .arena-problem__conclusion {
+    margin-top: 34px;
+  }
+
+  .arena-problem__conclusion > p {
+    font-size: 20px;
+  }
+
+  .arena-problem__conclusion > p br {
+    display: none;
+  }
+
+  .arena-problem__steps {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .arena-problem__steps li {
+    width: 100%;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .arena-problem__step {
+    width: min(100%, 320px);
+    min-height: 56px;
+    margin-inline: auto;
+  }
+
+  .arena-problem__step-arrow {
+    width: 25px;
+    transform: rotate(90deg);
+  }
+
   .arena-placeholder {
     min-height: 470px;
     padding: 72px 0;
@@ -816,6 +1317,14 @@
   .arena-hero h1 {
     font-size: 39px;
   }
+
+  .arena-problem h2 {
+    font-size: 35px;
+  }
+
+  .arena-problem-card__visual {
+    height: 210px;
+  }
 }
 
 @media (max-width: 370px) {
@@ -844,6 +1353,22 @@
   .arena-benefits__item {
     padding-inline: 6px;
     font-size: 10px;
+  }
+
+  .arena-problem {
+    padding-top: 58px;
+  }
+
+  .arena-problem h2 {
+    font-size: 32px;
+  }
+
+  .arena-problem__intro {
+    font-size: 15px;
+  }
+
+  .arena-problem-card__visual {
+    height: 194px;
   }
 }
 

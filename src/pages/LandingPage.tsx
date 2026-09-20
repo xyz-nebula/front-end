@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 
 import { HeroScene } from '@/components/landing/HeroScene'
 import { LandingHeader } from '@/components/landing/LandingHeader'
+import { ProblemSection } from '@/components/landing/ProblemSection'
 import '@/styles/landing.css'
 
 type BenefitIconName = 'chart' | 'brain' | 'shield'
@@ -45,7 +46,6 @@ const benefits: Array<{ icon: BenefitIconName; text: string }> = [
 ]
 
 const futureSections = [
-  { number: '02', id: 'problem', title: 'Проблема — почему обычной практики недостаточно' },
   { number: '03', id: 'how-it-works', title: 'Как работает Арена — 4 этапа' },
   { number: '04', id: 'ai-opponent', title: 'AI-оппонент, который действительно ведёт переговоры' },
   { number: '05', id: 'preparation', title: 'Глубокая подготовка + AI-тренер' },
@@ -98,10 +98,12 @@ export function LandingPage() {
           </div>
         </section>
 
+        <ProblemSection />
+
         <div className="arena-future-sections">
           {futureSections.map((section, index) => (
             <section
-              className={`arena-placeholder ${index % 2 === 1 ? 'arena-placeholder--tinted' : ''} ${section.id === 'teams' ? 'arena-placeholder--final' : ''}`}
+              className={`arena-placeholder ${index % 2 === 0 ? 'arena-placeholder--tinted' : ''} ${section.id === 'teams' ? 'arena-placeholder--final' : ''}`}
               id={section.id}
               key={section.id}
               aria-labelledby={`${section.id}-title`}
