@@ -9,12 +9,12 @@ import {
 const sectionHeadings = [
   'Переговоры — навык, который нельзя натренировать только по книге',
   'От кейса до новой стратегии — за один цикл',
-  'AI-оппонент, который действительно ведёт переговоры',
+  'Он не обязан с тобой соглашаться',
   'Глубокая подготовка + AI-тренер',
   'Независимое судейство и персональный разбор',
   'Реальные кейсы и разные переговорные ситуации',
   'Методология и развитие навыка',
-  'Для команд и компаний + финальный CTA',
+  'Одна Арена — разные задачи команды',
 ]
 
 const howItWorksSteps = [
@@ -32,6 +32,27 @@ const howItWorksViewports = [
   { width: 768, height: 900, screenshot: 'landing-how-it-works-tablet.png' },
   { width: 390, height: 844, screenshot: 'landing-how-it-works-mobile.png' },
   { width: 360, height: 800, screenshot: 'landing-how-it-works-mobile-narrow.png' },
+]
+
+const aiOpponentTraits = [
+  'Отстаивает интересы',
+  'Соблюдает границы',
+  'Помнит уступки',
+  'Ищет обмен',
+]
+
+const aiOpponentViewports = [
+  { width: 1440, height: 1000, screenshot: 'landing-ai-opponent-desktop.png' },
+  { width: 768, height: 900, screenshot: 'landing-ai-opponent-tablet.png' },
+  { width: 390, height: 844, screenshot: 'landing-ai-opponent-mobile.png' },
+  { width: 360, height: 800, screenshot: 'landing-ai-opponent-mobile-narrow.png' },
+]
+
+const teamsViewports = [
+  { width: 1440, height: 1000, screenshot: 'landing-teams-desktop.png' },
+  { width: 768, height: 900, screenshot: 'landing-teams-tablet.png' },
+  { width: 390, height: 844, screenshot: 'landing-teams-mobile.png' },
+  { width: 360, height: 800, screenshot: 'landing-teams-mobile-narrow.png' },
 ]
 
 test('landing renders the redesigned hero, problem section and section framework', async ({ page }) => {
@@ -201,6 +222,119 @@ test('how it works keeps every illustration inside its visual area', async ({ pa
   }
 })
 
+test('AI opponent shows both positions and negotiation principles responsively', async ({ page }) => {
+  test.setTimeout(45_000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+
+  for (const viewport of aiOpponentViewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+    await page.goto('/')
+
+    const section = page.locator('#ai-opponent')
+    await expect(section).toHaveAttribute('aria-labelledby', 'ai-opponent-title')
+    await expect(section.getByRole('heading', { level: 2, name: 'Он не обязан с тобой соглашаться' })).toBeVisible()
+    await expect(section.getByRole('heading', { level: 3, name: 'Ваша позиция' })).toBeVisible()
+    await expect(section.getByRole('heading', { level: 3, name: 'Позиция AI-оппонента' })).toBeVisible()
+
+    for (const trait of aiOpponentTraits) {
+      await expect(section.getByRole('heading', { level: 3, name: trait })).toBeVisible()
+    }
+
+    await expect(section.locator('.arena-placeholder__card')).toHaveCount(0)
+    await expect(section.locator('.arena-opponent__scene img')).toHaveJSProperty('complete', true)
+    await expectNoHorizontalOverflow(page)
+    await section.screenshot({
+      path: `${artifactsDir}/${viewport.screenshot}`,
+      animations: 'disabled',
+    })
+  }
+})
+
+test('teams section presents all audiences and the final calls to action responsively', async ({ page }) => {
+  test.setTimeout(45_000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+
+  for (const viewport of teamsViewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+    await page.goto('/')
+
+    const section = page.locator('#teams')
+    await expect(section).toHaveAttribute('aria-labelledby', 'teams-title')
+    await expect(section.getByRole('heading', { level: 2, name: 'Одна Арена — разные задачи команды' })).toBeVisible()
+    await expect(section.getByRole('heading', { level: 2, name: 'Следующие важные переговоры не должны быть первой попыткой' })).toBeVisible()
+    await expect(section.getByRole('heading', { level: 3, name: 'Больше практики' })).toBeVisible()
+    await expect(section.getByRole('heading', { level: 3, name: viewport.width > 980 ? 'Свои ситуации и правила' : 'Свои ситуации' })).toBeVisible()
+    await expect(section.getByRole('heading', { level: 3, name: 'Единый формат развития' })).toBeVisible()
+
+    await expect(section.getByRole('link', { name: 'Начать первый поединок' })).toHaveAttribute('href', '/home')
+    await expect(section.getByRole('link', { name: 'Посмотреть кейсы' })).toHaveAttribute('href', '#cases')
+    await expect(section.locator('.arena-placeholder__card')).toHaveCount(0)
+
+    const images = section.locator('img')
+    await expect(images).toHaveCount(3)
+    await expect
+      .poll(() =>
+        images.evaluateAll((elements) =>
+          elements.every((element) => {
+            const image = element as HTMLImageElement
+            return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0
+          }),
+        ),
+      )
+      .toBe(true)
+
+    const trainerCard = section.locator('.arena-team-card--trainer')
+    const preview = trainerCard.locator('.arena-case-preview')
+    await expect(trainerCard.locator('img')).toHaveCount(0)
+    await expect(preview).toBeVisible()
+    await expect(preview).toHaveAttribute('aria-hidden', 'true')
+    await expect(preview.getByText('Настройка кейса', { exact: true })).toBeVisible()
+    await expect(preview.locator('.arena-case-preview__label')).toHaveText(['Сфера', 'Сложность', 'Роль AI', 'Тон'])
+    await expect(preview.locator('.arena-case-preview__value')).toHaveText(['Работа и карьера', 'Средняя', 'Руководитель', 'Требовательный'])
+
+    const geometry = await preview.evaluate((element) => {
+      const card = element.closest('.arena-team-card')!
+      const copyElements = card.querySelectorAll('.arena-team-card__copy, .arena-team-card__label, .arena-team-card__copy h3, .arena-team-card__description')
+      const panel = element.getBoundingClientRect()
+      const bounds = card.getBoundingClientRect()
+      const textElements = element.querySelectorAll('.arena-case-preview__title, .arena-case-preview__label, .arena-case-preview__value')
+      return {
+        insideCard: panel.left >= bounds.left && panel.right <= bounds.right && panel.top >= bounds.top && panel.bottom <= bounds.bottom,
+        separateFromCopy: Array.from(copyElements).every((element) => {
+          const copy = element.getBoundingClientRect()
+          return panel.top >= copy.bottom || panel.left >= copy.right
+        }),
+        textFits: Array.from(textElements).every((text) => {
+          const range = document.createRange()
+          range.selectNodeContents(text)
+          const textBounds = range.getBoundingClientRect()
+          const available = text.getBoundingClientRect()
+          return textBounds.left >= available.left - 1 && textBounds.right <= available.right + 1
+            && textBounds.top >= panel.top && textBounds.bottom <= panel.bottom
+        }),
+      }
+    })
+    expect(geometry, `${viewport.width}px: preview containment, overlap and text clipping`).toEqual({
+      insideCard: true,
+      separateFromCopy: true,
+      textFits: true,
+    })
+
+    const ctaScene = section.locator('.arena-teams-cta__scene')
+    if (viewport.width > 980) {
+      await expect(ctaScene).toBeVisible()
+    } else {
+      await expect(ctaScene).toBeHidden()
+    }
+
+    await expectNoHorizontalOverflow(page)
+    await section.screenshot({
+      path: `${artifactsDir}/${viewport.screenshot}`,
+      animations: 'disabled',
+    })
+  }
+})
+
 test('mobile navigation opens and closes accessibly', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 390, height: 844 })
@@ -211,7 +345,7 @@ test('mobile navigation opens and closes accessibly', async ({ page }) => {
   await menuButton.click()
   await expect(page.getByRole('button', { name: 'Закрыть меню' })).toHaveAttribute('aria-expanded', 'true')
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Кейсы' })).toHaveAttribute('href', '#cases')
+  await expect(page.getByRole('link', { name: 'Кейсы', exact: true })).toHaveAttribute('href', '#cases')
   await expect(page.getByRole('link', { name: 'Как это работает' })).toHaveAttribute('href', '#how-it-works')
   await expect(page.getByRole('link', { name: 'Методика' })).toHaveAttribute('href', '#methodology')
   await captureScreenshot(page, `${artifactsDir}/landing-mobile-menu.png`)

@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
 
+import { AiOpponentSection } from '@/components/landing/AiOpponentSection'
 import { HeroScene } from '@/components/landing/HeroScene'
 import { HowItWorksSection } from '@/components/landing/HowItWorksSection'
 import { LandingHeader } from '@/components/landing/LandingHeader'
 import { ProblemSection } from '@/components/landing/ProblemSection'
+import { TeamsSection } from '@/components/landing/TeamsSection'
 import '@/styles/landing.css'
 
 type BenefitIconName = 'chart' | 'brain' | 'shield'
@@ -47,12 +49,10 @@ const benefits: Array<{ icon: BenefitIconName; text: string }> = [
 ]
 
 const futureSections = [
-  { number: '04', id: 'ai-opponent', title: 'AI-оппонент, который действительно ведёт переговоры' },
   { number: '05', id: 'preparation', title: 'Глубокая подготовка + AI-тренер' },
   { number: '06', id: 'review', title: 'Независимое судейство и персональный разбор' },
   { number: '07', id: 'cases', title: 'Реальные кейсы и разные переговорные ситуации' },
   { number: '08', id: 'methodology', title: 'Методология и развитие навыка' },
-  { number: '09', id: 'teams', title: 'Для команд и компаний + финальный CTA' },
 ]
 
 function HeroBenefits() {
@@ -102,10 +102,12 @@ export function LandingPage() {
 
         <HowItWorksSection />
 
+        <AiOpponentSection />
+
         <div className="arena-future-sections">
           {futureSections.map((section, index) => (
             <section
-              className={`arena-placeholder ${index % 2 === 0 ? 'arena-placeholder--tinted' : ''} ${section.id === 'teams' ? 'arena-placeholder--final' : ''}`}
+              className={`arena-placeholder ${index % 2 === 1 ? 'arena-placeholder--tinted' : ''}`}
               id={section.id}
               key={section.id}
               aria-labelledby={`${section.id}-title`}
@@ -123,6 +125,8 @@ export function LandingPage() {
             </section>
           ))}
         </div>
+
+        <TeamsSection />
       </main>
     </div>
   )
