@@ -164,6 +164,7 @@ test('how it works keeps every illustration inside its visual area', async ({ pa
     const section = page.locator('#how-it-works')
     const images = section.locator('.arena-how-step__image')
     await expect(images).toHaveCount(howItWorksSteps.length)
+    await images.last().scrollIntoViewIfNeeded()
     await expect
       .poll(() =>
         images.evaluateAll((elements) =>
@@ -238,7 +239,9 @@ test('AI opponent shows both positions and negotiation principles responsively',
     }
 
     await expect(section.locator('.arena-placeholder__card')).toHaveCount(0)
-    await expect(section.locator('.arena-opponent__scene img')).toHaveJSProperty('complete', true)
+    const sceneImage = section.locator('.arena-opponent__scene img')
+    await sceneImage.scrollIntoViewIfNeeded()
+    await expect(sceneImage).toHaveJSProperty('complete', true)
     await expectNoHorizontalOverflow(page)
     await section.screenshot({
       path: `${artifactsDir}/${viewport.screenshot}`,
@@ -269,12 +272,14 @@ test('teams section presents all audiences and the final calls to action respons
 
     const images = section.locator('img')
     await expect(images).toHaveCount(3)
+    await section.locator('.arena-teams-cta').scrollIntoViewIfNeeded()
     await expect
       .poll(() =>
         images.evaluateAll((elements) =>
           elements.every((element) => {
             const image = element as HTMLImageElement
-            return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0
+            return getComputedStyle(image).display === 'none'
+              || (image.complete && image.naturalWidth > 0 && image.naturalHeight > 0)
           }),
         ),
       )

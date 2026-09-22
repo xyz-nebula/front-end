@@ -1,13 +1,15 @@
-import chooseRoleImage from '@/assets/how-its-work/choose-role.png'
-import negotiateImage from '@/assets/how-its-work/negotiation-duel.png'
-import prepareStrategyImage from '@/assets/how-its-work/prepare-strategy.png'
-import reviewImage from '@/assets/how-its-work/result-review.png'
+import chooseRoleImage from '@/assets/how-its-work/choose-role.webp'
+import negotiateImage from '@/assets/how-its-work/negotiation-duel.webp'
+import prepareStrategyImage from '@/assets/how-its-work/prepare-strategy.webp'
+import reviewImage from '@/assets/how-its-work/result-review.webp'
 
 interface HowItWorksStep {
   number: string
   title: string
   description: string
   image: string
+  imageWidth: number
+  imageHeight: number
   alt: string
 }
 
@@ -18,6 +20,8 @@ const howItWorksSteps: HowItWorksStep[] = [
     description:
       'Выбери переговорную ситуацию, изучи контекст и реши, за какую сторону будешь играть.',
     image: chooseRoleImage,
+    imageWidth: 1122,
+    imageHeight: 986,
     alt: 'Экран выбора переговорного кейса и роли участника',
   },
   {
@@ -26,6 +30,8 @@ const howItWorksSteps: HowItWorksStep[] = [
     description:
       'Определи цель, границы торга, BATNA и сценарий разговора. AI-тренер поможет увидеть слабые места.',
     image: prepareStrategyImage,
+    imageWidth: 859,
+    imageHeight: 882,
     alt: 'Экран подготовки цели, границ торга, BATNA и сценария',
   },
   {
@@ -34,6 +40,8 @@ const howItWorksSteps: HowItWorksStep[] = [
     description:
       'Пять минут голосовых переговоров с AI-оппонентом, который отстаивает собственные интересы.',
     image: negotiateImage,
+    imageWidth: 1122,
+    imageHeight: 1030,
     alt: 'Экран голосового поединка с AI-оппонентом',
   },
   {
@@ -42,6 +50,8 @@ const howItWorksSteps: HowItWorksStep[] = [
     description:
       'Судьи оценивают результат, а тренер показывает, что изменить в следующей попытке.',
     image: reviewImage,
+    imageWidth: 1087,
+    imageHeight: 1196,
     alt: 'Экран результата переговоров и персонального разбора',
   },
 ]
@@ -103,7 +113,15 @@ export function HowItWorksSection() {
                   <h3>{step.title}</h3>
                   <p>{step.description}</p>
                   <div className="arena-how-step__visual">
-                    <img className="arena-how-step__image" src={step.image} alt={step.alt} />
+                    <img
+                      className="arena-how-step__image"
+                      src={step.image}
+                      alt={step.alt}
+                      width={step.imageWidth}
+                      height={step.imageHeight}
+                      loading="lazy"
+                      decoding="async"
+                    />
                   </div>
                 </div>
               </li>

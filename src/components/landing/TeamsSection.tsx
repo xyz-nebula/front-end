@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
 
-import ctaImage from '@/assets/for-command/for-cta.png'
-import employeeImage from '@/assets/for-command/for-employee.png'
-import hrImage from '@/assets/for-command/for-hr.png'
+import ctaImage from '@/assets/for-command/for-cta.webp'
+import employeeImage from '@/assets/for-command/for-employee.webp'
+import hrImage from '@/assets/for-command/for-hr.webp'
 import { CaseSettingsPreview } from './CaseSettingsPreview'
 
 type AudienceIconName = 'employee' | 'trainer' | 'team'
@@ -17,6 +17,8 @@ interface AudienceCard {
   desktopDescription: string
   mobileDescription: string
   image?: string
+  imageWidth?: number
+  imageHeight?: number
 }
 
 const audienceCards: AudienceCard[] = [
@@ -32,6 +34,8 @@ const audienceCards: AudienceCard[] = [
     mobileDescription:
       'Тренируется самостоятельно и может повторять сложные ситуации.',
     image: employeeImage,
+    imageWidth: 960,
+    imageHeight: 720,
   },
   {
     id: 'trainer',
@@ -57,6 +61,8 @@ const audienceCards: AudienceCard[] = [
     mobileDescription:
       'Использует общие кейсы и принципы разбора для всей команды.',
     image: hrImage,
+    imageWidth: 960,
+    imageHeight: 320,
   },
 ]
 
@@ -132,14 +138,34 @@ export function TeamsSection() {
               </div>
 
               <div className="arena-team-card__visual" aria-hidden="true">
-                {card.id === 'trainer' ? <CaseSettingsPreview /> : <img src={card.image} alt="" />}
+                {card.id === 'trainer' ? (
+                  <CaseSettingsPreview />
+                ) : (
+                  <img
+                    src={card.image}
+                    alt=""
+                    width={card.imageWidth}
+                    height={card.imageHeight}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
               </div>
             </li>
           ))}
         </ul>
 
         <section className="arena-teams-cta" aria-labelledby="teams-cta-title">
-          <img className="arena-teams-cta__scene" src={ctaImage} alt="" aria-hidden="true" />
+          <img
+            className="arena-teams-cta__scene"
+            src={ctaImage}
+            alt=""
+            aria-hidden="true"
+            width={1672}
+            height={941}
+            loading="lazy"
+            decoding="async"
+          />
           <div className="arena-teams-cta__copy">
             <h2 id="teams-cta-title">
               Следующие важные переговоры не должны быть первой попыткой

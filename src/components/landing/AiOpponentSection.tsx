@@ -1,4 +1,4 @@
-import aiOpponentImage from '@/assets/ai-opponent/ai-opponent.png'
+import aiOpponentImage from '@/assets/ai-opponent/ai-opponent.webp'
 
 type PositionIconName = 'target' | 'position' | 'limit' | 'alternative' | 'lock'
 type TraitIconName = 'shield' | 'lock' | 'history' | 'exchange'
@@ -269,6 +269,10 @@ export function AiOpponentSection() {
             <img
               src={aiOpponentImage}
               alt="Пользователь и AI-оппонент обсуждают условия за столом переговоров"
+              width={1440}
+              height={811}
+              loading="lazy"
+              decoding="async"
             />
           </figure>
 

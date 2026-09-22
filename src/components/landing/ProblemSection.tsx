@@ -1,6 +1,6 @@
-import cycleImage from '@/assets/problem/93df19e0-bb6b-470c-90b9-48358b82d2bd.png'
-import practiceImage from '@/assets/problem/d40a0404-67bb-4569-8861-5aab88fcb2c8.png'
-import mistakeImage from '@/assets/problem/f85c1a51-7601-4574-ab71-5125cee6e8c2.png'
+import cycleImage from '@/assets/problem/93df19e0-bb6b-470c-90b9-48358b82d2bd.webp'
+import practiceImage from '@/assets/problem/d40a0404-67bb-4569-8861-5aab88fcb2c8.webp'
+import mistakeImage from '@/assets/problem/f85c1a51-7601-4574-ab71-5125cee6e8c2.webp'
 
 type ProblemStepIconName = 'attempt' | 'feedback' | 'strategy' | 'repeat'
 
@@ -120,6 +120,10 @@ export function ProblemSection() {
                   className={`arena-problem-card__image ${card.imageClassName}`}
                   src={card.image}
                   alt={card.alt}
+                  width={1200}
+                  height={600}
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
               <div className="arena-problem-card__copy">
