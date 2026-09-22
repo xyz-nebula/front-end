@@ -46,6 +46,16 @@ async function loginThroughUi(page: Page, totpToken = '') {
   await expect(page).toHaveURL(/\/home$/)
 }
 
+async function submitRegistration(page: Page) {
+  await page.goto('/register')
+  await page.getByLabel('Имя', { exact: true }).fill('Ирина')
+  await page.getByLabel('Фамилия').fill('Петрова')
+  await page.getByLabel('Имя пользователя').fill('irina.pet')
+  await page.getByLabel('Email').fill('irina@example.com')
+  await page.getByLabel('Пароль').fill('strong-password')
+  await page.getByRole('button', { name: 'Создать аккаунт' }).click()
+}
+
 test('auth entry screens render on desktop and mobile', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
 
@@ -315,6 +325,78 @@ test('maps backend validation errors to fields and shows network failures', asyn
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Войти' }).click()
   await expect(page.getByRole('alert')).toContainText('Не удалось связаться с сервером')
+})
+
+test('rejects malformed login tokens without creating a session', async ({ page }) => {
+  await page.route('**/api/v1/auth/login', (route) => json(route, 200, {
+    access_token: 'access-token',
+    refresh_token: '   ',
+  }))
+
+  await page.goto('/login')
+  await page.getByLabel('Email').fill('user@example.com')
+  await page.getByLabel('Пароль').fill('strong-password')
+  await page.getByRole('button', { name: 'Войти' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('Сервер вернул несовместимый ответ')
+  await expect(page).toHaveURL(/\/login$/)
+  expect(await page.evaluate((key) => window.localStorage.getItem(key), storageKey)).toBeNull()
+})
+
+test('rejects malformed activation tokens without creating a session', async ({ page }) => {
+  await page.route('**/api/v1/auth/register/activate', (route) => json(route, 200, {
+    access_token: '',
+    refresh_token: 'refresh-token',
+  }))
+
+  await page.goto(`/activate?code=${activationCode}`)
+
+  await expect(page.getByRole('alert')).toContainText('Сервер вернул несовместимый ответ')
+  await expect(page.getByRole('heading', { name: 'Аккаунт активирован' })).toHaveCount(0)
+  expect(await page.evaluate((key) => window.localStorage.getItem(key), storageKey)).toBeNull()
+})
+
+test('rejects malformed refresh tokens without overwriting stored session', async ({ page }) => {
+  await seedSession(page)
+  await page.route('**/api/v1/auth/token/refresh', (route) => json(route, 200, {
+    access_token: 'renewed-access',
+  }))
+
+  await page.goto('/home')
+
+  await expect(page.getByRole('heading', { name: 'Не удалось проверить сессию' })).toBeVisible()
+  const storedSession = await page.evaluate((key) => window.localStorage.getItem(key), storageKey)
+  expect(storedSession).toContain('stored-refresh')
+  expect(storedSession).not.toContain('renewed-access')
+})
+
+test('rejects malformed registration response without showing success', async ({ page }) => {
+  await page.route('**/api/v1/auth/register', (route) => json(route, 200, {
+    user_id: 'not-a-uuid',
+    status: 'unknown',
+  }))
+
+  await submitRegistration(page)
+
+  await expect(page.getByRole('alert')).toContainText('Сервер вернул несовместимый ответ')
+  await expect(page).toHaveURL(/\/register$/)
+  await expect(page.getByRole('heading', { name: 'Проверьте почту' })).toHaveCount(0)
+})
+
+test('rejects malformed TOTP enrollment without exposing a success state', async ({ page }) => {
+  await seedSession(page)
+  await mockSuccessfulBootstrap(page)
+  await page.route('**/api/v1/auth/totp/enroll', (route) => json(route, 200, {
+    secret: '   ',
+    otpauth_url: 'otpauth://totp/Arena:user',
+  }))
+
+  await page.goto('/home')
+  await page.getByRole('button', { name: '2FA' }).click()
+  await page.getByRole('button', { name: /Подключить 2FA/ }).click()
+
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Сервер вернул несовместимый ответ')
+  await expect(page.getByText('Секретный ключ')).toHaveCount(0)
 })
 
 test('security modal renders on desktop and mobile', async ({ page }) => {

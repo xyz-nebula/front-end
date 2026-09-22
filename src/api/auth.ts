@@ -24,7 +24,9 @@ const DEFAULT_TIMEOUT_MS = Number.isFinite(configuredTimeout) && configuredTimeo
   : 20_000
 const LOGOUT_TIMEOUT_MS = 3_000
 
-export type ApiErrorReason = 'http' | 'network' | 'timeout'
+export type ApiErrorReason = 'http' | 'network' | 'timeout' | 'invalid-response'
+
+const invalidResponseMessage = 'Сервер вернул несовместимый ответ. Попробуйте ещё раз позже.'
 
 const statusMessages: Record<number, string> = {
   0: 'Не удалось связаться с сервером. Проверьте подключение к интернету.',
@@ -83,7 +85,7 @@ async function parseResponse(response: Response): Promise<unknown> {
     return JSON.parse(text) as unknown
   } catch {
     if (response.ok) {
-      throw new ApiError(response.status, 'Сервер вернул ответ в неизвестном формате.')
+      throw new ApiError(response.status, invalidResponseMessage, {}, 'invalid-response')
     }
     return undefined
   }
@@ -97,7 +99,7 @@ interface RequestOptions {
   keepalive?: boolean
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
   const headers = new Headers({ Accept: 'application/json' })
   if (options.body !== undefined) headers.set('Content-Type', 'application/json')
   if (options.accessToken) headers.set('Authorization', `Bearer ${options.accessToken}`)
@@ -128,7 +130,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       )
     }
 
-    return payload as T
+    return payload
   } catch (error) {
     if (isApiError(error)) throw error
     if (didTimeout) {
@@ -140,6 +142,43 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 }
 
+function invalidResponse(status = 200) {
+  return new ApiError(status, invalidResponseMessage, {}, 'invalid-response')
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isAuthTokensResponse(payload: unknown): payload is AuthTokensResponse {
+  return isRecord(payload)
+    && isNonEmptyString(payload.access_token)
+    && isNonEmptyString(payload.refresh_token)
+}
+
+function isUserStatus(value: unknown): value is AuthRegisterResponse['status'] {
+  return value === 'pending_activation' || value === 'active' || value === 'suspended'
+}
+
+function isAuthRegisterResponse(payload: unknown): payload is AuthRegisterResponse {
+  return isRecord(payload)
+    && typeof payload.user_id === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.user_id)
+    && isUserStatus(payload.status)
+}
+
+function isTotpEnrollResponse(payload: unknown): payload is TotpEnrollResponse {
+  return isRecord(payload)
+    && isNonEmptyString(payload.secret)
+    && isNonEmptyString(payload.otpauth_url)
+}
+
+async function requestTokens(path: string, options: RequestOptions): Promise<AuthTokens> {
+  const payload = await request(path, options)
+  if (!isAuthTokensResponse(payload)) throw invalidResponse()
+  return mapTokens(payload)
+}
+
 function mapTokens(response: AuthTokensResponse): AuthTokens {
   return {
     accessToken: response.access_token,
@@ -148,31 +187,33 @@ function mapTokens(response: AuthTokensResponse): AuthTokens {
 }
 
 export const authApi = {
-  register(payload: AuthRegisterRequest) {
-    return request<AuthRegisterResponse>('/v1/auth/register', { method: 'POST', body: payload })
+  async register(payload: AuthRegisterRequest) {
+    const response = await request('/v1/auth/register', { method: 'POST', body: payload })
+    if (!isAuthRegisterResponse(response)) throw invalidResponse()
+    return response
   },
 
-  async activate(code: string) {
-    return mapTokens(await request<AuthTokensResponse>('/v1/auth/register/activate', {
+  activate(code: string) {
+    return requestTokens('/v1/auth/register/activate', {
       method: 'POST',
       body: { code },
-    }))
+    })
   },
 
-  async login(payload: AuthLoginRequest) {
-    return mapTokens(await request<AuthTokensResponse>('/v1/auth/login', { method: 'POST', body: payload }))
+  login(payload: AuthLoginRequest) {
+    return requestTokens('/v1/auth/login', { method: 'POST', body: payload })
   },
 
-  async refresh(refreshToken: string, timeoutMs?: number) {
-    return mapTokens(await request<AuthTokensResponse>('/v1/auth/token/refresh', {
+  refresh(refreshToken: string, timeoutMs?: number) {
+    return requestTokens('/v1/auth/token/refresh', {
       method: 'POST',
       body: { refresh_token: refreshToken },
       timeoutMs,
-    }))
+    })
   },
 
-  logout(accessToken: string, refreshToken: string) {
-    return request<void>('/v1/auth/logout', {
+  async logout(accessToken: string, refreshToken: string) {
+    await request('/v1/auth/logout', {
       method: 'POST',
       accessToken,
       body: { refresh_token: refreshToken },
@@ -181,20 +222,22 @@ export const authApi = {
     })
   },
 
-  enrollTotp(accessToken: string) {
-    return request<TotpEnrollResponse>('/v1/auth/totp/enroll', { method: 'POST', accessToken })
+  async enrollTotp(accessToken: string) {
+    const response = await request('/v1/auth/totp/enroll', { method: 'POST', accessToken })
+    if (!isTotpEnrollResponse(response)) throw invalidResponse()
+    return response
   },
 
-  confirmTotp(accessToken: string, totpToken: string) {
-    return request<void>('/v1/auth/totp/confirm', {
+  async confirmTotp(accessToken: string, totpToken: string) {
+    await request('/v1/auth/totp/confirm', {
       method: 'POST',
       accessToken,
       body: { totp_token: totpToken },
     })
   },
 
-  disableTotp(accessToken: string, password: string) {
-    return request<void>('/v1/auth/totp', {
+  async disableTotp(accessToken: string, password: string) {
+    await request('/v1/auth/totp', {
       method: 'DELETE',
       accessToken,
       body: { password },
