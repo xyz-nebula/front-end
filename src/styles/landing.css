@@ -3616,6 +3616,34 @@
   }
 }
 
+@media (max-width: 340px) {
+  .arena-team-card--trainer,
+  .arena-team-card--hr {
+    min-height: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .arena-team-card--trainer .arena-team-card__copy,
+  .arena-team-card--hr .arena-team-card__copy {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .arena-team-card--trainer .arena-team-card__visual,
+  .arena-team-card--hr .arena-team-card__visual {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .arena-team-card--trainer .arena-team-card__visual {
+    padding: 0 12px 14px;
+  }
+
+  .arena-team-card--hr .arena-team-card__visual {
+    min-height: 108px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .arena-teams-cta__primary,
   .arena-teams-cta__secondary,

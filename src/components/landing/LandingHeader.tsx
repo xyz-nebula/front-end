@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 const navLinks = [
@@ -24,28 +24,64 @@ function ArenaBrand() {
 
 export function LandingHeader() {
   const [isOpen, setIsOpen] = useState(false)
+  const headerRef = useRef<HTMLElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!isOpen) return
 
+    const previousOverflow = document.body.style.overflow
+    const focusFirstLinkFrame = window.requestAnimationFrame(() => {
+      headerRef.current
+        ?.querySelector<HTMLElement>('#arena-navigation a')
+        ?.focus()
+    })
+
+    document.body.style.overflow = 'hidden'
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false)
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+        menuButtonRef.current?.focus()
+        return
+      }
+
     }
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (event.target instanceof Node && !headerRef.current?.contains(event.target)) {
+        setIsOpen(false)
+        menuButtonRef.current?.focus()
+      }
+    }
+
+    const handleFocusIn = (event: FocusEvent) => {
+      if (event.target instanceof Node && !headerRef.current?.contains(event.target)) {
+        setIsOpen(false)
+      }
+    }
+
     const handleResize = () => {
       if (window.innerWidth > 768) setIsOpen(false)
     }
 
     window.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('click', handleDocumentClick)
+    document.addEventListener('focusin', handleFocusIn)
     window.addEventListener('resize', handleResize)
 
     return () => {
+      window.cancelAnimationFrame(focusFirstLinkFrame)
+      document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('click', handleDocumentClick)
+      document.removeEventListener('focusin', handleFocusIn)
       window.removeEventListener('resize', handleResize)
     }
   }, [isOpen])
 
   return (
-    <header className="arena-header">
+    <header className="arena-header" ref={headerRef}>
       <div className="arena-shell arena-header__inner">
         <ArenaBrand />
 
@@ -70,6 +106,7 @@ export function LandingHeader() {
         <div className="arena-header__actions">
           <Link className="arena-header__login" to="/home">Войти</Link>
           <button
+            ref={menuButtonRef}
             className={`arena-menu-toggle ${isOpen ? 'is-open' : ''}`}
             type="button"
             aria-label={isOpen ? 'Закрыть меню' : 'Открыть меню'}

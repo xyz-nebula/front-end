@@ -49,6 +49,7 @@ const teamsViewports = [
   { width: 768, height: 900, screenshot: 'landing-teams-tablet.png' },
   { width: 390, height: 844, screenshot: 'landing-teams-mobile.png' },
   { width: 360, height: 800, screenshot: 'landing-teams-mobile-narrow.png' },
+  { width: 320, height: 800, screenshot: 'landing-teams-mobile-compact.png' },
 ]
 
 test('landing renders the redesigned hero, problem section and section framework', async ({ page }) => {
@@ -151,6 +152,11 @@ test('landing renders the redesigned hero, problem section and section framework
     path: `${artifactsDir}/landing-how-it-works-mobile-narrow.png`,
     animations: 'disabled',
   })
+
+  await page.setViewportSize({ width: 320, height: 800 })
+  await page.goto('/')
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/landing-mobile-compact.png`)
 })
 
 test('how it works keeps every illustration inside its visual area', async ({ page }) => {
@@ -346,14 +352,33 @@ test('mobile navigation opens and closes accessibly', async ({ page }) => {
   await expect(menuButton).toHaveAttribute('aria-expanded', 'false')
   await menuButton.click()
   await expect(page.getByRole('button', { name: 'Закрыть меню' })).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.locator('body')).toHaveCSS('overflow', 'hidden')
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Кейсы', exact: true })).toHaveAttribute('href', '/home#cases')
+  const casesLink = page.getByRole('link', { name: 'Кейсы', exact: true })
+  await expect(casesLink).toHaveAttribute('href', '/home#cases')
+  await expect(casesLink).toBeFocused()
   await expect(page.getByRole('link', { name: 'Как это работает' })).toHaveAttribute('href', '#how-it-works')
   await expect(page.getByRole('link', { name: 'AI-оппонент' })).toHaveAttribute('href', '#ai-opponent')
   await captureScreenshot(page, `${artifactsDir}/landing-mobile-menu.png`)
 
+  for (let index = 0; index < 5; index += 1) {
+    await page.keyboard.press('Tab')
+  }
+  await expect(page.getByRole('link', { name: 'Начать поединок' })).toBeFocused()
+  await expect(menuButton).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
+
+  await menuButton.click()
   await page.keyboard.press('Escape')
-  await expect(page.getByRole('button', { name: 'Открыть меню' })).toHaveAttribute('aria-expanded', 'false')
+  await expect(menuButton).toHaveAttribute('aria-expanded', 'false')
+  await expect(menuButton).toBeFocused()
+  await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
+
+  await menuButton.click()
+  await page.locator('.arena-benefits').click({ position: { x: 8, y: 8 } })
+  await expect(menuButton).toHaveAttribute('aria-expanded', 'false')
+  await expect(menuButton).toBeFocused()
+  await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
 })
 
 test('product home remains separate from the landing redesign', async ({ page }) => {
