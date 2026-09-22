@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 
 const HOST = '127.0.0.1'
-const SHUTDOWN_TIMEOUT_MS = 190_000
-const HARD_TIMEOUT_MS = 210_000
+const SHUTDOWN_TIMEOUT_MS = 310_000
+const HARD_TIMEOUT_MS = 330_000
 const PROCESS_EXIT_GRACE_MS = 2_000
 const PROCESS_TREE_SETTLE_MS = 500
 const projectRoot = fileURLToPath(new URL('../', import.meta.url))

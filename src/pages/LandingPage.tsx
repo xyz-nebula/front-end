@@ -1,7 +1,11 @@
 import { Link } from 'react-router-dom'
 
+import { AiOpponentSection } from '@/components/landing/AiOpponentSection'
 import { HeroScene } from '@/components/landing/HeroScene'
+import { HowItWorksSection } from '@/components/landing/HowItWorksSection'
 import { LandingHeader } from '@/components/landing/LandingHeader'
+import { ProblemSection } from '@/components/landing/ProblemSection'
+import { TeamsSection } from '@/components/landing/TeamsSection'
 import '@/styles/landing.css'
 
 type BenefitIconName = 'chart' | 'brain' | 'shield'
@@ -44,17 +48,6 @@ const benefits: Array<{ icon: BenefitIconName; text: string }> = [
   { icon: 'shield', text: 'Независимое судейство и разбор' },
 ]
 
-const futureSections = [
-  { number: '02', id: 'problem', title: 'Проблема — почему обычной практики недостаточно' },
-  { number: '03', id: 'how-it-works', title: 'Как работает Арена — 4 этапа' },
-  { number: '04', id: 'ai-opponent', title: 'AI-оппонент, который действительно ведёт переговоры' },
-  { number: '05', id: 'preparation', title: 'Глубокая подготовка + AI-тренер' },
-  { number: '06', id: 'review', title: 'Независимое судейство и персональный разбор' },
-  { number: '07', id: 'cases', title: 'Реальные кейсы и разные переговорные ситуации' },
-  { number: '08', id: 'methodology', title: 'Методология и развитие навыка' },
-  { number: '09', id: 'teams', title: 'Для команд и компаний + финальный CTA' },
-]
-
 function HeroBenefits() {
   return (
     <div className="arena-benefits" aria-label="Преимущества Арены">
@@ -84,7 +77,7 @@ export function LandingPage() {
                 <span>как стратегическую игру</span>
               </h1>
               <p>Готовь стратегию, веди голосовые переговоры с AI-оппонентом и получай разбор своих решений.</p>
-              <Link className="arena-hero__cta" to="/auth">
+              <Link className="arena-hero__cta" to="/home">
                 <span>Начать поединок</span>
                 <svg viewBox="0 0 26 26" aria-hidden="true">
                   <path d="M3 13h18m-6.5-6.5L21 13l-6.5 6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -98,27 +91,13 @@ export function LandingPage() {
           </div>
         </section>
 
-        <div className="arena-future-sections">
-          {futureSections.map((section, index) => (
-            <section
-              className={`arena-placeholder ${index % 2 === 1 ? 'arena-placeholder--tinted' : ''} ${section.id === 'teams' ? 'arena-placeholder--final' : ''}`}
-              id={section.id}
-              key={section.id}
-              aria-labelledby={`${section.id}-title`}
-            >
-              <div className="arena-shell arena-placeholder__layout">
-                <span className="arena-placeholder__number">{section.number}</span>
-                <h2 id={`${section.id}-title`}>{section.title}</h2>
-                <div className="arena-placeholder__card" aria-hidden="true">
-                  <span>Следующий этап редизайна</span>
-                  <i />
-                  <i />
-                  <i />
-                </div>
-              </div>
-            </section>
-          ))}
-        </div>
+        <ProblemSection />
+
+        <HowItWorksSection />
+
+        <AiOpponentSection />
+
+        <TeamsSection />
       </main>
     </div>
   )
