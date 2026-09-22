@@ -1239,119 +1239,6 @@
   text-align: center;
 }
 
-/* Temporary section framework */
-.arena-future-sections {
-  border-top: 1px solid #e7edf5;
-}
-
-.arena-placeholder {
-  min-height: 560px;
-  padding: 104px 0;
-  scroll-margin-top: 24px;
-  background: #ffffff;
-}
-
-.arena-placeholder--tinted {
-  background: #f5f8fc;
-}
-
-.arena-placeholder__layout {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) minmax(340px, 0.72fr);
-  gap: 38px;
-  align-items: start;
-}
-
-.arena-placeholder__number {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  place-items: center;
-  border: 1px solid #dce5f2;
-  border-radius: 12px;
-  color: #55709b;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.arena-placeholder h2 {
-  max-width: 760px;
-  margin: 0;
-  font-size: clamp(42px, 4.6vw, 68px);
-  line-height: 1.02;
-  font-weight: 720;
-  letter-spacing: -0.055em;
-}
-
-.arena-placeholder__card {
-  display: flex;
-  min-height: 310px;
-  flex-direction: column;
-  gap: 18px;
-  padding: 28px;
-  border: 1px solid #e1e8f2;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 18px 55px rgba(42, 73, 116, 0.06);
-}
-
-.arena-placeholder__card span {
-  width: max-content;
-  padding: 8px 11px;
-  border-radius: 8px;
-  color: #47658f;
-  background: #eaf2ff;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.arena-placeholder__card i {
-  display: block;
-  height: 18px;
-  border-radius: 6px;
-  background: #edf2f8;
-}
-
-.arena-placeholder__card i:nth-of-type(1) {
-  width: 88%;
-  margin-top: auto;
-}
-
-.arena-placeholder__card i:nth-of-type(2) {
-  width: 68%;
-}
-
-.arena-placeholder__card i:nth-of-type(3) {
-  width: 42%;
-}
-
-.arena-placeholder--final {
-  color: #ffffff;
-  background: linear-gradient(120deg, #086ef1 0%, #075bd1 67%, #d91f2c 140%);
-}
-
-.arena-placeholder--final .arena-placeholder__number {
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.35);
-}
-
-.arena-placeholder--final .arena-placeholder__card {
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: none;
-}
-
-.arena-placeholder--final .arena-placeholder__card span {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.arena-placeholder--final .arena-placeholder__card i {
-  background: rgba(255, 255, 255, 0.18);
-}
-
 @media (max-width: 1220px) {
   .arena-shell {
     width: min(100% - 64px, 1460px);
@@ -1763,14 +1650,6 @@
     transform: scale(0.45);
   }
 
-  .arena-placeholder__layout {
-    grid-template-columns: 58px 1fr;
-  }
-
-  .arena-placeholder__card {
-    grid-column: 2;
-    min-height: 230px;
-  }
 }
 
 @media (max-width: 768px) {
@@ -2157,33 +2036,6 @@
     padding-right: 130px;
   }
 
-  .arena-placeholder {
-    min-height: 470px;
-    padding: 72px 0;
-    scroll-margin-top: 78px;
-  }
-
-  .arena-placeholder__layout {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-
-  .arena-placeholder__number {
-    width: 42px;
-    height: 42px;
-  }
-
-  .arena-placeholder h2 {
-    max-width: 600px;
-    font-size: clamp(36px, 10.3vw, 52px);
-  }
-
-  .arena-placeholder__card {
-    grid-column: auto;
-    min-height: 210px;
-    padding: 22px;
-    border-radius: 20px;
-  }
 }
 
 @media (max-width: 520px) {

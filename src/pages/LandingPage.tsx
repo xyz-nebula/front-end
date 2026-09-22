@@ -48,13 +48,6 @@ const benefits: Array<{ icon: BenefitIconName; text: string }> = [
   { icon: 'shield', text: 'Независимое судейство и разбор' },
 ]
 
-const futureSections = [
-  { number: '05', id: 'preparation', title: 'Глубокая подготовка + AI-тренер' },
-  { number: '06', id: 'review', title: 'Независимое судейство и персональный разбор' },
-  { number: '07', id: 'cases', title: 'Реальные кейсы и разные переговорные ситуации' },
-  { number: '08', id: 'methodology', title: 'Методология и развитие навыка' },
-]
-
 function HeroBenefits() {
   return (
     <div className="arena-benefits" aria-label="Преимущества Арены">
@@ -103,28 +96,6 @@ export function LandingPage() {
         <HowItWorksSection />
 
         <AiOpponentSection />
-
-        <div className="arena-future-sections">
-          {futureSections.map((section, index) => (
-            <section
-              className={`arena-placeholder ${index % 2 === 1 ? 'arena-placeholder--tinted' : ''}`}
-              id={section.id}
-              key={section.id}
-              aria-labelledby={`${section.id}-title`}
-            >
-              <div className="arena-shell arena-placeholder__layout">
-                <span className="arena-placeholder__number">{section.number}</span>
-                <h2 id={`${section.id}-title`}>{section.title}</h2>
-                <div className="arena-placeholder__card" aria-hidden="true">
-                  <span>Следующий этап редизайна</span>
-                  <i />
-                  <i />
-                  <i />
-                </div>
-              </div>
-            </section>
-          ))}
-        </div>
 
         <TeamsSection />
       </main>

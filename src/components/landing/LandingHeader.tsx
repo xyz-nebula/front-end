@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 const navLinks = [
-  { label: 'Кейсы', href: '#cases' },
-  { label: 'Как это работает', href: '#how-it-works' },
-  { label: 'Методика', href: '#methodology' },
+  { label: 'Кейсы', to: '/home#cases' },
+  { label: 'Как это работает', to: '#how-it-works' },
+  { label: 'AI-оппонент', to: '#ai-opponent' },
 ]
 
 function ArenaBrand() {
@@ -55,9 +55,15 @@ export function LandingHeader() {
           aria-label="Основная навигация"
         >
           {navLinks.map((link) => (
-            <a key={link.href} href={link.href} onClick={() => setIsOpen(false)}>
-              {link.label}
-            </a>
+            link.to.startsWith('#') ? (
+              <a key={link.to} href={link.to} onClick={() => setIsOpen(false)}>
+                {link.label}
+              </a>
+            ) : (
+              <Link key={link.to} to={link.to} onClick={() => setIsOpen(false)}>
+                {link.label}
+              </Link>
+            )
           ))}
         </nav>
 

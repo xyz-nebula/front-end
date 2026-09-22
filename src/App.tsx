@@ -5,12 +5,17 @@ import { LandingPage } from '@/pages/LandingPage'
 import { HomePage } from '@/pages/HomePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
-function ScrollToTop() {
-  const { pathname } = useLocation()
+function ScrollToLocation() {
+  const { hash, pathname } = useLocation()
 
   useEffect(() => {
+    if (hash) {
+      document.getElementById(hash.slice(1))?.scrollIntoView()
+      return
+    }
+
     window.scrollTo({ top: 0, behavior: 'instant' })
-  }, [pathname])
+  }, [hash, pathname])
 
   return null
 }
@@ -18,7 +23,7 @@ function ScrollToTop() {
 export function App() {
   return (
     <>
-      <ScrollToTop />
+      <ScrollToLocation />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/home" element={<HomePage />} />

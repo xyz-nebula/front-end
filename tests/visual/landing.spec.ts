@@ -10,10 +10,6 @@ const sectionHeadings = [
   'Переговоры — навык, который нельзя натренировать только по книге',
   'От кейса до новой стратегии — за один цикл',
   'Он не обязан с тобой соглашаться',
-  'Глубокая подготовка + AI-тренер',
-  'Независимое судейство и персональный разбор',
-  'Реальные кейсы и разные переговорные ситуации',
-  'Методология и развитие навыка',
   'Одна Арена — разные задачи команды',
 ]
 
@@ -64,6 +60,7 @@ test('landing renders the redesigned hero, problem section and section framework
   await expect(page.getByRole('link', { name: 'Начать поединок' })).toHaveAttribute('href', '/home')
   await expect(page.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/home')
   await expect(page.locator('.arena-scene-card')).toHaveCount(0)
+  await expect(page.locator('.arena-placeholder')).toHaveCount(0)
   for (const heading of sectionHeadings) {
     await expect(page.getByRole('heading', { level: 2, name: heading })).toBeAttached()
   }
@@ -267,7 +264,7 @@ test('teams section presents all audiences and the final calls to action respons
     await expect(section.getByRole('heading', { level: 3, name: 'Единый формат развития' })).toBeVisible()
 
     await expect(section.getByRole('link', { name: 'Начать первый поединок' })).toHaveAttribute('href', '/home')
-    await expect(section.getByRole('link', { name: 'Посмотреть кейсы' })).toHaveAttribute('href', '#cases')
+    await expect(section.getByRole('link', { name: 'Посмотреть кейсы' })).toHaveAttribute('href', '/home#cases')
     await expect(section.locator('.arena-placeholder__card')).toHaveCount(0)
 
     const images = section.locator('img')
@@ -345,9 +342,9 @@ test('mobile navigation opens and closes accessibly', async ({ page }) => {
   await menuButton.click()
   await expect(page.getByRole('button', { name: 'Закрыть меню' })).toHaveAttribute('aria-expanded', 'true')
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Кейсы', exact: true })).toHaveAttribute('href', '#cases')
+  await expect(page.getByRole('link', { name: 'Кейсы', exact: true })).toHaveAttribute('href', '/home#cases')
   await expect(page.getByRole('link', { name: 'Как это работает' })).toHaveAttribute('href', '#how-it-works')
-  await expect(page.getByRole('link', { name: 'Методика' })).toHaveAttribute('href', '#methodology')
+  await expect(page.getByRole('link', { name: 'AI-оппонент' })).toHaveAttribute('href', '#ai-opponent')
   await captureScreenshot(page, `${artifactsDir}/landing-mobile-menu.png`)
 
   await page.keyboard.press('Escape')
@@ -362,4 +359,13 @@ test('product home remains separate from the landing redesign', async ({ page })
   await expect(page.locator('.arena-landing')).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/home-mobile-regression.png`)
+})
+
+test('cases links open the product catalog', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+
+  await page.getByRole('link', { name: 'Кейсы', exact: true }).click()
+  await expect(page).toHaveURL(/\/home#cases$/)
+  await expect(page.locator('#cases')).toBeInViewport()
 })
