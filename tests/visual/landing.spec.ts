@@ -59,7 +59,8 @@ test('landing renders the redesigned hero, problem section and section framework
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1, name: 'Тренируй переговоры как стратегическую игру' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Начать поединок' })).toHaveAttribute('href', '/home')
-  await expect(page.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/home')
+  await expect(page.locator('.arena-header').getByRole('link', { name: 'Начать', exact: true })).toHaveAttribute('href', '/home')
+  await expect(page.locator('.arena-header')).toHaveAttribute('data-state', 'transparent')
   await expect(page.locator('.arena-scene-card')).toHaveCount(0)
   await expect(page.locator('.arena-placeholder')).toHaveCount(0)
   for (const heading of sectionHeadings) {
@@ -72,6 +73,8 @@ test('landing renders the redesigned hero, problem section and section framework
   await page.locator('#problem').evaluate((element) => {
     window.scrollTo(0, (element as HTMLElement).offsetTop)
   })
+  await expect(page.locator('.arena-header')).toHaveAttribute('data-state', 'compact')
+  await expect(page.getByRole('link', { name: 'Зачем', exact: true })).toHaveAttribute('aria-current', 'location')
   await expect(page.getByRole('heading', { level: 2, name: sectionHeadings[0] })).toBeVisible()
   await expect(page.getByRole('heading', { level: 3, name: 'Мало практики' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 3, name: 'Ошибки имеют последствия' })).toBeVisible()
@@ -83,6 +86,7 @@ test('landing renders the redesigned hero, problem section and section framework
   await expect(page.locator('#problem .arena-placeholder__card')).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/landing-problem-desktop.png`)
+  await captureScreenshot(page, `${artifactsDir}/landing-header-scrolled-desktop.png`)
 
   await page.locator('#how-it-works').evaluate((element) => {
     window.scrollTo(0, (element as HTMLElement).offsetTop)
@@ -352,21 +356,20 @@ test('mobile navigation opens and closes accessibly', async ({ page }) => {
   await expect(menuButton).toHaveAttribute('aria-expanded', 'false')
   await menuButton.click()
   await expect(page.getByRole('button', { name: 'Закрыть меню' })).toHaveAttribute('aria-expanded', 'true')
-  await expect(page.locator('body')).toHaveCSS('overflow', 'hidden')
-  await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible()
-  const casesLink = page.getByRole('link', { name: 'Кейсы', exact: true })
-  await expect(casesLink).toHaveAttribute('href', '/home#cases')
-  await expect(casesLink).toBeFocused()
+  await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
+  await expect(page.getByRole('navigation', { name: 'Навигация по лендингу' })).toBeVisible()
+  const problemLink = page.getByRole('link', { name: 'Зачем', exact: true })
+  await expect(problemLink).toHaveAttribute('href', '#problem')
+  await expect(problemLink).toBeFocused()
   await expect(page.getByRole('link', { name: 'Как это работает' })).toHaveAttribute('href', '#how-it-works')
   await expect(page.getByRole('link', { name: 'AI-оппонент' })).toHaveAttribute('href', '#ai-opponent')
+  await expect(page.getByRole('link', { name: 'Для команд' })).toHaveAttribute('href', '#teams')
   await captureScreenshot(page, `${artifactsDir}/landing-mobile-menu.png`)
 
-  for (let index = 0; index < 5; index += 1) {
-    await page.keyboard.press('Tab')
-  }
-  await expect(page.getByRole('link', { name: 'Начать поединок' })).toBeFocused()
+  await problemLink.click()
   await expect(menuButton).toHaveAttribute('aria-expanded', 'false')
-  await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
+  await expect(menuButton).toBeFocused()
+  await expect(page.locator('#problem')).toBeInViewport()
 
   await menuButton.click()
   await page.keyboard.press('Escape')
@@ -375,10 +378,16 @@ test('mobile navigation opens and closes accessibly', async ({ page }) => {
   await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
 
   await menuButton.click()
-  await page.locator('.arena-benefits').click({ position: { x: 8, y: 8 } })
+  await page.locator('#problem').click({ position: { x: 8, y: 120 } })
   await expect(menuButton).toHaveAttribute('aria-expanded', 'false')
   await expect(menuButton).toBeFocused()
-  await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
+
+  await menuButton.click()
+  await page.setViewportSize({ width: 900, height: 844 })
+  await expect(page.getByRole('navigation', { name: 'Навигация по лендингу' })).toBeVisible()
+  await expect(menuButton).toBeHidden()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(menuButton).toHaveAttribute('aria-expanded', 'false')
 })
 
 test('product home remains separate from the landing redesign', async ({ page }) => {
@@ -391,11 +400,27 @@ test('product home remains separate from the landing redesign', async ({ page })
   await captureScreenshot(page, `${artifactsDir}/home-mobile-regression.png`)
 })
 
-test('cases links open the product catalog', async ({ page }) => {
+test('header navigation follows every landing section and CTA opens the product', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
 
-  await page.getByRole('link', { name: 'Кейсы', exact: true }).click()
-  await expect(page).toHaveURL(/\/home#cases$/)
-  await expect(page.locator('#cases')).toBeInViewport()
+  const links = [
+    { name: 'Зачем', href: '#problem' },
+    { name: 'Как это работает', href: '#how-it-works' },
+    { name: 'AI-оппонент', href: '#ai-opponent' },
+    { name: 'Для команд', href: '#teams' },
+  ]
+
+  for (const link of links) {
+    const navigationLink = page.getByRole('link', { name: link.name, exact: true })
+    await expect(navigationLink).toHaveAttribute('href', link.href)
+    await navigationLink.click()
+    await expect(page.locator(link.href)).toBeInViewport()
+    await expect(navigationLink).toHaveAttribute('aria-current', 'location')
+    await expect(page.locator('.arena-header')).toHaveAttribute('data-state', 'compact')
+    await expectNoHorizontalOverflow(page)
+  }
+
+  await page.locator('.arena-header').getByRole('link', { name: 'Начать', exact: true }).click()
+  await expect(page).toHaveURL(/\/home$/)
 })

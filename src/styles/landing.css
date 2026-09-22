@@ -22,12 +22,24 @@
 
 /* Header */
 .arena-header {
-  position: absolute;
-  z-index: 50;
+  position: fixed;
+  z-index: 100;
   top: 0;
   right: 0;
   left: 0;
   padding: 22px 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  transition: padding 220ms ease, background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.arena-header.is-compact {
+  padding: 9px 0;
+  border-color: rgba(190, 206, 228, 0.68);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 9px 28px rgba(27, 59, 104, 0.1);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
 }
 
 .arena-header__inner {
@@ -49,7 +61,7 @@
   width: 40px;
   height: 44px;
   filter: drop-shadow(0 6px 8px rgba(14, 78, 170, 0.14));
-  transition: transform 250ms ease;
+  transition: width 220ms ease, height 220ms ease, transform 250ms ease;
 }
 
 .arena-brand:hover .arena-brand__mark {
@@ -61,6 +73,16 @@
   line-height: 1;
   font-weight: 850;
   letter-spacing: -0.045em;
+  transition: font-size 220ms ease;
+}
+
+.arena-header.is-compact .arena-brand__mark {
+  width: 32px;
+  height: 36px;
+}
+
+.arena-header.is-compact .arena-brand > span {
+  font-size: 23px;
 }
 
 .arena-header__nav {
@@ -68,7 +90,7 @@
   left: 50%;
   display: flex;
   align-items: center;
-  gap: clamp(38px, 5vw, 76px);
+  gap: clamp(20px, 2.6vw, 42px);
   transform: translateX(-50%);
 }
 
@@ -95,9 +117,14 @@
   transition: transform 220ms ease;
 }
 
-.arena-header__nav a:hover::after {
+.arena-header__nav a:hover::after,
+.arena-header__nav a[aria-current="location"]::after {
   transform: scaleX(1);
   transform-origin: left;
+}
+
+.arena-header__nav a[aria-current="location"] {
+  color: var(--arena-blue-dark);
 }
 
 .arena-header__actions {
@@ -106,7 +133,7 @@
   gap: 14px;
 }
 
-.arena-header__login {
+.arena-header__cta {
   display: inline-flex;
   min-width: 140px;
   min-height: 48px;
@@ -115,18 +142,23 @@
   padding: 0 24px;
   border: 1.5px solid var(--arena-blue);
   border-radius: 10px;
-  color: var(--arena-ink);
-  background: rgba(255, 255, 255, 0.75);
+  color: #ffffff;
+  background: var(--arena-blue);
   font-size: 16px;
   font-weight: 650;
   transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
-.arena-header__login:hover {
+.arena-header__cta:hover {
   color: #ffffff;
   background: var(--arena-blue);
   box-shadow: 0 10px 24px rgba(8, 117, 255, 0.18);
   transform: translateY(-1px);
+}
+
+.arena-header__cta:active {
+  box-shadow: 0 5px 13px rgba(8, 117, 255, 0.18);
+  transform: translateY(1px);
 }
 
 .arena-menu-toggle {
@@ -138,6 +170,15 @@
   border-radius: 10px;
   background: transparent;
   cursor: pointer;
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.arena-menu-toggle:hover {
+  background: rgba(8, 117, 255, 0.08);
+}
+
+.arena-menu-toggle:active {
+  transform: scale(0.96);
 }
 
 .arena-menu-toggle span {
@@ -1306,8 +1347,13 @@
     gap: 24px;
   }
 
-  .arena-header__login {
-    min-width: 112px;
+  .arena-header__cta {
+    min-width: 96px;
+    padding-inline: 18px;
+  }
+
+  .arena-header__nav a {
+    font-size: 14px;
   }
 
   .arena-hero__copy {
@@ -1661,6 +1707,10 @@
     padding: 16px 0;
   }
 
+  .arena-header.is-compact {
+    padding: 8px 0;
+  }
+
   .arena-brand {
     gap: 9px;
   }
@@ -1678,10 +1728,10 @@
     gap: 8px;
   }
 
-  .arena-header__login {
-    min-width: 88px;
+  .arena-header__cta {
+    min-width: 82px;
     min-height: 44px;
-    padding: 0 18px;
+    padding: 0 16px;
     border-radius: 9px;
     font-size: 15px;
   }
@@ -1692,7 +1742,7 @@
 
   .arena-header__nav {
     position: absolute;
-    top: 60px;
+    top: calc(100% + 8px);
     right: 0;
     left: 0;
     display: none;
@@ -1725,6 +1775,11 @@
 
   .arena-header__nav a:hover {
     background: #f0f6ff;
+  }
+
+  .arena-header__nav a[aria-current="location"] {
+    color: var(--arena-blue-dark);
+    background: #eaf3ff;
   }
 
   .arena-header__nav a::after {
@@ -2111,7 +2166,7 @@
 }
 
 @media (max-width: 370px) {
-  .arena-header__login {
+  .arena-header__cta {
     min-width: 76px;
     padding-inline: 13px;
   }
@@ -3211,6 +3266,13 @@
 .arena-teams-cta__secondary:focus-visible {
   outline: 3px solid rgba(110, 199, 255, 0.75);
   outline-offset: 4px;
+}
+
+.arena-problem,
+.arena-how,
+.arena-opponent,
+.arena-teams {
+  scroll-margin-top: 86px;
 }
 
 @media (max-width: 1220px) {
