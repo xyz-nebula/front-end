@@ -24,6 +24,13 @@ interface ClearSessionOptions {
 
 const AUTH_REFRESH_LOCK_NAME = `${AUTH_STORAGE_KEY}.refresh`
 
+class StaleSessionCreationError extends Error {
+  constructor() {
+    super('Операция входа больше не актуальна.')
+    this.name = 'StaleSessionCreationError'
+  }
+}
+
 function isDefinitiveAuthError(error: unknown) {
   return isApiError(error)
     && error.reason === 'http'
@@ -43,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initialSession.storageAvailable ? 'persistent' : 'memory',
   )
   const sessionVersionRef = useRef(0)
+  const sessionCreationGenerationRef = useRef(0)
   const refreshOperationRef = useRef<RefreshOperation | null>(null)
   const didBootstrapRef = useRef(false)
   const memoryNoticeShownRef = useRef(false)
@@ -68,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const adoptExternalSession = useCallback((tokens: AuthTokens) => {
+    sessionCreationGenerationRef.current += 1
     sessionVersionRef.current += 1
     tokensRef.current = tokens
     persistenceRef.current = 'persistent'
@@ -79,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const clearSession = useCallback((options: ClearSessionOptions = {}) => {
+    sessionCreationGenerationRef.current += 1
     sessionVersionRef.current += 1
     tokensRef.current = null
     if (options.removeStored !== false && !removeStoredTokens()) {
@@ -90,6 +100,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLogoutRequested(options.requestedByLogout ?? false)
     setStatus('unauthenticated')
   }, [])
+
+  const createSession = useCallback(async (requestTokens: () => Promise<AuthTokens>) => {
+    const generation = sessionCreationGenerationRef.current + 1
+    sessionCreationGenerationRef.current = generation
+    const tokens = await requestTokens()
+
+    if (sessionCreationGenerationRef.current !== generation) {
+      throw new StaleSessionCreationError()
+    }
+
+    saveSession(tokens)
+  }, [saveSession])
 
   const refreshSession = useCallback((): Promise<AuthTokens> => {
     const version = sessionVersionRef.current
@@ -271,12 +293,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dismissMemorySessionNotice: () => setShowMemorySessionNotice(false),
     retrySession: restoreSession,
     register: authApi.register,
-    activate: async (code) => {
-      saveSession(await authApi.activate(code))
-    },
-    login: async (payload) => {
-      saveSession(await authApi.login(payload))
-    },
+    activate: (code) => createSession(() => authApi.activate(code)),
+    login: (payload) => createSession(() => authApi.login(payload)),
     logout: () => {
       const tokens = tokensRef.current
       setStatus('signing-out')
@@ -289,12 +307,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     disableTotp: (password) => runAuthorized((accessToken) => authApi.disableTotp(accessToken, password)),
   }), [
     clearSession,
+    createSession,
     logoutRequested,
     persistence,
     restoreSession,
     revokeRemoteSession,
     runAuthorized,
-    saveSession,
     showMemorySessionNotice,
     status,
   ])

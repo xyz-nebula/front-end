@@ -63,6 +63,13 @@ async function closeSecurityModal(page: Page) {
   await page.getByRole('dialog').getByRole('button', { name: 'Закрыть' }).click()
 }
 
+async function navigateInApp(page: Page, path: string) {
+  await page.evaluate((nextPath) => {
+    window.history.pushState(null, '', nextPath)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }, path)
+}
+
 test('times out login and activation without leaving forms loading', async ({ page }) => {
   const delayedResponse = async (route: Route) => {
     await delay(1_200)
@@ -81,6 +88,137 @@ test('times out login and activation without leaving forms loading', async ({ pa
   await page.goto(`/activate?code=${uuidV7}`)
   await expect(page.getByRole('alert')).toContainText('Сервер не ответил вовремя')
   await expect(page.getByRole('button', { name: 'Попробовать снова' })).toBeEnabled()
+})
+
+test('does not let a delayed activation overwrite a newer login', async ({ page }) => {
+  let releaseActivation = () => undefined
+  const activationReleased = new Promise<void>((resolve) => { releaseActivation = resolve })
+  let markActivationStarted = () => undefined
+  const activationStarted = new Promise<void>((resolve) => { markActivationStarted = resolve })
+  let markActivationResponded = () => undefined
+  const activationResponded = new Promise<void>((resolve) => { markActivationResponded = resolve })
+
+  await page.route('**/api/v1/auth/register/activate', async (route) => {
+    markActivationStarted()
+    await activationReleased
+    await json(route, 200, {
+      access_token: 'activation-a-access',
+      refresh_token: 'activation-a-refresh',
+    })
+    markActivationResponded()
+  })
+  await page.route('**/api/v1/auth/login', (route) => json(route, 200, {
+    access_token: 'login-b-access',
+    refresh_token: 'login-b-refresh',
+  }))
+
+  await page.goto(`/activate?code=${uuidV7}`)
+  await activationStarted
+  await navigateInApp(page, '/login')
+  await fillLogin(page)
+  await page.getByRole('button', { name: 'Войти' }).click()
+
+  await expect(page).toHaveURL(/\/home$/)
+  await expect.poll(() => readStoredTokens(page)).toContain('login-b-refresh')
+
+  releaseActivation()
+  await activationResponded
+  await delay(100)
+  expect(await readStoredTokens(page)).not.toContain('activation-a-refresh')
+  expect(await readStoredTokens(page)).toContain('login-b-refresh')
+})
+
+test('keeps the result of the last-started concurrent login', async ({ page }) => {
+  let loginRequests = 0
+  let releaseFirstLogin = () => undefined
+  const firstLoginReleased = new Promise<void>((resolve) => { releaseFirstLogin = resolve })
+  let markFirstLoginStarted = () => undefined
+  const firstLoginStarted = new Promise<void>((resolve) => { markFirstLoginStarted = resolve })
+  let markFirstLoginResponded = () => undefined
+  const firstLoginResponded = new Promise<void>((resolve) => { markFirstLoginResponded = resolve })
+
+  await page.route('**/api/v1/auth/login', async (route) => {
+    loginRequests += 1
+    if (loginRequests === 1) {
+      markFirstLoginStarted()
+      await firstLoginReleased
+      await json(route, 200, {
+        access_token: 'first-access',
+        refresh_token: 'first-refresh',
+      })
+      markFirstLoginResponded()
+      return
+    }
+
+    await json(route, 200, {
+      access_token: 'second-access',
+      refresh_token: 'second-refresh',
+    })
+  })
+
+  await page.goto('/login')
+  await fillLogin(page)
+  await page.getByRole('button', { name: 'Войти' }).click()
+  await firstLoginStarted
+
+  await navigateInApp(page, '/auth')
+  await page.getByRole('link', { name: 'Войти' }).click()
+  await fillLogin(page)
+  await page.getByLabel('Email').fill('newer@example.com')
+  await page.getByRole('button', { name: 'Войти' }).click()
+
+  await expect(page).toHaveURL(/\/home$/)
+  await expect.poll(() => readStoredTokens(page)).toContain('second-refresh')
+
+  releaseFirstLogin()
+  await firstLoginResponded
+  await delay(100)
+  expect(await readStoredTokens(page)).not.toContain('first-refresh')
+  expect(await readStoredTokens(page)).toContain('second-refresh')
+})
+
+test('does not restore a pending login after logout', async ({ page }) => {
+  let releaseLogin = () => undefined
+  const loginReleased = new Promise<void>((resolve) => { releaseLogin = resolve })
+  let markLoginStarted = () => undefined
+  const loginStarted = new Promise<void>((resolve) => { markLoginStarted = resolve })
+  let markLoginResponded = () => undefined
+  const loginResponded = new Promise<void>((resolve) => { markLoginResponded = resolve })
+
+  await page.route('**/api/v1/auth/login', async (route) => {
+    markLoginStarted()
+    await loginReleased
+    await json(route, 200, {
+      access_token: 'late-access',
+      refresh_token: 'late-refresh',
+    })
+    markLoginResponded()
+  })
+  await page.route('**/api/v1/auth/logout', (route) => route.fulfill({ status: 204 }))
+
+  await page.goto('/login')
+  await fillLogin(page)
+  await page.getByRole('button', { name: 'Войти' }).click()
+  await loginStarted
+
+  await page.evaluate(({ key, value }) => {
+    const serialized = JSON.stringify(value)
+    window.localStorage.setItem(key, serialized)
+    window.dispatchEvent(new StorageEvent('storage', { key, newValue: serialized }))
+  }, {
+    key: storageKey,
+    value: { accessToken: 'temporary-access', refreshToken: 'temporary-refresh' },
+  })
+  await expect(page).toHaveURL(/\/home$/)
+  await page.getByRole('button', { name: 'Выйти' }).click()
+  await expect(page).toHaveURL(/\/auth$/)
+  expect(await readStoredTokens(page)).toBeNull()
+
+  releaseLogin()
+  await loginResponded
+  await delay(100)
+  expect(await readStoredTokens(page)).toBeNull()
+  await expect(page).toHaveURL(/\/auth$/)
 })
 
 test('keeps tokens after a transient bootstrap failure and recovers on retry', async ({ page }) => {
