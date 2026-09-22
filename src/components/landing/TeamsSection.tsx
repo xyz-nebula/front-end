@@ -181,10 +181,6 @@ export function TeamsSection() {
             <p className="arena-teams-cta__meta" aria-label="5 минут, голосом, с персональным разбором">
               <span>5 минут</span><i /><span>голосом</span><i /><span>с персональным разбором</span>
             </p>
-            <Link className="arena-teams-cta__secondary" to="/home#cases">
-              <span>Посмотреть кейсы</span>
-              <ArrowIcon />
-            </Link>
           </div>
         </section>
       </div>

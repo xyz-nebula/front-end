@@ -60,6 +60,8 @@ test('landing renders the redesigned hero, problem section and section framework
   await expect(page.getByRole('heading', { level: 1, name: 'Тренируй переговоры как стратегическую игру' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Начать поединок' })).toHaveAttribute('href', '/home')
   await expect(page.locator('.arena-header').getByRole('link', { name: 'Начать', exact: true })).toHaveAttribute('href', '/home')
+  await expect(page.getByRole('link', { name: 'Начать первый поединок' })).toHaveAttribute('href', '/home')
+  await expect(page.getByRole('link', { name: 'Посмотреть кейсы' })).toHaveCount(0)
   await expect(page.locator('.arena-header')).toHaveAttribute('data-state', 'transparent')
   await expect(page.locator('.arena-scene-card')).toHaveCount(0)
   await expect(page.locator('.arena-placeholder')).toHaveCount(0)
@@ -277,7 +279,7 @@ test('teams section presents all audiences and the final calls to action respons
     await expect(section.getByRole('heading', { level: 3, name: 'Единый формат развития' })).toBeVisible()
 
     await expect(section.getByRole('link', { name: 'Начать первый поединок' })).toHaveAttribute('href', '/home')
-    await expect(section.getByRole('link', { name: 'Посмотреть кейсы' })).toHaveAttribute('href', '/home#cases')
+    await expect(section.getByRole('link', { name: 'Посмотреть кейсы' })).toHaveCount(0)
     await expect(section.locator('.arena-placeholder__card')).toHaveCount(0)
 
     const images = section.locator('img')
@@ -391,16 +393,32 @@ test('mobile navigation opens and closes accessibly', async ({ page }) => {
 })
 
 test('product home remains separate from the landing redesign', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('arena.auth.tokens.v1', JSON.stringify({
+      accessToken: 'landing-test-access',
+      refreshToken: 'landing-test-refresh',
+    }))
+  })
+  await page.route('**/api/v1/auth/token/refresh', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      access_token: 'landing-test-fresh-access',
+      refresh_token: 'landing-test-fresh-refresh',
+    }),
+  }))
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/home')
+  await page.goto('/')
+  await page.getByRole('link', { name: 'Начать поединок' }).click()
 
+  await expect(page).toHaveURL(/\/home$/)
   await expect(page.getByRole('heading', { level: 1, name: /Какой разговор/ })).toBeVisible()
   await expect(page.locator('.arena-landing')).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/home-mobile-regression.png`)
 })
 
-test('header navigation follows every landing section and CTA opens the product', async ({ page }) => {
+test('header navigation follows every landing section and guest CTA opens login', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
 
@@ -422,5 +440,5 @@ test('header navigation follows every landing section and CTA opens the product'
   }
 
   await page.locator('.arena-header').getByRole('link', { name: 'Начать', exact: true }).click()
-  await expect(page).toHaveURL(/\/home$/)
+  await expect(page).toHaveURL(/\/login$/)
 })

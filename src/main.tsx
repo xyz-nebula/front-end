@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 
 import { App } from '@/App'
+import { AuthProvider } from '@/auth/AuthContext'
 import { AppThemeProvider } from '@/components/layout/AppThemeProvider'
 import '@/styles/global.css'
 
@@ -16,7 +17,9 @@ createRoot(rootElement).render(
   <StrictMode>
     <BrowserRouter>
       <AppThemeProvider>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </AppThemeProvider>
     </BrowserRouter>
   </StrictMode>,
