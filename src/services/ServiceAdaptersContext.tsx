@@ -1,8 +1,11 @@
 import { useMemo, type ReactNode } from 'react'
 
-import type { AudioClient } from '@/services/contracts/audioClient'
-import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 import { parseServiceConfig } from '@/services/config'
+import { MockAudioClient } from '@/services/mock/mockAudioClient'
+import { MockAuthClient } from '@/services/mock/mockAuthClient'
+import { MockNegotiationClient } from '@/services/mock/mockNegotiationClient'
+import { MockRuntime } from '@/services/mock/mockRuntime'
+import { MockStorage } from '@/services/mock/mockStorage'
 import { AudioEngineClient } from '@/services/real/audioEngineClient'
 import { BackendAuthClient } from '@/services/real/backendAuthClient'
 import { BackendNegotiationClient } from '@/services/real/backendNegotiationClient'
@@ -10,60 +13,6 @@ import {
   ServiceAdaptersContext,
   type ServiceAdapters,
 } from '@/services/serviceAdapters'
-import type { AuthClient } from '@/services/contracts/authClient'
-import { ServiceError, featureUnavailable } from '@/types/api'
-
-function pendingMockAuthClient(): AuthClient {
-  const unavailable = (): never => {
-    throw new ServiceError('Mock-аутентификация будет подключена на этапе 3.', {
-      reason: 'feature-unavailable',
-      code: 'MOCK_AUTH_PENDING',
-    })
-  }
-
-  return {
-    register: async () => unavailable(),
-    activate: async () => unavailable(),
-    login: async () => unavailable(),
-    refresh: async () => unavailable(),
-    logout: async () => unavailable(),
-    enrollTotp: async () => unavailable(),
-    confirmTotp: async () => unavailable(),
-    disableTotp: async () => unavailable(),
-  }
-}
-
-function pendingMockNegotiationClient(): NegotiationClient {
-  const unavailable = (): never => {
-    throw featureUnavailable('negotiation')
-  }
-
-  return {
-    createSession: async () => unavailable(),
-    getSession: async () => unavailable(),
-    sendTextTurn: async () => unavailable(),
-    createAudioTicket: async () => unavailable(),
-    finishSession: async () => unavailable(),
-    getResult: async () => unavailable(),
-    listSessions: async () => unavailable(),
-  }
-}
-
-function pendingMockAudioClient(): AudioClient {
-  const unavailable = (): never => {
-    throw featureUnavailable('audio')
-  }
-
-  return {
-    getState: () => 'idle',
-    connect: async () => unavailable(),
-    sendAudio: () => unavailable(),
-    sendControl: () => unavailable(),
-    subscribe: () => () => undefined,
-    subscribeState: () => () => undefined,
-    disconnect: async () => undefined,
-  }
-}
 
 export function ServiceAdaptersProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ServiceAdapters>(() => {
@@ -76,9 +25,11 @@ export function ServiceAdaptersProvider({ children }: { children: ReactNode }) {
       VITE_MOCK_LATENCY_MS: import.meta.env.VITE_MOCK_LATENCY_MS,
       VITE_AUDIO_WS_URL: import.meta.env.VITE_AUDIO_WS_URL,
     })
+    const mockStorage = new MockStorage()
+    const mockRuntime = new MockRuntime(mockStorage)
     const authClient = config.authSource === 'real'
       ? new BackendAuthClient({ baseUrl: config.apiBaseUrl, timeoutMs: config.apiTimeoutMs })
-      : pendingMockAuthClient()
+      : new MockAuthClient(mockStorage, config.mockLatencyMs)
 
     return {
       config,
@@ -86,11 +37,11 @@ export function ServiceAdaptersProvider({ children }: { children: ReactNode }) {
       createNegotiationClient: (context) => {
         return config.negotiationSource === 'real'
           ? new BackendNegotiationClient(context.runAuthorized)
-          : pendingMockNegotiationClient()
+          : new MockNegotiationClient(mockRuntime, context.mockOwnerKey, config.mockLatencyMs)
       },
       createAudioClient: () => config.audioSource === 'real'
         ? new AudioEngineClient()
-        : pendingMockAudioClient(),
+        : new MockAudioClient(mockRuntime, { latencyMs: config.mockLatencyMs }),
     }
   }, [])
 

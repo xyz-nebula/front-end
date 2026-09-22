@@ -118,6 +118,8 @@ img, picture, svg, canvas { display: block; max-width: 100%; }
 .activation-mark--success { color: #2f7650; background: #ddf1e4; box-shadow: 0 0 0 9px rgba(72,153,103,.07); }
 .activation-mark--error { color: #a33f39; background: #f8e3df; box-shadow: 0 0 0 9px rgba(192,62,55,.06); }
 .activation-email { max-width: 100%; margin-top: 22px; padding: 9px 14px; border-radius: 999px; color: #51457f; background: #e9e5fb; font-size: 12px; font-weight: 750; overflow-wrap: anywhere; }
+.demo-activation-link { margin-top: 16px; color: #5d43bd; font-size: 13px; font-weight: 800; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.demo-activation-link:hover { color: #3d278f; }
 .activation-action { width: 100%; margin-top: 18px; }
 .auth-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .auth-choice__item { position: relative; display: flex; min-height: 240px; flex-direction: column; align-items: flex-start; padding: 24px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255,255,255,.72); overflow: hidden; transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
