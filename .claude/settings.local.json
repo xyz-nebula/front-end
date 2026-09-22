@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(ls /Users/cursay/Documents/Programming/nebula/front-end/.env*)"
-    ]
-  }
-}
