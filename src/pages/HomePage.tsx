@@ -12,10 +12,10 @@ import { caseCategories, recentTrainings, trainingCases } from '@/mocks/cases'
 import type { CaseCategory, TrainingCase } from '@/types/case'
 
 export function HomePage() {
-  const { dismissMemorySessionNotice, logout, showMemorySessionNotice } = useAuth()
+  const { dismissMemorySessionNotice, externalSessionVersion, logout, showMemorySessionNotice } = useAuth()
   const [category, setCategory] = useState<CaseCategory>('Все')
   const [selectedCase, setSelectedCase] = useState<TrainingCase | null>(null)
-  const [isSecurityOpen, setIsSecurityOpen] = useState(false)
+  const [securityModalVersion, setSecurityModalVersion] = useState<number | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const recommendedCase = trainingCases[0]
   const visibleCases = useMemo(
@@ -36,7 +36,7 @@ export function HomePage() {
           <Logo />
           <nav aria-label="Навигация приложения"><a className="is-active" href="#cases">Тренировки</a><a href="#progress">Мой прогресс</a></nav>
           <div className="app-header__actions">
-            <button type="button" onClick={() => setIsSecurityOpen(true)}><span className="app-header__shield" aria-hidden="true">✦</span><span>2FA</span></button>
+            <button type="button" onClick={() => setSecurityModalVersion(externalSessionVersion)}><span className="app-header__shield" aria-hidden="true">✦</span><span>2FA</span></button>
             <button type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>{isLoggingOut ? 'Выходим…' : 'Выйти'}</button>
           </div>
         </div>
@@ -102,7 +102,7 @@ export function HomePage() {
 
       <footer className="app-home__footer"><div className="app-shell"><Logo /><span>Тренируйся сегодня — говори увереннее завтра.</span><span>Прототип · 2026</span></div></footer>
       {selectedCase && <TrainingModal item={selectedCase} onClose={() => setSelectedCase(null)} />}
-      {isSecurityOpen && <TotpModal onClose={() => setIsSecurityOpen(false)} />}
+      {securityModalVersion === externalSessionVersion && <TotpModal onClose={() => setSecurityModalVersion(null)} />}
     </div>
   )
 }

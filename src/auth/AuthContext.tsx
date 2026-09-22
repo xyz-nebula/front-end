@@ -31,6 +31,13 @@ class StaleSessionCreationError extends Error {
   }
 }
 
+class StaleAuthorizedOperationError extends Error {
+  constructor() {
+    super('Сессия изменилась во время выполнения операции.')
+    this.name = 'StaleAuthorizedOperationError'
+  }
+}
+
 function isDefinitiveAuthError(error: unknown) {
   return isApiError(error)
     && error.reason === 'http'
@@ -45,19 +52,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initialSession.storageAvailable ? 'persistent' : 'memory',
   )
   const [showMemorySessionNotice, setShowMemorySessionNotice] = useState(false)
+  const [externalSessionVersion, setExternalSessionVersion] = useState(0)
   const tokensRef = useRef<AuthTokens | null>(initialSession.tokens)
   const persistenceRef = useRef<SessionPersistence>(
     initialSession.storageAvailable ? 'persistent' : 'memory',
   )
   const sessionVersionRef = useRef(0)
+  const sessionGenerationRef = useRef(0)
   const sessionCreationGenerationRef = useRef(0)
   const refreshOperationRef = useRef<RefreshOperation | null>(null)
   const didBootstrapRef = useRef(false)
   const memoryNoticeShownRef = useRef(false)
 
-  const saveSession = useCallback((tokens: AuthTokens) => {
+  const saveSession = useCallback((tokens: AuthTokens, replacesSession = true) => {
     const wasPersisted = writeStoredTokens(tokens)
     if (!wasPersisted) removeStoredTokens()
+    if (replacesSession) sessionGenerationRef.current += 1
     sessionVersionRef.current += 1
     tokensRef.current = tokens
     const nextPersistence = wasPersisted ? 'persistent' : 'memory'
@@ -77,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const adoptExternalSession = useCallback((tokens: AuthTokens) => {
     sessionCreationGenerationRef.current += 1
+    sessionGenerationRef.current += 1
     sessionVersionRef.current += 1
     tokensRef.current = tokens
     persistenceRef.current = 'persistent'
@@ -85,10 +96,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setShowMemorySessionNotice(false)
     setLogoutRequested(false)
     setStatus('authenticated')
+    setExternalSessionVersion((version) => version + 1)
   }, [])
 
   const clearSession = useCallback((options: ClearSessionOptions = {}) => {
     sessionCreationGenerationRef.current += 1
+    sessionGenerationRef.current += 1
     sessionVersionRef.current += 1
     tokensRef.current = null
     if (options.removeStored !== false && !removeStoredTokens()) {
@@ -128,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (currentTokens) return currentTokens
           throw new ApiError(401, 'Сессия уже завершена.')
         }
-        saveSession(tokens)
+        saveSession(tokens, false)
         return tokens
       })
       .catch((error: unknown): AuthTokens => {
@@ -218,29 +231,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const runAuthorized = useCallback(async <T,>(operation: (accessToken: string) => Promise<T>): Promise<T> => {
     const initialTokens = tokensRef.current
-    const initialVersion = sessionVersionRef.current
+    const sessionGeneration = sessionGenerationRef.current
     if (!initialTokens) {
       clearSession()
       throw new ApiError(401, 'Войдите, чтобы продолжить.')
     }
 
+    const assertSessionIsCurrent = () => {
+      if (sessionGenerationRef.current !== sessionGeneration) {
+        throw new StaleAuthorizedOperationError()
+      }
+    }
+
     try {
-      return await operation(initialTokens.accessToken)
+      assertSessionIsCurrent()
+      const result = await operation(initialTokens.accessToken)
+      assertSessionIsCurrent()
+      return result
     } catch (error) {
+      assertSessionIsCurrent()
       if (!isApiError(error) || error.status !== 401) throw error
     }
 
-    let retryTokens: AuthTokens
-    if (sessionVersionRef.current !== initialVersion && tokensRef.current) {
-      retryTokens = tokensRef.current
-    } else {
-      retryTokens = await refreshSession()
-    }
+    assertSessionIsCurrent()
+    const retryTokens = await refreshSession()
+    assertSessionIsCurrent()
 
     const retryVersion = sessionVersionRef.current
     try {
-      return await operation(retryTokens.accessToken)
+      assertSessionIsCurrent()
+      const result = await operation(retryTokens.accessToken)
+      assertSessionIsCurrent()
+      return result
     } catch (error) {
+      assertSessionIsCurrent()
       if (isApiError(error) && error.status === 401 && sessionVersionRef.current === retryVersion) {
         clearSession()
       }
@@ -289,6 +313,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     status,
     logoutRequested,
     persistence,
+    externalSessionVersion,
     showMemorySessionNotice,
     dismissMemorySessionNotice: () => setShowMemorySessionNotice(false),
     retrySession: restoreSession,
@@ -308,6 +333,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }), [
     clearSession,
     createSession,
+    externalSessionVersion,
     logoutRequested,
     persistence,
     restoreSession,

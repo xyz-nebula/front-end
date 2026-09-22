@@ -54,6 +54,14 @@ async function readStoredTokens(page: Page) {
   return page.evaluate((key) => window.localStorage.getItem(key), storageKey)
 }
 
+async function replaceSessionExternally(page: Page, accessToken: string, refreshToken: string) {
+  await page.evaluate(({ key, value }) => {
+    const serialized = JSON.stringify(value)
+    window.localStorage.setItem(key, serialized)
+    window.dispatchEvent(new StorageEvent('storage', { key, newValue: serialized }))
+  }, { key: storageKey, value: { accessToken, refreshToken } })
+}
+
 async function openEnrollment(page: Page) {
   await page.getByRole('button', { name: '2FA' }).click()
   await page.getByRole('button', { name: /Подключить 2FA/ }).click()
@@ -333,6 +341,96 @@ test('keeps an authenticated session when refresh fails during a protected opera
   await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Сервис временно недоступен')
   await expect(page).toHaveURL(/\/home$/)
   expect(await readStoredTokens(page)).toContain('bootstrap-refresh')
+})
+
+test('does not retry a protected request with a replacement session', async ({ page }) => {
+  await seedSession(page, 'account-a-access', 'account-a-refresh')
+  let refreshRequests = 0
+  let enrollRequests = 0
+  let releaseEnrollment = () => undefined
+  const enrollmentReleased = new Promise<void>((resolve) => { releaseEnrollment = resolve })
+  let markEnrollmentStarted = () => undefined
+  const enrollmentStarted = new Promise<void>((resolve) => { markEnrollmentStarted = resolve })
+
+  await page.route('**/api/v1/auth/token/refresh', async (route) => {
+    refreshRequests += 1
+    await json(route, 200, {
+      access_token: 'account-a-bootstrap-access',
+      refresh_token: 'account-a-bootstrap-refresh',
+    })
+  })
+  await page.route('**/api/v1/auth/totp/enroll', async (route) => {
+    enrollRequests += 1
+    markEnrollmentStarted()
+    await enrollmentReleased
+    await json(route, 401, { detail: 'Expired' })
+  })
+
+  await page.goto('/home')
+  await openEnrollment(page)
+  await enrollmentStarted
+  await replaceSessionExternally(page, 'account-b-access', 'account-b-refresh')
+  await expect(page.getByRole('dialog')).toBeHidden()
+
+  releaseEnrollment()
+  await delay(100)
+
+  expect(enrollRequests).toBe(1)
+  expect(refreshRequests).toBe(1)
+  expect(await readStoredTokens(page)).toContain('account-b-refresh')
+})
+
+test('discards a late protected success from the previous session', async ({ page }) => {
+  await seedSession(page, 'account-a-access', 'account-a-refresh')
+  let releaseEnrollment = () => undefined
+  const enrollmentReleased = new Promise<void>((resolve) => { releaseEnrollment = resolve })
+  let markEnrollmentStarted = () => undefined
+  const enrollmentStarted = new Promise<void>((resolve) => { markEnrollmentStarted = resolve })
+
+  await page.route('**/api/v1/auth/token/refresh', (route) => json(route, 200, {
+    access_token: 'account-a-bootstrap-access',
+    refresh_token: 'account-a-bootstrap-refresh',
+  }))
+  await page.route('**/api/v1/auth/totp/enroll', async (route) => {
+    markEnrollmentStarted()
+    await enrollmentReleased
+    await json(route, 200, {
+      secret: 'ACCOUNT_A_LATE_SECRET',
+      otpauth_url: 'otpauth://totp/Arena:account-a',
+    })
+  })
+
+  await page.goto('/home')
+  await openEnrollment(page)
+  await enrollmentStarted
+  await replaceSessionExternally(page, 'account-b-access', 'account-b-refresh')
+  releaseEnrollment()
+  await delay(100)
+
+  await page.getByRole('button', { name: '2FA' }).click()
+  await expect(page.getByRole('heading', { name: 'Двухфакторная защита' })).toBeVisible()
+  await expect(page.getByText('ACCOUNT_A_LATE_SECRET')).toHaveCount(0)
+})
+
+test('closes an open security modal when the session is replaced externally', async ({ page }) => {
+  await seedSession(page, 'account-a-access', 'account-a-refresh')
+  await page.route('**/api/v1/auth/token/refresh', (route) => json(route, 200, {
+    access_token: 'account-a-bootstrap-access',
+    refresh_token: 'account-a-bootstrap-refresh',
+  }))
+  await page.route('**/api/v1/auth/totp/enroll', (route) => json(route, 200, {
+    secret: 'ACCOUNT_A_VISIBLE_SECRET',
+    otpauth_url: 'otpauth://totp/Arena:account-a',
+  }))
+
+  await page.goto('/home')
+  await openEnrollment(page)
+  await expect(page.getByText('ACCOUNT_A_VISIBLE_SECRET')).toBeVisible()
+
+  await replaceSessionExternally(page, 'account-b-access', 'account-b-refresh')
+
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(page.getByText('ACCOUNT_A_VISIBLE_SECRET')).toHaveCount(0)
 })
 
 test('survives corrupted storage and removes its invalid value', async ({ page }) => {

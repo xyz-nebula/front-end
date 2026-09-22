@@ -13,6 +13,7 @@ export interface AuthContextValue {
   status: AuthStatus
   logoutRequested: boolean
   persistence: SessionPersistence
+  externalSessionVersion: number
   showMemorySessionNotice: boolean
   dismissMemorySessionNotice: () => void
   retrySession: () => Promise<void>
