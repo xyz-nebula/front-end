@@ -84,7 +84,7 @@ export function LandingPage() {
                 <span>как стратегическую игру</span>
               </h1>
               <p>Готовь стратегию, веди голосовые переговоры с AI-оппонентом и получай разбор своих решений.</p>
-              <Link className="arena-hero__cta" to="/home">
+              <Link className="arena-hero__cta" to="/auth">
                 <span>Начать поединок</span>
                 <svg viewBox="0 0 26 26" aria-hidden="true">
                   <path d="M3 13h18m-6.5-6.5L21 13l-6.5 6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

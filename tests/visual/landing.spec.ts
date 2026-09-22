@@ -23,8 +23,8 @@ test('landing renders the redesigned hero and section framework', async ({ page 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1, name: 'Тренируй переговоры как стратегическую игру' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Начать поединок' })).toHaveAttribute('href', '/home')
-  await expect(page.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/home')
+  await expect(page.getByRole('link', { name: 'Начать поединок' })).toHaveAttribute('href', '/auth')
+  await expect(page.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/login')
   await expect(page.locator('.arena-scene-card')).toHaveCount(0)
   for (const heading of sectionHeadings) {
     await expect(page.getByRole('heading', { level: 2, name: heading })).toBeAttached()
@@ -68,6 +68,20 @@ test('mobile navigation opens and closes accessibly', async ({ page }) => {
 })
 
 test('product home remains separate from the landing redesign', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('arena.auth.tokens.v1', JSON.stringify({
+      accessToken: 'landing-test-access',
+      refreshToken: 'landing-test-refresh',
+    }))
+  })
+  await page.route('**/api/v1/auth/token/refresh', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      access_token: 'landing-test-fresh-access',
+      refresh_token: 'landing-test-fresh-refresh',
+    }),
+  }))
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/home')
 

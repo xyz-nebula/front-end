@@ -62,7 +62,7 @@ export function LandingHeader() {
         </nav>
 
         <div className="arena-header__actions">
-          <Link className="arena-header__login" to="/home">Войти</Link>
+          <Link className="arena-header__login" to="/login">Войти</Link>
           <button
             className={`arena-menu-toggle ${isOpen ? 'is-open' : ''}`}
             type="button"
