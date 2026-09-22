@@ -24,6 +24,23 @@ C:\Users\user\UrFU\coolname\audio-engine
 В рамках этого плана запрещено менять backend, audio-engine, базу данных или
 LocalAI.
 
+Результат этого плана — работающий frontend-прототип на mock и готовые границы
+для будущих real adapter'ов. Реальная интеграция negotiation/audio в задачу не
+входит: до появления совместимых серверных контрактов real adapter'ы остаются
+типизированными заглушками.
+
+## 1.1. Зафиксированные решения
+
+- target-контракты сначала фиксируются типами и fixtures, затем реализуется UI;
+- `finishSession` допускает состояния `processing`, `ready`, `failed`;
+- partial transcript содержит полный актуальный текст, а не delta;
+- долговременная дедупликация сообщений выполняется по `message.id`;
+- `eventId` дедуплицируется только в рамках audio connection;
+- один `AudioClient` создаётся на одну arena session;
+- mock registration показывает demo-ссылку активации;
+- mock server data хранится в localStorage намеренно; запрет localStorage для
+  server-owned metadata относится только к будущему real adapter.
+
 ## 2. Целевая ответственность сервисов
 
 ### 2.1. Backend — источник истины
@@ -286,6 +303,21 @@ interface NegotiationResult {
   recommendations: string[]
 }
 
+interface NegotiationSessionSummary {
+  id: string
+  caseId: string
+  mode: NegotiationMode
+  status: NegotiationStatus
+  startedAt: string
+  finishedAt?: string
+  score?: number
+}
+
+type NegotiationResultState =
+  | { status: 'processing' }
+  | { status: 'ready'; result: NegotiationResult }
+  | { status: 'failed'; message: string }
+
 interface TextTurnResult {
   userMessage: NegotiationMessage
   aiMessage: NegotiationMessage
@@ -296,6 +328,20 @@ interface AudioTicket {
   ticket: string
   expiresAt: string
   protocol: 'audio-engine.v1'
+}
+
+interface AudioFormat {
+  codec: 'pcm_s16le'
+  sampleRate: 24000
+  channels: 1
+  bitDepth: 16
+}
+
+interface AudioInputFrame {
+  sequence: number
+  timestamp: number
+  format: AudioFormat
+  payload: string
 }
 ```
 
@@ -347,9 +393,9 @@ interface NegotiationClient {
   finishSession(input: {
     sessionId: string
     clientCommandId: string
-  }): Promise<NegotiationResult>
+  }): Promise<NegotiationResultState>
 
-  getResult(sessionId: string): Promise<NegotiationResult>
+  getResult(sessionId: string): Promise<NegotiationResultState>
   listSessions(): Promise<NegotiationSessionSummary[]>
 }
 ```
@@ -399,22 +445,49 @@ interface AudioClient {
   sendAudio(frame: AudioInputFrame): void
   sendControl(action: 'pause' | 'resume' | 'stop' | 'close'): void
   subscribe(listener: (event: AudioEngineEvent) => void): () => void
+  subscribeState(listener: (state: AudioConnectionState) => void): () => void
   disconnect(): Promise<void>
 }
 ```
 
 `message_committed` означает, что audio-engine уже сохранил transcript в
-backend. Frontend добавляет сообщение в UI и при следующем `getSession`
-сверяется с backend по `message.id`, `sequence` и `eventId`.
+backend. Frontend добавляет сообщение в UI. `eventId` защищает от повторного
+события в текущем connection, а после reload/reconnect история сверяется по
+`message.id` и `sequence`.
 
 ### 7.3. Auth и защищённые запросы
 
 Auth client повторяет существующие операции `authApi`. `AuthContext` остаётся
 владельцем токенов и единственного refresh flow.
 
+Auth storage получает `source: 'mock' | 'real'` и стабильный `mockOwnerKey`.
+`mockOwnerKey` создаётся при новой frontend-сессии, сохраняется при refresh и
+используется только для изоляции mock negotiation data. Страницы не получают и
+не декодируют tokens. Старый auth storage мигрируется как `source: 'real'`.
+
 Будущий real negotiation adapter должен выполнять защищённые запросы через
 существующую семантику `runAuthorized`: первоначальный запрос, один refresh
 после 401 и один повтор. Страницы и hooks не получают access token.
+
+### 7.4. Target wire contract
+
+Real stubs документируют, но пока не вызывают:
+
+| Метод | Target path | Idempotency |
+|---|---|---|
+| createSession | `POST /v1/negotiations` | `Idempotency-Key` |
+| getSession | `GET /v1/negotiations/{id}` | — |
+| sendTextTurn | `POST /v1/negotiations/{id}/turns/text` | `Idempotency-Key` |
+| createAudioTicket | `POST /v1/negotiations/{id}/audio-ticket` | — |
+| finishSession | `POST /v1/negotiations/{id}/finish` | `Idempotency-Key` |
+| getResult | `GET /v1/negotiations/{id}/result` | — |
+| listSessions | `GET /v1/negotiations` | — |
+
+Wire DTO используют snake_case и проверяются runtime parser'ами. WebSocket target:
+`/v1/audio-stream?ticket=<short-lived-ticket>&protocol=audio-engine.v1`.
+Frontend не логирует полный URL. Ticket одноразовый, привязан к session/user и
+при reconnect запрашивается заново. Partial transcript — snapshot. Committed
+event содержит `event_id` и сохранённый `message`.
 
 ## 8. Реализации и dependency injection
 
@@ -446,7 +519,8 @@ ServiceAdaptersProvider
 
 - adapters provider читает env и создаёт выбранные низкоуровневые adapter'ы;
 - AuthProvider использует auth client и предоставляет `runAuthorized`;
-- domain provider создаёт защищённый negotiation client и audio client;
+- domain provider создаёт защищённый negotiation client и factory для создания
+  отдельного audio client на arena session;
 - страницы получают только финальные ports;
 - pages/hooks не импортируют mock/real реализации напрямую.
 
@@ -475,8 +549,10 @@ Storage обязан:
 - обеспечивать монотонный sequence;
 - дедуплицировать `clientCommandId`, `clientTurnId` и `eventId`;
 - не читать и не записывать реальные tokens;
-- сериализовать мутации через одну очередь, чтобы параллельные события не
-  получили одинаковый sequence.
+- сериализовать мутации через локальную очередь и `navigator.locks`, чтобы
+  вкладки не получили одинаковый sequence;
+- в fallback без Web Locks поддерживать одну активную mock arena-вкладку и
+  показывать понятную ошибку во второй.
 
 ### 9.2. Mock negotiation
 
@@ -493,7 +569,8 @@ Mock negotiation ведёт себя как будущий backend:
 - `sendTextTurn` одной операцией сохраняет user и AI messages;
 - повтор с тем же turn id не создаёт сообщения повторно;
 - `createAudioTicket` возвращает короткоживущий mock ticket;
-- `finishSession` идемпотентно сохраняет стабильный result;
+- `finishSession` идемпотентно создаёт `processing`, затем стабильный `ready`
+  result; ResultPage опрашивает `getResult` с ограниченным backoff;
 - `getSession`, `getResult`, `listSessions` читают сохранённые данные.
 
 Mock AI response выбирается детерминированно по caseId и номеру хода. UI не
@@ -521,6 +598,10 @@ audio-engine. Arena hook не вызывает `addMessage` в ответ на t
 По умолчанию mock не запрашивает микрофон. Дополнительный demo microphone режим
 использует `getUserMedia` только для permission UX и останавливает все tracks при
 disconnect. Отправка MediaRecorder/WebM как PCM запрещена.
+
+Partial event всегда содержит полный актуальный transcript. После commit,
+disconnect или ошибки partial очищается. События от старого connection после
+reconnect игнорируются.
 
 ## 10. UI flow
 
@@ -561,6 +642,8 @@ src/components/arena/*
 - добавляет только `message_committed` и дедуплицирует его по id/eventId;
 - после reconnect/reload заново загружает session;
 - завершает session одной командой;
+- хранит незавершённые command/turn id в `sessionStorage` и очищает после
+  подтверждённого успеха;
 - снимает listeners, timers, MediaStream и WebSocket при cleanup.
 
 Страница отображает case/opponent, таймер, сообщения, thinking, partial voice
@@ -575,9 +658,9 @@ loading/error/empty states.
 /result/:sessionId
 ```
 
-ResultPage вызывает `getResult`, показывает outcome, score, summary, strengths,
-improvements и recommendations. Повтор кейса создаёт новую session с новым
-command id.
+ResultPage вызывает `getResult`, отображает processing/error и после готовности
+показывает outcome, score, summary, strengths, improvements и recommendations.
+Повтор кейса создаёт новую session с новым command id.
 
 HomePage получает историю через `listSessions`. Статические progress-значения
 остаются явно демонстрационными до появления соответствующего backend contract.
@@ -606,58 +689,82 @@ HomePage получает историю через `listSessions`. Статич
 - manual close не запускает reconnect;
 - токены и URL с ticket не попадают в логи или UI.
 
-## 12. Порядок реализации
+Target fixture фиксирует, что audio ticket короткоживущий, привязан к одной
+session и не переиспользуется после reconnect. Способ передачи ticket, точные
+HTTP paths, DTO, internal auth и close codes документируются как требования к
+будущим сервисам, но real network code сейчас не реализуется.
 
-Фазы выполняются последовательно. Следующая начинается после прохождения
-критерия текущей.
+## 12. Этапы разработки
 
-### Фаза A — финальные ports и composition
+Этапы выполняются строго последовательно. Команда «выполняем этап N» означает
+работу только в границах этого этапа.
 
-1. Добавить общие ошибки, negotiation/audio types и interfaces.
-2. Вынести существующий auth API в auth client без изменения поведения.
-3. Добавить config parsing и двухуровневый composition root.
-4. Добавить real negotiation/audio stubs `feature-unavailable`.
-5. Настроить visual smoke на явный mock mode без API proxy.
+### Этап 1 — контракты и типы
 
-Критерий: существующий auth flow и тесты не изменились по поведению; lint и
-build проходят; UI не импортирует конкретные adapter'ы.
+- зафиксировать ports, DTO/event fixtures, ошибки и config;
+- определить result processing, audio format, retry и reconciliation;
+- добавить real negotiation/audio stubs без сетевых запросов;
+- описать target backend/audio requirements в README.
 
-### Фаза B — mock backend и mock audio-engine
+Готово: типы компилируются, fixtures валидируются, спорных контрактов не осталось.
 
-1. Реализовать mock auth.
-2. Реализовать versioned storage и mutation queue.
-3. Реализовать mock negotiation с idempotency.
-4. Реализовать mock runtime для внутренних transcript commits.
-5. Реализовать mock audio events и resource cleanup.
+### Этап 2 — auth и composition root
 
-Критерий: mock clients имитируют целевые сервисные границы; voice messages
-появляются в session storage через mock runtime, а не через UI `addMessage`.
+- вынести `authApi` в `AuthClient` без изменения поведения;
+- добавить source-aware auth storage и `mockOwnerKey`;
+- собрать providers и factories;
+- настроить env parsing и режимы запуска.
 
-### Фаза C — UI
+Готово: прежние auth tests проходят, UI не импортирует реализации adapter'ов.
 
-1. Расширить TrainingModal.
-2. Добавить ArenaPage, ResultPage и routes.
-3. Реализовать `useArenaSession`.
-4. Подключить text и voice flows.
-5. Подключить session history на HomePage.
-6. Добавить desktop/mobile стили и состояния.
+### Этап 3 — mock domain
 
-Критерий: полный mock flow работает от login/register до result, а reload
-восстанавливает session без создания дублей.
+- реализовать mock auth и demo activation link;
+- реализовать versioned storage, Web Lock и idempotency;
+- реализовать mock negotiation, result processing и mock runtime;
+- реализовать mock audio events, reconnect и cleanup.
 
-### Фаза D — contract readiness
+Готово: lint/build проходят; runtime детерминирован, не импортируется страницами
+и готов к подключению в этапе 4.
 
-1. Добавить README-раздел с таблицей требуемых backend/audio контрактов.
-2. Для каждого метода real stub указать ожидаемый DTO/event mapping.
-3. Добавить contract fixtures, на которых позднее будет проверяться real adapter.
-4. Убедиться, что замена mock adapter не требует изменений pages/hooks.
+### Этап 4 — текстовый сценарий
 
-Критерий: для подключения готовых сервисов требуется реализовать только
-`backendNegotiationClient` и `audioEngineClient`, затем переключить env.
+- расширить TrainingModal;
+- добавить ArenaPage, route и `useArenaSession`;
+- реализовать create/load/text turn/finish;
+- добавить loading/error/empty/disabled состояния и reload recovery.
+
+Готово: полный text flow работает на desktop/mobile без дублей.
+
+### Этап 5 — голос, результат и история
+
+- добавить voice controls, partial transcript и committed messages;
+- добавить ResultPage с processing/polling;
+- подключить HomePage history;
+- реализовать playback mock, reconnect и resource cleanup.
+
+Готово: полный mock flow работает от login/register до result и переживает reload.
+
+### Этап 6 — проверка готовности
+
+- разделить Playwright-запуски по env-режимам;
+- закрыть resilience, idempotency, cleanup и corrupted storage cases;
+- проверить отсутствие network calls у real stubs;
+- выполнить lint, build, visual smoke и открыть desktop/mobile PNG.
+
+Готово: замена mock на будущие real adapter'ы не требует изменений pages/hooks.
+
 
 ## 13. Тестирование
 
 Не добавлять новый test framework. Использовать Playwright.
+
+Запуски разделить по режимам:
+
+- auth contract/resilience: `real / mock / mock`, HTTP перехватывает Playwright;
+- полный demo flow и visual smoke: `mock / mock / mock`;
+- режимы запускаются отдельными Vite-процессами, потому что env фиксируется при
+  старте.
 
 Добавить:
 
@@ -688,15 +795,15 @@ tests/visual/service-contracts.spec.ts
 16. real negotiation/audio stubs без сетевых запросов;
 17. desktop/mobile и отсутствие horizontal overflow.
 
-После каждой фазы запускать:
+После каждого этапа запускать:
 
 ```bash
 npm run lint
 npm run build
-npm run visual:smoke
 ```
 
-После UI/CSS изменений открыть соответствующие PNG из
+После этапов с UI/CSS дополнительно запускать `npm run visual:smoke` и открыть
+соответствующие PNG из
 `artifacts/visual-smoke/` через `view_image`. PNG не коммитить.
 
 ## 14. Запрещённые временные решения
@@ -706,7 +813,7 @@ npm run visual:smoke
 - строить Arena flow на отдельных `POST /message/` для user и AI;
 - передавать `is_ai: true` из frontend;
 - сохранять voice transcript через frontend;
-- хранить server-owned session metadata только в localStorage;
+- хранить real server-owned session metadata только в localStorage;
 - выдавать mock result за real backend result;
 - генерировать или подписывать JWT в браузере;
 - передавать backend access token в audio-engine;
@@ -737,4 +844,3 @@ npm run visual:smoke
 - в README перечислены обязательные внешние контракты: session CRUD, atomic
   text turn, audio ticket, internal transcript commit, committed message event,
   finish/result, session list, input PCM и close/reconnect policy.
-
