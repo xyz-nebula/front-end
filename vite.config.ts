@@ -5,13 +5,15 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 
 export default defineConfig(({ command, isPreview, mode }) => {
-  const env = loadEnv(mode, process.cwd(), 'API_PROXY_')
+  const env = loadEnv(mode, process.cwd(), '')
   const apiProxyTarget = env.API_PROXY_TARGET
-  const needsApiProxy = command === 'serve' && !isPreview
+  const needsApiProxy = command === 'serve'
+    && !isPreview
+    && env.VITE_AUTH_SOURCE === 'real'
 
   if (needsApiProxy && !apiProxyTarget) {
     throw new Error(
-      'API_PROXY_TARGET is required. Copy .env.example to .env and set the backend URL.',
+      'API_PROXY_TARGET is required when VITE_AUTH_SOURCE=real. Copy .env.example to .env and set the backend URL.',
     )
   }
 

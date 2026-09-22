@@ -444,6 +444,71 @@ test('survives corrupted storage and removes its invalid value', async ({ page }
   expect(await readStoredTokens(page)).toBeNull()
 })
 
+test('migrates legacy auth storage and preserves its mock owner key across refreshes', async ({ page }) => {
+  await page.goto('/login')
+  await page.evaluate(({ key, value }) => {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  }, {
+    key: storageKey,
+    value: { accessToken: 'stored-access', refreshToken: 'stored-refresh' },
+  })
+  let refreshRequests = 0
+  await page.route('**/api/v1/auth/token/refresh', async (route) => {
+    refreshRequests += 1
+    await json(route, 200, {
+      access_token: `rotated-access-${refreshRequests}`,
+      refresh_token: `rotated-refresh-${refreshRequests}`,
+    })
+  })
+
+  await page.goto('/home')
+  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  const migrated = await page.evaluate((key) => JSON.parse(
+    window.localStorage.getItem(key) ?? 'null',
+  ) as unknown, storageKey) as {
+    source: unknown
+    mockOwnerKey: unknown
+    tokens: { refreshToken?: unknown }
+  }
+
+  expect(migrated.source).toBe('real')
+  expect(migrated.mockOwnerKey).toEqual(expect.any(String))
+  expect(migrated.tokens.refreshToken).toBe('rotated-refresh-1')
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  const refreshed = await page.evaluate((key) => JSON.parse(
+    window.localStorage.getItem(key) ?? 'null',
+  ) as unknown, storageKey) as {
+    mockOwnerKey: unknown
+    tokens: { refreshToken?: unknown }
+  }
+
+  expect(refreshed.mockOwnerKey).toBe(migrated.mockOwnerKey)
+  expect(refreshed.tokens.refreshToken).toBe('rotated-refresh-2')
+})
+
+test('does not restore credentials saved for another auth source', async ({ page }) => {
+  await page.addInitScript(({ key }) => {
+    window.localStorage.setItem(key, JSON.stringify({
+      source: 'mock',
+      mockOwnerKey: 'mock-owner',
+      tokens: { accessToken: 'mock-access', refreshToken: 'mock-refresh' },
+    }))
+  }, { key: storageKey })
+  let refreshRequests = 0
+  await page.route('**/api/v1/auth/token/refresh', async (route) => {
+    refreshRequests += 1
+    await json(route, 200, apiTokens)
+  })
+
+  await page.goto('/home')
+
+  await expect(page).toHaveURL(/\/login$/)
+  expect(refreshRequests).toBe(0)
+  expect(await readStoredTokens(page)).toContain('"source":"mock"')
+})
+
 test('uses a one-tab memory session when localStorage is unavailable', async ({ page }) => {
   await page.addInitScript(() => {
     const fail = () => { throw new DOMException('Storage disabled', 'SecurityError') }

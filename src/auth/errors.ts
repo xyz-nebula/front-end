@@ -1,9 +1,9 @@
-import { isApiError } from '@/api/auth'
+import { isAuthClientError } from '@/services/contracts/authClient'
 
 export function getErrorMessage(error: unknown, fallback: string) {
-  return isApiError(error) ? error.message : fallback
+  return isAuthClientError(error) ? error.message : fallback
 }
 
 export function getFieldErrors(error: unknown) {
-  return isApiError(error) ? error.fieldErrors : {}
+  return isAuthClientError(error) ? error.fieldErrors : {}
 }

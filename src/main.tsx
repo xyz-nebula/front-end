@@ -5,6 +5,8 @@ import { BrowserRouter } from 'react-router-dom'
 import { App } from '@/App'
 import { AuthProvider } from '@/auth/AuthContext'
 import { AppThemeProvider } from '@/components/layout/AppThemeProvider'
+import { DomainServicesProvider } from '@/services/DomainServicesContext'
+import { ServiceAdaptersProvider } from '@/services/ServiceAdaptersContext'
 import '@/styles/global.css'
 
 const rootElement = document.getElementById('root')
@@ -17,9 +19,13 @@ createRoot(rootElement).render(
   <StrictMode>
     <BrowserRouter>
       <AppThemeProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <ServiceAdaptersProvider>
+          <AuthProvider>
+            <DomainServicesProvider>
+              <App />
+            </DomainServicesProvider>
+          </AuthProvider>
+        </ServiceAdaptersProvider>
       </AppThemeProvider>
     </BrowserRouter>
   </StrictMode>,
