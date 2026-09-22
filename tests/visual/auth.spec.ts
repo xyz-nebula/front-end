@@ -143,6 +143,8 @@ test('does not replace an existing session from an activation link', async ({ pa
 })
 
 test('activation loading, success, and error states render on desktop and mobile', async ({ page }) => {
+  // Six screenshots and several viewport changes share this test budget.
+  test.setTimeout(30_000)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.route('**/api/v1/auth/register/activate', (route) => json(route, 422, {
     detail: [{ loc: ['body', 'code'], msg: 'Ссылка истекла или уже была использована', type: 'value_error' }],
@@ -167,6 +169,10 @@ test('activation loading, success, and error states render on desktop and mobile
     await json(route, 200, tokens)
   })
 
+  // Keep the intercepted request pending while taking loading screenshots;
+  // the runner uses a short API timeout for dedicated resilience tests.
+  await page.clock.install()
+  await page.clock.pauseAt(new Date())
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`/activate?code=${activationCode}`)
   await expect(page.getByRole('heading', { name: 'Активируем аккаунт' })).toBeVisible()
@@ -179,6 +185,7 @@ test('activation loading, success, and error states render on desktop and mobile
 
   releaseActivation()
   await expect(page.getByRole('heading', { name: 'Аккаунт активирован' })).toBeVisible()
+  await page.clock.resume()
   await captureScreenshot(page, `${artifactsDir}/activation-success-mobile.png`)
 
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -190,6 +197,8 @@ test('returns to a protected route after password login and logs out locally', a
   let loginPayload: unknown
   let logoutPayload: unknown
   let logoutAuthorization = ''
+  let markLogoutHandled = () => undefined
+  const logoutHandled = new Promise<void>((resolve) => { markLogoutHandled = resolve })
 
   await page.route('**/api/v1/auth/login', async (route) => {
     loginPayload = JSON.parse(route.request().postData() ?? 'null') as unknown
@@ -199,6 +208,7 @@ test('returns to a protected route after password login and logs out locally', a
     logoutPayload = JSON.parse(route.request().postData() ?? 'null') as unknown
     logoutAuthorization = route.request().headers().authorization ?? ''
     await route.fulfill({ status: 204 })
+    markLogoutHandled()
   })
 
   await page.goto('/home')
@@ -211,6 +221,8 @@ test('returns to a protected route after password login and logs out locally', a
 
   await page.getByRole('button', { name: 'Выйти' }).click()
   await expect(page).toHaveURL(/\/auth$/)
+  // Local logout is optimistic; the redirect does not await remote revocation.
+  await logoutHandled
   expect(logoutPayload).toEqual({ refresh_token: 'refresh-token' })
   expect(logoutAuthorization).toBe('Bearer access-token')
   expect(await page.evaluate((key) => window.localStorage.getItem(key), storageKey)).toBeNull()
