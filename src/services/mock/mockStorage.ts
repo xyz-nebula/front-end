@@ -191,30 +191,34 @@ function copyData(data: MockData): MockData {
 export class MockStorage {
   private readonly storage: StorageLike | null
   private memoryData = emptyData()
+  private memoryFallback: boolean
   private mutationQueue: Promise<void> = Promise.resolve()
   private readonly tabId = crypto.randomUUID()
   private leaseTimer: number | undefined
 
   constructor(storage: StorageLike | null = getBrowserStorage()) {
     this.storage = storage
+    this.memoryFallback = storage === null
   }
 
   private load(): MockData {
-    if (!this.storage) return copyData(this.memoryData)
+    if (!this.storage || this.memoryFallback) return copyData(this.memoryData)
     try {
       return parseData(this.storage.getItem(MOCK_DATA_STORAGE_KEY)) ?? emptyData()
     } catch {
+      this.memoryFallback = true
       return copyData(this.memoryData)
     }
   }
 
   private save(data: MockData): void {
     this.memoryData = copyData(data)
-    if (!this.storage) return
+    if (!this.storage || this.memoryFallback) return
     try {
       this.storage.setItem(MOCK_DATA_STORAGE_KEY, JSON.stringify(data))
     } catch {
-      // The in-memory copy keeps the demo usable when storage is unavailable.
+      this.memoryFallback = true
+      this.releaseFallbackLease()
     }
   }
 
@@ -227,7 +231,7 @@ export class MockStorage {
   }
 
   private claimFallbackLease(): void {
-    if (!this.storage) return
+    if (!this.storage || this.memoryFallback) return
     const now = Date.now()
     try {
       const serialized = this.storage.getItem(MOCK_LEASE_STORAGE_KEY)
@@ -263,7 +267,7 @@ export class MockStorage {
   }
 
   private refreshFallbackLease = (): void => {
-    if (!this.storage) return
+    if (!this.storage || this.memoryFallback) return
     try {
       const lease: unknown = JSON.parse(this.storage.getItem(MOCK_LEASE_STORAGE_KEY) ?? 'null')
       if (isRecord(lease) && lease.tabId === this.tabId) {

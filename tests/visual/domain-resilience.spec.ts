@@ -1,5 +1,91 @@
 import { expect, test } from './helpers'
 
+test('keeps confirmed mutations after persistent storage rejects a write', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(async () => {
+    const [{ MockRuntime }, { MockStorage }] = await Promise.all([
+      import('/src/services/mock/mockRuntime.ts'),
+      import('/src/services/mock/mockStorage.ts'),
+    ])
+    let persisted: string | null = null
+    const failingStorage = {
+      getItem: () => persisted,
+      setItem: () => { throw new DOMException('Quota exceeded', 'QuotaExceededError') },
+      removeItem: () => { persisted = null },
+    }
+    const storage = new MockStorage(failingStorage)
+    const runtime = new MockRuntime(storage)
+    const created = await runtime.createSession('owner', {
+      caseId: 'salary-review', mode: 'text', clientCommandId: 'memory-create',
+    })
+    const readAfterCreate = runtime.getSession('owner', created.id)
+    const firstTurn = await runtime.sendTextTurn('owner', {
+      sessionId: created.id, text: 'Первый ход', clientTurnId: 'memory-turn',
+    })
+    const repeatedTurn = await runtime.sendTextTurn('owner', {
+      sessionId: created.id, text: 'Не должен сохраниться', clientTurnId: 'memory-turn',
+    })
+    const readAfterTurn = runtime.getSession('owner', created.id)
+    storage.dispose()
+    return {
+      readAfterCreate: readAfterCreate.id === created.id,
+      messageIdsMatch: firstTurn.userMessage.id === repeatedTurn.userMessage.id,
+      messages: readAfterTurn.messages.map((message) => message.text),
+      persistentValue: persisted,
+    }
+  })
+
+  expect(result).toEqual({
+    readAfterCreate: true,
+    messageIdsMatch: true,
+    messages: ['Первый ход', expect.any(String)],
+    persistentValue: null,
+  })
+})
+
+test('preserves old and new data when storage fails after earlier writes', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(async () => {
+    const [{ MockRuntime }, { MockStorage }] = await Promise.all([
+      import('/src/services/mock/mockRuntime.ts'),
+      import('/src/services/mock/mockStorage.ts'),
+    ])
+    let persisted: string | null = null
+    let rejectWrites = false
+    const intermittentStorage = {
+      getItem: () => persisted,
+      setItem: (_key: string, value: string) => {
+        if (rejectWrites) throw new DOMException('Quota exceeded', 'QuotaExceededError')
+        persisted = value
+      },
+      removeItem: () => { persisted = null },
+    }
+    const storage = new MockStorage(intermittentStorage)
+    const runtime = new MockRuntime(storage)
+    const first = await runtime.createSession('owner', {
+      caseId: 'salary-review', mode: 'text', clientCommandId: 'persisted-create',
+    })
+    rejectWrites = true
+    const second = await runtime.createSession('owner', {
+      caseId: 'refund', mode: 'voice', clientCommandId: 'memory-create',
+    })
+    await runtime.sendTextTurn('owner', {
+      sessionId: first.id, text: 'Ход после quota error', clientTurnId: 'memory-turn',
+    })
+    const sessions = storage.read((data) => data.sessions.map((session) => ({
+      id: session.id,
+      messages: session.messages.length,
+    })))
+    storage.dispose()
+    return { firstId: first.id, secondId: second.id, sessions }
+  })
+
+  expect(result.sessions).toEqual([
+    { id: result.firstId, messages: 2 },
+    { id: result.secondId, messages: 0 },
+  ])
+})
+
 test('parallel mock tabs keep one session and monotonic message sequence', async ({ page, context }) => {
   await page.goto('/')
   const otherPage = await context.newPage()
