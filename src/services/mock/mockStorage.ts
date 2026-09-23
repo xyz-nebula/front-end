@@ -307,7 +307,13 @@ export class MockStorage {
     }
 
     if (this.hasWebLocks()) {
-      return navigator.locks.request(MOCK_LOCK_NAME, execute)
+      return navigator.locks.request(MOCK_LOCK_NAME, async () => {
+        // A Web Lock can move to another renderer before its localStorage snapshot
+        // observes the previous holder's synchronous write. Yield one task before
+        // reading so the completed cross-tab storage mutation is visible.
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
+        return execute()
+      })
     }
     this.claimFallbackLease()
     return execute()

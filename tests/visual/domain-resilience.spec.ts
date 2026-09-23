@@ -131,17 +131,22 @@ test('parallel mock tabs keep one session and monotonic message sequence', async
   expect(firstId).toBe(sessionId)
   expect(secondId).toBe(sessionId)
 
-  const stored = await page.evaluate(async (id) => {
-    const [{ MockRuntime }, { MockStorage }] = await Promise.all([
-      import('/src/services/mock/mockRuntime.ts'),
-      import('/src/services/mock/mockStorage.ts'),
-    ])
-    const storage = new MockStorage(localStorage)
-    const runtime = new MockRuntime(storage)
-    const messages = runtime.getSession('shared-owner', id).messages
-    storage.dispose()
-    return messages
-  }, sessionId)
+  const readStoredMessages = () => page.evaluate(
+    async (id) => {
+      const [{ MockRuntime }, { MockStorage }] = await Promise.all([
+        import('/src/services/mock/mockRuntime.ts'),
+        import('/src/services/mock/mockStorage.ts'),
+      ])
+      const storage = new MockStorage(localStorage)
+      const runtime = new MockRuntime(storage)
+      const messages = runtime.getSession('shared-owner', id).messages
+      storage.dispose()
+      return messages
+    },
+    sessionId,
+  )
+  await expect.poll(async () => (await readStoredMessages()).length).toBe(16)
+  const stored = await readStoredMessages()
   expect(stored.map((message) => message.sequence)).toEqual(Array.from({ length: 16 }, (_, index) => index + 1))
   expect(new Set(stored.map((message) => message.id)).size).toBe(16)
 })

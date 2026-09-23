@@ -633,23 +633,65 @@ test('synchronizes login, token rotation, and logout between tabs', async ({ pag
 
 test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, context }) => {
   test.setTimeout(30_000)
+  let lockAttempts = 0
+  let releaseLockBarrier = () => undefined
+  const bothTabsRequestedLock = new Promise<void>((resolve) => { releaseLockBarrier = resolve })
+  const lockOrder: string[] = []
+  await context.exposeBinding('__testRefreshLockRequested', ({ page: sourcePage }) => {
+    lockAttempts += 1
+    lockOrder.push(sourcePage === page ? 'first-tab' : 'second-tab')
+    if (lockAttempts === 2) releaseLockBarrier()
+  })
+  await context.addInitScript(() => {
+    const notify = (window as typeof window & {
+      __testRefreshLockRequested?: () => Promise<void>
+    }).__testRefreshLockRequested
+    if (!notify || !('locks' in navigator)) return
+    const originalRequest = navigator.locks.request.bind(navigator.locks)
+    Object.defineProperty(navigator.locks, 'request', {
+      configurable: true,
+      value: new Proxy(originalRequest, {
+        apply(target, thisArgument, argumentsList) {
+          void notify()
+          return Reflect.apply(target, thisArgument, argumentsList)
+        },
+      }),
+    })
+  })
   await page.goto('/login')
   await page.evaluate(({ key, value }) => {
     window.localStorage.setItem(key, JSON.stringify(value))
   }, {
     key: storageKey,
-    value: { accessToken: 'shared-access', refreshToken: 'shared-refresh' },
+    value: {
+      source: 'real',
+      mockOwnerKey: 'shared-owner',
+      tokens: { accessToken: 'shared-access', refreshToken: 'shared-refresh' },
+    },
   })
 
-  let refreshRequests = 0
+  const refreshTokenKinds: string[] = []
+  let bothTabsHadInitialStorage = false
   await context.route('**/api/v1/auth/token/refresh', async (route) => {
-    refreshRequests += 1
-    if (refreshRequests > 1) {
+    const body: unknown = JSON.parse(route.request().postData() ?? 'null')
+    const refreshToken = typeof body === 'object' && body !== null && 'refresh_token' in body
+      ? body.refresh_token
+      : undefined
+    refreshTokenKinds.push(
+      refreshToken === 'shared-refresh'
+        ? 'initial'
+        : refreshToken === 'rotated-refresh' ? 'rotated' : 'unexpected',
+    )
+    if (refreshTokenKinds.length > 1) {
       await json(route, 403, { detail: 'Refresh token already rotated' })
       return
     }
 
-    await delay(200)
+    await bothTabsRequestedLock
+    const storageSnapshots = await Promise.all([page, ...context.pages().filter((item) => item !== page)]
+      .slice(0, 2)
+      .map((item) => readStoredTokens(item)))
+    bothTabsHadInitialStorage = storageSnapshots.every((value) => value?.includes('shared-refresh'))
     await json(route, 200, {
       access_token: 'rotated-access',
       refresh_token: 'rotated-refresh',
@@ -666,7 +708,10 @@ test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, 
   await expect(otherPage.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
   await expect.poll(() => readStoredTokens(page)).toContain('rotated-refresh')
   await expect.poll(() => readStoredTokens(otherPage)).toContain('rotated-refresh')
-  expect(refreshRequests).toBe(1)
+  const diagnostics = { lockOrder, refreshTokenKinds, bothTabsHadInitialStorage }
+  expect(lockOrder, JSON.stringify(diagnostics)).toHaveLength(2)
+  expect(bothTabsHadInitialStorage, JSON.stringify(diagnostics)).toBe(true)
+  expect(refreshTokenKinds, JSON.stringify(diagnostics)).toEqual(['initial'])
 })
 
 test('does not let a stale refresh overwrite a newer cross-tab session', async ({ page, context }) => {
