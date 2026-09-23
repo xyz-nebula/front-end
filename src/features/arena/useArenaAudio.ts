@@ -29,7 +29,9 @@ export function useArenaAudio(
   const [isPlaying, setIsPlaying] = useState(false)
   const clientRef = useRef<AudioClient | null>(null)
   const contextRef = useRef<AudioContext | null>(null)
-  const sourceRef = useRef<AudioBufferSourceNode | null>(null)
+  const sourceRefs = useRef(new Set<AudioBufferSourceNode>())
+  const playbackEndRef = useRef(0)
+  const playbackGenerationRef = useRef(0)
   const eventIdsRef = useRef(new Set<string>())
   const committedMessageIdsRef = useRef(new Set<string>())
   const contextGenerationRef = useRef(0)
@@ -42,8 +44,17 @@ export function useArenaAudio(
   useEffect(() => { onReconnectRef.current = onReconnect }, [onReconnect])
 
   const stopPlayback = useCallback(() => {
-    sourceRef.current?.stop()
-    sourceRef.current = null
+    playbackGenerationRef.current += 1
+    for (const source of sourceRefs.current) {
+      source.onended = null
+      try {
+        source.stop()
+      } catch {
+        // A source may already have ended between cleanup scheduling and stop().
+      }
+    }
+    sourceRefs.current.clear()
+    playbackEndRef.current = 0
     setIsPlaying(false)
   }, [])
 
@@ -58,7 +69,10 @@ export function useArenaAudio(
       const context = contextRef.current ?? new AudioContext()
       contextRef.current = context
       void context.resume().catch(() => {
-        if (isCurrent()) setError('Не удалось воспроизвести ответ. Текст ответа сохранён в диалоге.')
+        if (isCurrent()) {
+          stopPlayback()
+          setError('Не удалось воспроизвести ответ. Текст ответа сохранён в диалоге.')
+        }
       })
       const buffer = context.createBuffer(1, bytes.length / 2, event.format.sampleRate)
       const samples = buffer.getChannelData(0)
@@ -67,19 +81,24 @@ export function useArenaAudio(
         samples[index] = view.getInt16(index * 2, true) / 32768
       }
       if (!isCurrent()) return
-      stopPlayback()
       const source = context.createBufferSource()
       source.buffer = buffer
       source.connect(context.destination)
+      const playbackGeneration = playbackGenerationRef.current
+      const startAt = Math.max(context.currentTime, playbackEndRef.current)
       source.onended = () => {
-        if (isCurrent() && sourceRef.current === source) {
-          sourceRef.current = null
-          setIsPlaying(false)
+        if (isCurrent() && playbackGenerationRef.current === playbackGeneration) {
+          sourceRefs.current.delete(source)
+          if (sourceRefs.current.size === 0) {
+            playbackEndRef.current = 0
+            setIsPlaying(false)
+          }
         }
       }
-      sourceRef.current = source
+      source.start(startAt)
+      sourceRefs.current.add(source)
+      playbackEndRef.current = startAt + buffer.duration
       setIsPlaying(true)
-      source.start()
     } catch {
       if (isCurrent()) setError('Не удалось воспроизвести ответ. Текст ответа сохранён в диалоге.')
     }
@@ -94,6 +113,7 @@ export function useArenaAudio(
     committedMessageIdsRef.current = new Set<string>()
     const client = createAudioClient()
     clientRef.current = client
+    const playbackSources = sourceRefs.current
     const eventIds = eventIdsRef.current
     const committedMessageIds = committedMessageIdsRef.current
     const isCurrent = () => contextGenerationRef.current === generation && clientRef.current === client
@@ -137,8 +157,17 @@ export function useArenaAudio(
       if (clientRef.current === client) clientRef.current = null
       eventIds.clear()
       committedMessageIds.clear()
-      sourceRef.current?.stop()
-      sourceRef.current = null
+      playbackGenerationRef.current += 1
+      for (const source of playbackSources) {
+        source.onended = null
+        try {
+          source.stop()
+        } catch {
+          // Best-effort cleanup for sources that ended concurrently.
+        }
+      }
+      playbackSources.clear()
+      playbackEndRef.current = 0
       void contextRef.current?.close()
       contextRef.current = null
     }
@@ -192,14 +221,36 @@ export function useArenaAudio(
     setState('stopped')
   }, [stopPlayback])
 
+  const pause = useCallback(() => {
+    clientRef.current?.sendControl('pause')
+    const context = contextRef.current
+    const generation = contextGenerationRef.current
+    void context?.suspend().catch(() => {
+      if (contextGenerationRef.current === generation && contextRef.current === context) {
+        setError('Не удалось приостановить звук. Текст ответа сохранён в диалоге.')
+      }
+    })
+  }, [])
+
+  const resume = useCallback(() => {
+    clientRef.current?.sendControl('resume')
+    const context = contextRef.current
+    const generation = contextGenerationRef.current
+    void context?.resume().catch(() => {
+      if (contextGenerationRef.current === generation && contextRef.current === context) {
+        setError('Не удалось продолжить звук. Текст ответа сохранён в диалоге.')
+      }
+    })
+  }, [])
+
   return {
     state,
     partial,
     error,
     isPlaying,
     connect,
-    pause: () => clientRef.current?.sendControl('pause'),
-    resume: () => clientRef.current?.sendControl('resume'),
+    pause,
+    resume,
     stop,
   }
 }
