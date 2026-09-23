@@ -597,7 +597,9 @@ audio-engine. Arena hook не вызывает `addMessage` в ответ на t
 
 По умолчанию mock не запрашивает микрофон. Дополнительный demo microphone режим
 использует `getUserMedia` только для permission UX и останавливает все tracks при
-disconnect. Отправка MediaRecorder/WebM как PCM запрещена.
+disconnect. Рабочего пути `microphone → PCM → sendAudio` сейчас нет:
+`sendAudio` объявлен как target port, но capture-код его не вызывает. Отправка
+MediaRecorder/WebM как PCM запрещена.
 
 Partial event всегда содержит полный актуальный transcript. После commit,
 disconnect или ошибки partial очищается. События от старого connection после
@@ -636,15 +638,15 @@ src/components/arena/*
 - загружает session;
 - отправляет text turn одной командой;
 - блокирует двойной submit;
-- получает audio ticket перед connect;
-- подписывается на audio events;
-- показывает partial transcript отдельно от history;
-- добавляет только `message_committed` и дедуплицирует его по id/eventId;
-- после reconnect/reload заново загружает session;
+- после reload заново загружает session;
 - завершает session одной командой;
 - хранит незавершённые command/turn id в `sessionStorage` и очищает после
   подтверждённого успеха;
-- снимает listeners, timers, MediaStream и WebSocket при cleanup.
+
+`useArenaAudio` получает audio ticket перед connect, подписывается на events,
+показывает partial отдельно от history, добавляет только `message_committed` с
+дедупликацией и при reconnect сверяет backend history. При cleanup он снимает
+listeners, останавливает playback/MediaStream и отключает transport.
 
 Страница отображает case/opponent, таймер, сообщения, thinking, partial voice
 transcript, text input или voice controls, finish confirmation, reconnect и
@@ -752,7 +754,16 @@ HTTP paths, DTO, internal auth и close codes документируются к�
 - проверить отсутствие network calls у real stubs;
 - выполнить lint, build, visual smoke и открыть desktop/mobile PNG.
 
-Готово: замена mock на будущие real adapter'ы не требует изменений pages/hooks.
+Статус: mock/resilience часть этапа выполнена, включая изоляцию поздних операций,
+привязку audio client к arena, идемпотентные retry, устойчивый storage, очередь
+playback и cleanup при отказе audio. Это не означает готовность real-интеграции.
+Отдельно остаются согласование внешних контрактов, microphone/PCM capture,
+реализация real negotiation/audio adapters и интеграционная проверка с сервисами.
+До неё нельзя утверждать, что замена mock ограничится только adapter-файлами.
+
+Перед real-режимом подписи `ResultPage`, истории `HomePage`, `VoiceControls` и
+`TrainingModal` должны стать source-aware; сейчас часть текста намеренно
+описывает demo независимо от выбранного источника.
 
 
 ## 13. Тестирование

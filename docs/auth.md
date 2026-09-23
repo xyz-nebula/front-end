@@ -1,9 +1,16 @@
 # Сессия и защищённые инварианты
 
-Auth — существующая реальная интеграция. Основные владельцы:
+Auth доступен как в реальном, так и в mock-режиме. Основные владельцы:
 `src/auth/AuthContext.tsx`, `src/auth/storage.ts`, `src/auth/useAuth.ts`,
-`src/api/auth.ts` и `src/components/auth/RouteGate.tsx`.
+`src/services/contracts/authClient.ts`,
+`src/services/real/backendAuthClient.ts`, `src/services/mock/mockAuthClient.ts`
+и `src/components/auth/RouteGate.tsx`.
 Документ фиксирует поведение; он не разрешает новые API-интеграции.
+
+`VITE_AUTH_SOURCE=real` использует backend через `/api` для регистрации,
+активации, login/refresh/logout и TOTP. `VITE_AUTH_SOURCE=mock` выполняет те же
+frontend-сценарии локально. Auth storage содержит `source`, поэтому credentials
+одного режима не восстанавливаются в другом.
 
 ## Состояния
 
@@ -16,8 +23,9 @@ Auth — существующая реальная интеграция. Осн�
 | `signing-out` | Переходное состояние logout; локальная очистка синхронная, UI не ждёт сеть. |
 
 Без сохранённых токенов стартуем гостем. Наличие токенов запускает bootstrap
-refresh один раз, в том числе под React StrictMode. Пара access/refresh хранится
-под `arena.auth.tokens.v1`; API использует snake_case, клиент — camelCase.
+refresh один раз, в том числе под React StrictMode. Пара access/refresh,
+`source` и стабильный `mockOwnerKey` хранятся под `arena.auth.tokens.v1`; wire
+API использует snake_case, клиент — camelCase.
 Успешный HTTP-ответ сам по себе недостаточен: клиент проверяет структуру токенов,
 регистрации и TOTP enrollment, несовместимый ответ становится `invalid-response`.
 

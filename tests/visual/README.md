@@ -1,14 +1,13 @@
 # Playwright: поведение и визуальная диагностика
 
-Текущие 44 сценария находятся в трёх suites:
+Текущие 82 сценария запускаются двумя изолированными группами source modes:
 
-| Suite | Сценариев | Покрытие |
+| Группа | Сценариев | Spec-файлы и покрытие |
 | --- | ---: | --- |
-| `landing.spec.ts` | 7 | Секции и CTA landing, responsive geometry, мобильное меню, навигация, независимость home. |
-| `auth.spec.ts` | 16 | Регистрация/активация/login/logout, gates и возврат, payload/Authorization, refresh после 401, TOTP, некорректные ответы, desktop/mobile состояния. |
-| `auth-resilience.spec.ts` | 21 | Timeout/network/5xx, поздние ответы, конкурентные входы, optimistic logout, recovery, memory fallback, повреждённый storage, UUIDv7, storage events и cross-tab refresh/rotation. |
+| `real/mock/mock` | 51 | `auth`, `auth-resilience`, `authorized-operation`, `service-contracts`: auth/TOTP, recovery, cross-tab refresh, target DTO и отсутствие сети у real domain stubs. |
+| `mock/mock/mock` | 31 | Landing, mock domain/storage, arena session/audio resilience, text/voice flow, result и idempotent repeat. |
 
-Число включает параметризованные network/timeout случаи. Список можно проверить
+Числа включают параметризованные случаи. Список можно проверить
 через `npm run test:e2e -- --list`. Инварианты и их привязка к сценариям описаны
 в [docs/auth.md](../../docs/auth.md).
 
@@ -39,8 +38,8 @@ checkout нельзя: они используют одну папку artifacts
 которые управляют двумя страницами. Тестовые часы удерживают pending request во
 время loading-кадров, чтобы короткий API-timeout не прерывал фотосъёмку.
 
-Runner подставляет `API_PROXY_TARGET=http://127.0.0.1:9` и
-`VITE_API_TIMEOUT_MS=600`, если эти переменные ещё не заданы. Это настройки
+Runner задаёт `API_PROXY_TARGET=http://127.0.0.1:9` и
+`VITE_API_TIMEOUT_MS=600` для auth-группы. Это настройки
 тестового процесса, не изменение production defaults. Auth/API-моки задаются
 через `page.route`/`context.route`, включая отказы, задержки, rotation и malformed
 ответы. Для reproducible запуска используйте те же env и браузер; живой backend

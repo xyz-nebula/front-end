@@ -47,6 +47,15 @@ demo с настоящей авторизацией (`real/mock/mock`). Real neg
 типизированные заглушки с ошибкой `feature-unavailable`; они намеренно не
 выполняют сетевых запросов до появления совместимых серверных контрактов.
 
+| Контур | `mock` | `real` |
+| --- | --- | --- |
+| Auth | Локальные регистрация, активация, login/refresh/logout и TOTP для demo | Рабочий `BackendAuthClient` через `/api` |
+| Negotiation | Сессии, text/voice demo, история, finish/result и retry recovery | Только `feature-unavailable`, сетевых запросов нет |
+| Audio | Локальные события transcript/playback и permission UX | Только `feature-unavailable`, WebSocket не открывается |
+
+Основные защищённые маршруты продукта: `/home`, `/arena/:sessionId` и
+`/result/:sessionId`. Полная карта находится в [docs/routes.md](docs/routes.md).
+
 ## Существующий API авторизации
 
 Клиент обращается к backend через относительный префикс `/api`. Во время
@@ -175,6 +184,32 @@ Runtime-парсеры целевых DTO и событий находятся �
 audio-engine JWT с `chat_uuid` несовместимы с этим контрактом и не используются
 как временный обход.
 
+## Текущая готовность и границы интеграции
+
+Frontend сейчас готов для автономной демонстрации на mock и для сценария с
+реальной авторизацией и mock-переговорами. DTO, events, idempotency и
+reconciliation выше являются целевым контрактом, а не описанием уже доступных
+negotiation/audio API.
+
+Рабочего пути `microphone → PCM → AudioClient.sendAudio` пока нет. Метод
+`sendAudio` объявлен в port, но capture-компонент его не вызывает; mock может
+запросить микрофон только для демонстрации permission UX. Подключение real audio
+потребует отдельно реализовать capture/resampling/cleanup после согласования
+формата с audio-engine.
+
+До real-интеграции внешние команды должны предоставить и согласовать:
+
+- backend session/list/text-turn/audio-ticket/finish/result endpoints,
+  идемпотентность и внутренний transcript commit;
+- audio-engine ticket handshake, PCM input, committed events, control/close и
+  reconnect policy;
+- поведение последней неподтверждённой voice-реплики при finish.
+
+Часть подписей в `ResultPage`, истории `HomePage`, `VoiceControls` и
+`TrainingModal` пока намеренно описывает demo. Перед включением real negotiation
+или audio они должны стать source-aware, чтобы mock-данные не выглядели как
+ответ реального сервиса.
+
 ## Визуальная проверка
 
 `npm run visual:smoke` последовательно запускает два отдельных Vite-процесса
@@ -183,6 +218,9 @@ audio-engine JWT с `chat_uuid` несовместимы с этим контр�
 визуальных сценариев. Оба процесса останавливаются после проверки. Установленный
 Google Chrome нужен для Playwright; предварительно запускать `npm run dev` не
 нужно. Значения источников в окружении не меняют режимы smoke-прогона.
+
+На текущей версии полный прогон содержит 82 сценария: 51 в `real/mock/mock` и
+31 в `mock/mock/mock` (включая параметризованные случаи).
 ## Проверки и скриншоты
 
 Среди диагностических кадров:
