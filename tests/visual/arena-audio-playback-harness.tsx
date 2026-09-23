@@ -14,11 +14,16 @@ class PlaybackAudioClient implements AudioClient {
   private readonly listeners = new Set<(event: AudioEngineEvent) => void>()
   disconnectCalls = 0
   controls: string[] = []
+  throwControls = new Set<string>()
+  rejectDisconnect = false
 
   getState(): AudioConnectionState { return 'connected' }
   async connect(input: { sessionId: string; ticket: AudioTicket }) { void input }
   sendAudio(frame: AudioInputFrame) { void frame }
-  sendControl(action: 'pause' | 'resume' | 'stop' | 'close') { this.controls.push(action) }
+  sendControl(action: 'pause' | 'resume' | 'stop' | 'close') {
+    this.controls.push(action)
+    if (this.throwControls.has(action)) throw new Error(`${action} unavailable`)
+  }
   subscribe(listener: (event: AudioEngineEvent) => void) {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
@@ -27,7 +32,10 @@ class PlaybackAudioClient implements AudioClient {
     void listener
     return () => undefined
   }
-  async disconnect() { this.disconnectCalls += 1 }
+  async disconnect() {
+    this.disconnectCalls += 1
+    if (this.rejectDisconnect) throw new Error('disconnect unavailable')
+  }
   emit(event: AudioEngineEvent) { this.listeners.forEach((listener) => listener(event)) }
 }
 
@@ -182,6 +190,8 @@ export async function runAudioPlaybackScenario() {
     }
 
     const resumeCallsBeforeManualResume = contextA.resumeCalls
+    clientA.throwControls.add('pause')
+    clientA.throwControls.add('resume')
     await act(async () => {
       value().pause()
       value().resume()
@@ -191,6 +201,7 @@ export async function runAudioPlaybackScenario() {
       suspendCalls: contextA.suspendCalls,
       manualResumeCalls: contextA.resumeCalls - resumeCallsBeforeManualResume,
       stopCalls: contextA.sources.map((source) => source.stopCalls),
+      hasError: Boolean(value().error),
     }
 
     await act(async () => { contextA.sources[0].finish() })
@@ -227,12 +238,24 @@ export async function runAudioPlaybackScenario() {
     })
     const contextB = contexts[1]
     const stoppedSources = [...contextB.sources]
-    await act(async () => { await value().stop() })
+    clientB.throwControls.add('stop')
+    clientB.rejectDisconnect = true
+    let stopRejected = false
+    await act(async () => {
+      try {
+        await value().stop()
+      } catch {
+        stopRejected = true
+      }
+    })
     await act(async () => { stoppedSources.forEach((source) => source.finishLate()) })
     const afterStop = {
       stops: stoppedSources.map((source) => source.stopCalls),
       isPlaying: value().isPlaying,
       controls: [...clientB.controls],
+      disconnectCalls: clientB.disconnectCalls,
+      stopRejected,
+      hasError: Boolean(value().error),
     }
 
     await act(async () => {

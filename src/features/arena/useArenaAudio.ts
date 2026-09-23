@@ -153,7 +153,9 @@ export function useArenaAudio(
       busyRef.current = false
       unsubscribeEvent()
       unsubscribeState()
-      void client.disconnect()
+      void client.disconnect().catch(() => {
+        // The transport may already be unavailable; local cleanup below is mandatory.
+      })
       if (clientRef.current === client) clientRef.current = null
       eventIds.clear()
       committedMessageIds.clear()
@@ -214,15 +216,32 @@ export function useArenaAudio(
     connectAttemptRef.current += 1
     busyRef.current = false
     const client = clientRef.current
-    client?.sendControl('stop')
-    await client?.disconnect()
-    stopPlayback()
-    setPartial({ user: '', ai: '' })
-    setState('stopped')
+    let transportFailed = false
+    try {
+      client?.sendControl('stop')
+    } catch {
+      transportFailed = true
+    }
+    try {
+      await client?.disconnect()
+    } catch {
+      transportFailed = true
+    } finally {
+      stopPlayback()
+      setPartial({ user: '', ai: '' })
+      setState('stopped')
+      if (transportFailed) {
+        setError('Аудиосвязь недоступна. Локальные ресурсы освобождены, тренировку можно завершить.')
+      }
+    }
   }, [stopPlayback])
 
   const pause = useCallback(() => {
-    clientRef.current?.sendControl('pause')
+    try {
+      clientRef.current?.sendControl('pause')
+    } catch {
+      setError('Не удалось приостановить голосовой раунд.')
+    }
     const context = contextRef.current
     const generation = contextGenerationRef.current
     void context?.suspend().catch(() => {
@@ -233,7 +252,11 @@ export function useArenaAudio(
   }, [])
 
   const resume = useCallback(() => {
-    clientRef.current?.sendControl('resume')
+    try {
+      clientRef.current?.sendControl('resume')
+    } catch {
+      setError('Не удалось продолжить голосовой раунд.')
+    }
     const context = contextRef.current
     const generation = contextGenerationRef.current
     void context?.resume().catch(() => {

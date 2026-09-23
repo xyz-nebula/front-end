@@ -53,3 +53,20 @@ test('reload recovery keeps the original turn and finish command IDs', async ({ 
     pendingFinish: null,
   })
 })
+
+test('failed finish keeps its command ID for an explicit retry', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { runFinishRetryScenario } = await import('/tests/visual/arena-session-harness.tsx')
+    return runFinishRetryScenario()
+  })
+
+  expect(result.finishCalls).toHaveLength(2)
+  expect(result.finishCalls[0]).toBe(result.finishCalls[1])
+  expect(result.afterFailure).toMatchObject({
+    result: false,
+    viewState: 'ready',
+    error: 'Временная ошибка завершения',
+  })
+  expect(result.afterFailure.pending).toBe(result.finishCalls[0])
+  expect(result.afterRetry).toEqual({ result: true, viewState: 'finished', pending: null })
+})

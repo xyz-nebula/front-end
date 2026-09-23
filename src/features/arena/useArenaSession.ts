@@ -35,7 +35,7 @@ interface UseArenaSessionValue {
   refreshSession: () => Promise<void>
   addCommittedMessage: (message: NegotiationMessage) => void
   sendTextTurn: () => Promise<void>
-  finishSession: () => Promise<void>
+  finishSession: () => Promise<boolean>
 }
 
 const pendingTurnKey = (sessionId: string) => `arena.pending-turn.${sessionId}`
@@ -158,9 +158,9 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
     }
   }, [arenaContext, isCurrent])
 
-  const finishWithCommand = useCallback(async (commandId: string) => {
+  const finishWithCommand = useCallback(async (commandId: string): Promise<boolean> => {
     const operation: ArenaOperation = { context: arenaContext }
-    if (finishInFlightRef.current?.context === arenaContext) return
+    if (finishInFlightRef.current?.context === arenaContext) return false
     finishInFlightRef.current = operation
     setViewState('finishing')
     setError(null)
@@ -169,7 +169,7 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
         sessionId: arenaContext.sessionId,
         clientCommandId: commandId,
       })
-      if (!isCurrent(arenaContext)) return
+      if (!isCurrent(arenaContext)) return false
       removeSessionValue(pendingFinishKey(arenaContext.sessionId))
       setSession((current) => current ? {
         ...current,
@@ -177,10 +177,12 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
         ...(result.status === 'ready' ? { finishedAt: new Date().toISOString() } : {}),
       } : current)
       setViewState('finished')
+      return true
     } catch (caught) {
-      if (!isCurrent(arenaContext)) return
+      if (!isCurrent(arenaContext)) return false
       setViewState('ready')
       setError(errorMessage(caught, 'Не удалось завершить тренировку. Попробуйте ещё раз.'))
+      return false
     } finally {
       if (finishInFlightRef.current === operation) finishInFlightRef.current = null
     }
@@ -275,11 +277,11 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
       finishInFlightRef.current?.context === arenaContext
       || turnInFlightRef.current?.context === arenaContext
       || session?.status !== 'active'
-    ) return
+    ) return false
     const key = pendingFinishKey(arenaContext.sessionId)
     const commandId = readSessionValue(key) ?? crypto.randomUUID()
     writeSessionValue(key, commandId)
-    await finishWithCommand(commandId)
+    return finishWithCommand(commandId)
   }, [arenaContext, finishWithCommand, session?.status])
 
   const contextStateIsCurrent = stateContext === arenaContext

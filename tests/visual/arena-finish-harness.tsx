@@ -1,0 +1,129 @@
+import { act } from 'react'
+import { createRoot } from 'react-dom/client'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+
+import { ArenaPage } from '@/pages/ArenaPage'
+import type { AudioClient } from '@/services/contracts/audioClient'
+import type { NegotiationClient } from '@/services/contracts/negotiationClient'
+import { DomainServicesContext } from '@/services/domainServices'
+import type { AudioConnectionState, AudioEngineEvent, AudioInputFrame } from '@/types/audio'
+import type { AudioTicket, NegotiationSession } from '@/types/negotiation'
+
+class FailingAudioClient implements AudioClient {
+  disconnectCalls = 0
+  stopCalls = 0
+
+  getState(): AudioConnectionState { return 'connected' }
+  async connect(input: { sessionId: string; ticket: AudioTicket }) { void input }
+  sendAudio(frame: AudioInputFrame) { void frame }
+  sendControl() {
+    this.stopCalls += 1
+    throw new Error('audio control unavailable')
+  }
+  subscribe(listener: (event: AudioEngineEvent) => void) {
+    void listener
+    return () => undefined
+  }
+  subscribeState(listener: (state: AudioConnectionState) => void) {
+    void listener
+    return () => undefined
+  }
+  async disconnect() {
+    this.disconnectCalls += 1
+    throw new Error('audio disconnect unavailable')
+  }
+}
+
+function voiceSession(): NegotiationSession {
+  return {
+    id: 'voice-finish',
+    caseId: 'salary-review',
+    mode: 'voice',
+    status: 'active',
+    startedAt: '2026-09-23T08:00:00.000Z',
+    messages: [],
+  }
+}
+
+export async function runAudioFinishFailureScenario() {
+  ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+    .IS_REACT_ACT_ENVIRONMENT = true
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  const audioClient = new FailingAudioClient()
+  const finishCommands: string[] = []
+  let finishAttempt = 0
+  const unavailable = async (): Promise<never> => { throw new Error('Unexpected negotiation call') }
+  const negotiationClient: NegotiationClient = {
+    createSession: unavailable,
+    getSession: () => Promise.resolve(voiceSession()),
+    sendTextTurn: unavailable,
+    createAudioTicket: unavailable,
+    finishSession: (input) => {
+      finishCommands.push(input.clientCommandId)
+      finishAttempt += 1
+      return finishAttempt === 1
+        ? Promise.reject(new Error('Backend finish unavailable'))
+        : Promise.resolve({ status: 'processing' })
+    },
+    getResult: unavailable,
+    listSessions: unavailable,
+  }
+  const unhandled: string[] = []
+  const onUnhandled = (event: PromiseRejectionEvent) => {
+    unhandled.push(String(event.reason))
+    event.preventDefault()
+  }
+  window.addEventListener('unhandledrejection', onUnhandled)
+
+  const flush = async () => {
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 5))
+    })
+  }
+  const button = (label: string) => [...host.querySelectorAll('button')]
+    .filter((candidate) => candidate.textContent?.trim() === label)
+    .at(-1)
+
+  try {
+    await act(async () => {
+      root.render(
+        <DomainServicesContext.Provider value={{
+          negotiationClient,
+          createAudioClient: () => audioClient,
+        }}>
+          <MemoryRouter initialEntries={['/arena/voice-finish']}>
+            <Routes>
+              <Route path="/arena/:sessionId" element={<ArenaPage />} />
+              <Route path="/result/:sessionId" element={<div data-testid="result-route">Результат</div>} />
+            </Routes>
+          </MemoryRouter>
+        </DomainServicesContext.Provider>,
+      )
+    })
+    await flush()
+    await act(async () => { button('Завершить')?.click() })
+    await act(async () => { button('Завершить')?.click() })
+    await flush()
+    const afterFailure = {
+      dialogOpen: Boolean(host.querySelector('[role="dialog"]')),
+      error: host.querySelector('[role="dialog"] [role="alert"]')?.textContent ?? null,
+    }
+    await act(async () => { button('Завершить')?.click() })
+    await flush()
+    return {
+      afterFailure,
+      finishCommands,
+      audio: { stopCalls: audioClient.stopCalls, disconnectCalls: audioClient.disconnectCalls },
+      reachedResult: Boolean(host.querySelector('[data-testid="result-route"]')),
+      unhandled,
+    }
+  } finally {
+    window.removeEventListener('unhandledrejection', onUnhandled)
+    await act(async () => root.unmount())
+    host.remove()
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+      .IS_REACT_ACT_ENVIRONMENT = false
+  }
+}

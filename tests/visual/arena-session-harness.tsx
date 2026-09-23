@@ -298,3 +298,35 @@ export async function runPendingRecoveryScenario() {
   await harness.dispose()
   return result
 }
+
+export async function runFinishRetryScenario() {
+  const finishCalls: string[] = []
+  let attempt = 0
+  const negotiationClient = client({
+    getSession: (sessionId) => Promise.resolve(session(sessionId)),
+    finishSession: (input) => {
+      finishCalls.push(input.clientCommandId)
+      attempt += 1
+      return attempt === 1
+        ? Promise.reject(new Error('Временная ошибка завершения'))
+        : Promise.resolve({ status: 'processing' })
+    },
+  })
+  const harness = await mountHarness('retry-finish-arena', negotiationClient)
+  await waitFor(harness, (value) => value.viewState === 'ready')
+  const firstResult = await act(async () => harness.value().finishSession())
+  const afterFailure = {
+    result: firstResult,
+    viewState: harness.value().viewState,
+    error: harness.value().error,
+    pending: sessionStorage.getItem('arena.pending-finish.retry-finish-arena'),
+  }
+  const secondResult = await act(async () => harness.value().finishSession())
+  const afterRetry = {
+    result: secondResult,
+    viewState: harness.value().viewState,
+    pending: sessionStorage.getItem('arena.pending-finish.retry-finish-arena'),
+  }
+  await harness.dispose()
+  return { finishCalls, afterFailure, afterRetry }
+}

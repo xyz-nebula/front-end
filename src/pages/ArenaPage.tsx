@@ -17,6 +17,8 @@ export function ArenaPage() {
   const arena = useArenaSession(sessionId)
   const audio = useArenaAudio(sessionId, arena.session?.mode === 'voice' && arena.session.status === 'active', arena.addCommittedMessage, arena.refreshSession)
   const [showFinishDialog, setShowFinishDialog] = useState(false)
+  const [isFinishing, setIsFinishing] = useState(false)
+  const [finishError, setFinishError] = useState<string | null>(null)
   const trainingCase = trainingCases.find((item) => item.id === arena.session?.caseId)
 
   useEffect(() => {
@@ -48,6 +50,23 @@ export function ArenaPage() {
   const isFinished = arena.viewState === 'finished' || arena.session.status !== 'active'
   const isSending = arena.turnState === 'sending' || arena.turnState === 'thinking'
   const isConnecting = audio.state === 'connecting' || audio.state === 'reconnecting'
+
+  const confirmFinish = async () => {
+    if (isFinishing) return
+    setIsFinishing(true)
+    setFinishError(null)
+    try {
+      if (arena.session?.mode === 'voice') await audio.stop()
+      const finished = await arena.finishSession()
+      if (finished) setShowFinishDialog(false)
+    } catch (caught) {
+      setFinishError(caught instanceof Error
+        ? caught.message
+        : 'Не удалось завершить тренировку. Попробуйте ещё раз.')
+    } finally {
+      setIsFinishing(false)
+    }
+  }
 
   return (
     <div className="arena-page">
@@ -86,7 +105,12 @@ export function ArenaPage() {
           )}
         </section>
       </main>
-      {showFinishDialog && <FinishDialog onCancel={() => setShowFinishDialog(false)} onConfirm={() => { setShowFinishDialog(false); void (async () => { if (arena.session?.mode === 'voice') await audio.stop(); await arena.finishSession() })() }} />}
+      {showFinishDialog && <FinishDialog
+        busy={isFinishing}
+        error={finishError ?? arena.error}
+        onCancel={() => setShowFinishDialog(false)}
+        onConfirm={() => { void confirmFinish() }}
+      />}
     </div>
   )
 }
