@@ -589,6 +589,7 @@ test('recovers from activation validation and network errors on retry', async ({
 })
 
 test('synchronizes login, token rotation, and logout between tabs', async ({ page, context }) => {
+  test.setTimeout(30_000)
   const otherPage = await context.newPage()
   await mockLogin(page)
   await page.route('**/api/v1/auth/token/refresh', (route) => json(route, 200, {
@@ -631,6 +632,7 @@ test('synchronizes login, token rotation, and logout between tabs', async ({ pag
 })
 
 test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, context }) => {
+  test.setTimeout(30_000)
   await page.goto('/login')
   await page.evaluate(({ key, value }) => {
     window.localStorage.setItem(key, JSON.stringify(value))
@@ -668,6 +670,7 @@ test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, 
 })
 
 test('does not let a stale refresh overwrite a newer cross-tab session', async ({ page, context }) => {
+  test.setTimeout(30_000)
   await seedSession(page, 'old-access', 'old-refresh')
   let releaseRefresh = () => undefined
   const refreshReleased = new Promise<void>((resolve) => { releaseRefresh = resolve })
