@@ -412,33 +412,68 @@ storage event мог изменить поколение сессии во вр�
 
 ### Шаг 11. Выполнить итоговую проверку объединённой ветки
 
-- [ ] Запустить `npm run lint` и `npm run build`.
-- [ ] Запустить полный `npm run visual:smoke`, а не только новые тесты.
-- [ ] После UI/CSS/адаптивных изменений расширить необходимые сценарии
+- [x] Запустить `npm run lint` и `npm run build`.
+- [x] Запустить полный `npm run visual:smoke`, а не только новые тесты.
+- [x] После UI/CSS/адаптивных изменений расширить необходимые сценарии
       `tests/visual/` и открыть относящиеся desktop/mobile PNG через `view_image`.
-- [ ] Проверить полный text и voice demo flow, reload, retry, смену арены,
+- [x] Проверить полный text и voice demo flow, reload, retry, смену арены,
       finish/result и историю.
-- [ ] Подтвердить отсутствие запросов к chat/message CRUD из Arena и отсутствие
+- [x] Подтвердить отсутствие запросов к chat/message CRUD из Arena и отсутствие
       сетевой работы у real negotiation/audio stubs.
-- [ ] Проверить `git diff --check`, конфликтные маркеры и `git status`.
-- [ ] Убедиться, что backend/audio-engine не изменены, а generated artifacts
+- [x] Проверить `git diff --check`, конфликтные маркеры и `git status`.
+- [x] Убедиться, что backend/audio-engine не изменены, а generated artifacts
       не попали в diff.
-- [ ] Записать результаты по каждому ID: исправлено, проверено, либо отложено
+- [x] Записать результаты по каждому ID: исправлено, проверено, либо отложено
       в отдельную интеграционную задачу с объяснением.
 
 Runner очищает `artifacts/visual-smoke/` перед новым запуском. Нужные кадры
 открывать до следующего точечного прогона либо повторить соответствующий suite.
 
+Проверено 23 сентября 2026 года:
+
+- `npm run lint` и `npm run build` завершились успешно;
+- полный `npm run visual:smoke` прошёл в обоих режимах: 51/51 сценарий для
+  `real/mock/mock` и 31/31 для `mock/mock/mock`;
+- сценарии `arena-text`, `arena-voice`, `arena-session-resilience`,
+  `arena-audio-resilience`, `result`, `result-repeat-resilience` и
+  `domain-resilience` подтвердили text/voice flow, reload, retry, смену арены,
+  finish/result и сохранение истории;
+- через `view_image` просмотрены desktop/mobile кадры текстовой и голосовой
+  арены, результата и мобильной истории; видимых проблем компоновки не найдено;
+- `service-contracts` подтвердил отсутствие HTTP/WebSocket работы у real
+  negotiation/audio stubs; проверка зависимостей Arena не выявила обращения к
+  browser chat/message CRUD;
+- `git diff --check` успешен, конфликтных маркеров нет, merge-tree с
+  `origin/dev` строится без конфликта; внешние backend/audio-engine worktree
+  чисты, `dist` и `artifacts/visual-smoke` не попали в Git.
+
+Статус замечаний:
+
+- R01 исправлено и проверено сценариями привязки audio client, поздних событий
+  и reconnect; R02 — изоляцией late load/turn/finish и recovery command IDs;
+- R03 исправлено и проверено retry/reload/double-submit для повтора кейса;
+  R04 — refresh на `ServiceError` 401 и сохранением command identity;
+- R05 исправлено и проверено очередью PCM и cleanup; R06 — устойчивым memory
+  fallback и межвкладочными сценариями; R07 — fault injection аудиотранспорта,
+  finish flow и повтором с исходным command ID;
+- M01 исправлено и повторно проверено относительно `origin/dev`; T01 исправлено
+  детерминированным барьером и прошло в составе полного suite без retries;
+- D01 исправлено: документация разделяет доступный mock-прототип, auth backend,
+  target contracts и ещё не реализованную real интеграцию;
+- I01–I03 не являются дефектами текущего frontend PR и отложены в отдельную
+  интеграционную задачу: отсутствует microphone/PCM pipeline, а внешние backend
+  и audio-engine ещё не реализуют согласованные negotiation/audio contracts.
+
 ## 5. Критерий готовности текущего PR
 
 Текущая серия исправлений завершена, когда:
 
-- [ ] R01–R07 закрыты регрессионными проверками.
-- [ ] M01 разрешён относительно актуальной `origin/dev`.
-- [ ] Причина T01 установлена, а полный suite проходит без маскирующих retries.
-- [ ] Документация соответствует объединённому коду и ограничениям интеграции.
-- [ ] Lint/build/full smoke проходят; необходимые PNG просмотрены.
-- [ ] Mock demo остаётся автономным, real stubs остаются явными заглушками.
+- [x] R01–R07 закрыты регрессионными проверками.
+- [x] M01 разрешён относительно актуальной `origin/dev`.
+- [x] Причина T01 установлена, а полный suite проходит без маскирующих retries.
+- [x] Документация соответствует объединённому коду и ограничениям интеграции.
+- [x] Lint/build/full smoke проходят; необходимые PNG просмотрены.
+- [x] Mock demo остаётся автономным, real stubs остаются явными заглушками.
 
 Этот критерий означает готовность frontend-прототипа к PR. Он не равен
 готовности продукта к работе с настоящим голосовым сервисом.
