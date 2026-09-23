@@ -11,7 +11,9 @@
 | `/login` | GuestRoute | Email, пароль и необязательный шестизначный TOTP. |
 | `/register` | GuestRoute | Регистрация; после успеха переход на `/activate` с состоянием подтверждения email. |
 | `/activate` | ActivationRoute | Ожидание письма, проверка кода из query, загрузка, успех или ошибка активации с повтором. |
-| `/home` | ProtectedRoute | Mock-каталог, прогресс, тренировки; реальные logout и управление TOTP в модальном окне. |
+| `/home` | ProtectedRoute | Mock-каталог, прогресс, тренировки; logout и управление TOTP через выбранный auth source. |
+| `/arena/:sessionId` | ProtectedRoute | Text/voice переговоры выбранной сессии; сейчас доменный flow работает через mock negotiation/audio. |
+| `/result/:sessionId` | ProtectedRoute | Processing/error/готовый разбор, повтор кейса и возврат к каталогу; сейчас данные результата mock. |
 | `*` | Публичный | Страница 404. |
 
 GuestRoute, ProtectedRoute и ActivationRoute показывают `SessionLoading` при
@@ -29,6 +31,10 @@ pathname и query исходного адреса. LoginPage возвращае�
 Landing CTA ссылаются на `/home`: у гостя получается цепочка
 `/` → `/home` → `/login` → `/home` после входа. У пользователя с подтверждённой
 сессией CTA сразу открывает `/home`.
+
+`/arena/:sessionId` и `/result/:sessionId` не принимают токены и не обращаются к
+chat/message CRUD напрямую. Источник negotiation/audio выбирается composition
+root; поддерживаемые demo-комбинации описаны в [README](../README.md#режимы-сервисов).
 
 ActivationRoute намеренно отличается от GuestRoute: существующая подтверждённая
 сессия ведёт на `/home` без замены токенов кодом из письма. Если пользователь

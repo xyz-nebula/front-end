@@ -1,15 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 
-import { ApiError, authApi, isApiError } from '@/api/auth'
 import {
   AUTH_STORAGE_KEY,
-  parseStoredTokens,
+  createStoredSession,
+  parseStoredSession,
   readStoredSession,
-  removeStoredTokens,
-  removeStoredTokensIfRefreshTokenMatches,
-  writeStoredTokens,
+  removeStoredSession,
+  removeStoredSessionIfRefreshTokenMatches,
+  writeStoredSession,
+  type StoredAuthSession,
 } from '@/auth/storage'
+import { executeAuthorizedOperation } from '@/auth/authorizedOperation'
 import { AuthContext, type AuthContextValue } from '@/auth/useAuth'
+import { AuthRuntimeContext, type AuthRuntimeContextValue } from '@/auth/runtime'
+import { AuthClientError, isAuthClientError } from '@/services/contracts/authClient'
+import { useServiceAdapters } from '@/services/serviceAdapters'
 import type { AuthStatus, AuthTokens, SessionPersistence } from '@/types/auth'
 
 interface RefreshOperation {
@@ -31,29 +43,27 @@ class StaleSessionCreationError extends Error {
   }
 }
 
-class StaleAuthorizedOperationError extends Error {
-  constructor() {
-    super('Сессия изменилась во время выполнения операции.')
-    this.name = 'StaleAuthorizedOperationError'
-  }
-}
-
 function isDefinitiveAuthError(error: unknown) {
-  return isApiError(error)
+  return isAuthClientError(error)
     && error.reason === 'http'
     && (error.status === 401 || error.status === 403)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [initialSession] = useState(() => readStoredSession())
-  const [status, setStatus] = useState<AuthStatus>(initialSession.tokens ? 'booting' : 'unauthenticated')
+  const { authClient, config } = useServiceAdapters()
+  const [initialSession] = useState(() => readStoredSession(config.authSource))
+  const [status, setStatus] = useState<AuthStatus>(initialSession.session ? 'booting' : 'unauthenticated')
   const [logoutRequested, setLogoutRequested] = useState(false)
   const [persistence, setPersistence] = useState<SessionPersistence>(
     initialSession.storageAvailable ? 'persistent' : 'memory',
   )
   const [showMemorySessionNotice, setShowMemorySessionNotice] = useState(false)
   const [externalSessionVersion, setExternalSessionVersion] = useState(0)
-  const tokensRef = useRef<AuthTokens | null>(initialSession.tokens)
+  const tokensRef = useRef<AuthTokens | null>(initialSession.session?.tokens ?? null)
+  const mockOwnerKeyRef = useRef<string | null>(initialSession.session?.mockOwnerKey ?? null)
+  const [mockOwnerKey, setMockOwnerKey] = useState<string | null>(
+    initialSession.session?.mockOwnerKey ?? null,
+  )
   const persistenceRef = useRef<SessionPersistence>(
     initialSession.storageAvailable ? 'persistent' : 'memory',
   )
@@ -64,12 +74,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const didBootstrapRef = useRef(false)
   const memoryNoticeShownRef = useRef(false)
 
-  const saveSession = useCallback((tokens: AuthTokens, replacesSession = true) => {
-    const wasPersisted = writeStoredTokens(tokens)
-    if (!wasPersisted) removeStoredTokens()
+  const saveSession = useCallback((session: StoredAuthSession, replacesSession = true) => {
+    const wasPersisted = writeStoredSession(session)
+    if (!wasPersisted) removeStoredSession()
     if (replacesSession) sessionGenerationRef.current += 1
     sessionVersionRef.current += 1
-    tokensRef.current = tokens
+    tokensRef.current = session.tokens
+    mockOwnerKeyRef.current = session.mockOwnerKey
+    setMockOwnerKey(session.mockOwnerKey)
     const nextPersistence = wasPersisted ? 'persistent' : 'memory'
     persistenceRef.current = nextPersistence
     setPersistence(nextPersistence)
@@ -85,11 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return wasPersisted ? 'persistent' as const : 'memory' as const
   }, [])
 
-  const adoptExternalSession = useCallback((tokens: AuthTokens) => {
+  const adoptExternalSession = useCallback((session: StoredAuthSession) => {
     sessionCreationGenerationRef.current += 1
     sessionGenerationRef.current += 1
     sessionVersionRef.current += 1
-    tokensRef.current = tokens
+    tokensRef.current = session.tokens
+    mockOwnerKeyRef.current = session.mockOwnerKey
+    setMockOwnerKey(session.mockOwnerKey)
     persistenceRef.current = 'persistent'
     setPersistence('persistent')
     memoryNoticeShownRef.current = false
@@ -104,7 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionGenerationRef.current += 1
     sessionVersionRef.current += 1
     tokensRef.current = null
-    if (options.removeStored !== false && !removeStoredTokens()) {
+    mockOwnerKeyRef.current = null
+    setMockOwnerKey(null)
+    if (options.removeStored !== false && !removeStoredSession()) {
       persistenceRef.current = 'memory'
       setPersistence('memory')
     }
@@ -123,8 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new StaleSessionCreationError()
     }
 
-    saveSession(tokens)
-  }, [saveSession])
+    saveSession(createStoredSession(tokens, config.authSource))
+  }, [config.authSource, saveSession])
 
   const refreshSession = useCallback((): Promise<AuthTokens> => {
     const version = sessionVersionRef.current
@@ -132,16 +148,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (activeRefresh?.version === version) return activeRefresh.promise
 
     const refreshToken = tokensRef.current?.refreshToken
-    if (!refreshToken) return Promise.reject(new ApiError(401, 'Сессия не найдена.'))
+    if (!refreshToken) return Promise.reject(new AuthClientError(401, 'Сессия не найдена.'))
 
-    const performRefresh = () => authApi.refresh(refreshToken)
+    const performRefresh = () => authClient.refresh(refreshToken)
       .then((tokens): AuthTokens => {
         if (sessionVersionRef.current !== version || tokensRef.current?.refreshToken !== refreshToken) {
           const currentTokens = tokensRef.current
           if (currentTokens) return currentTokens
-          throw new ApiError(401, 'Сессия уже завершена.')
+          throw new AuthClientError(401, 'Сессия уже завершена.')
         }
-        saveSession(tokens, false)
+        const ownerKey = mockOwnerKeyRef.current
+        if (!ownerKey) throw new AuthClientError(401, 'Сессия уже завершена.')
+        saveSession({ tokens, source: config.authSource, mockOwnerKey: ownerKey }, false)
         return tokens
       })
       .catch((error: unknown): AuthTokens => {
@@ -151,12 +169,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw error
         }
         if (isDefinitiveAuthError(error)) {
-          const removalResult = removeStoredTokensIfRefreshTokenMatches(refreshToken)
+          const removalResult = removeStoredSessionIfRefreshTokenMatches(
+            refreshToken,
+            config.authSource,
+          )
           if (removalResult === 'changed') {
-            const externalSession = readStoredSession()
-            if (externalSession.tokens) {
-              adoptExternalSession(externalSession.tokens)
-              return externalSession.tokens
+            const externalSession = readStoredSession(config.authSource)
+            if (externalSession.session) {
+              adoptExternalSession(externalSession.session)
+              return externalSession.session.tokens
             }
           }
 
@@ -174,24 +195,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (sessionVersionRef.current !== version || tokensRef.current?.refreshToken !== refreshToken) {
           const currentTokens = tokensRef.current
           if (currentTokens) return currentTokens
-          throw new ApiError(401, 'Сессия уже завершена.')
+          throw new AuthClientError(401, 'Сессия уже завершена.')
         }
 
-        const storedSession = readStoredSession()
+        const storedSession = readStoredSession(config.authSource)
         if (!storedSession.storageAvailable) {
           persistenceRef.current = 'memory'
           setPersistence('memory')
           return performRefresh()
         }
 
-        if (!storedSession.tokens) {
+        if (!storedSession.session) {
           clearSession({ removeStored: false })
-          throw new ApiError(401, 'Сессия уже завершена.')
+          throw new AuthClientError(401, 'Сессия уже завершена.')
         }
 
-        if (storedSession.tokens.refreshToken !== refreshToken) {
-          adoptExternalSession(storedSession.tokens)
-          return storedSession.tokens
+        if (storedSession.session.tokens.refreshToken !== refreshToken) {
+          adoptExternalSession(storedSession.session)
+          return storedSession.session.tokens
         }
 
         return performRefresh()
@@ -206,7 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const operation: RefreshOperation = { version, promise }
     refreshOperationRef.current = operation
     return promise
-  }, [adoptExternalSession, clearSession, saveSession])
+  }, [adoptExternalSession, authClient, clearSession, config.authSource, saveSession])
 
   const restoreSession = useCallback(async () => {
     if (!tokensRef.current) {
@@ -234,57 +255,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const sessionGeneration = sessionGenerationRef.current
     if (!initialTokens) {
       clearSession()
-      throw new ApiError(401, 'Войдите, чтобы продолжить.')
+      throw new AuthClientError(401, 'Войдите, чтобы продолжить.')
     }
 
-    const assertSessionIsCurrent = () => {
-      if (sessionGenerationRef.current !== sessionGeneration) {
-        throw new StaleAuthorizedOperationError()
-      }
-    }
-
-    try {
-      assertSessionIsCurrent()
-      const result = await operation(initialTokens.accessToken)
-      assertSessionIsCurrent()
-      return result
-    } catch (error) {
-      assertSessionIsCurrent()
-      if (!isApiError(error) || error.status !== 401) throw error
-    }
-
-    assertSessionIsCurrent()
-    const retryTokens = await refreshSession()
-    assertSessionIsCurrent()
-
-    const retryVersion = sessionVersionRef.current
-    try {
-      assertSessionIsCurrent()
-      const result = await operation(retryTokens.accessToken)
-      assertSessionIsCurrent()
-      return result
-    } catch (error) {
-      assertSessionIsCurrent()
-      if (isApiError(error) && error.status === 401 && sessionVersionRef.current === retryVersion) {
-        clearSession()
-      }
-      throw error
-    }
+    return executeAuthorizedOperation(operation, {
+      accessToken: initialTokens.accessToken,
+      sessionGeneration,
+      getSessionGeneration: () => sessionGenerationRef.current,
+      getSessionVersion: () => sessionVersionRef.current,
+      refreshSession,
+      clearSession,
+    })
   }, [clearSession, refreshSession])
 
   const revokeRemoteSession = useCallback(async (tokens: AuthTokens) => {
     try {
-      await authApi.logout(tokens.accessToken, tokens.refreshToken)
+      await authClient.logout(tokens.accessToken, tokens.refreshToken)
     } catch (error) {
-      if (!isApiError(error) || error.status !== 401) return
+      if (!isAuthClientError(error) || error.status !== 401) return
       try {
-        const refreshedTokens = await authApi.refresh(tokens.refreshToken, 3_000)
-        await authApi.logout(refreshedTokens.accessToken, refreshedTokens.refreshToken)
+        const refreshedTokens = await authClient.refresh(tokens.refreshToken, 3_000)
+        await authClient.logout(refreshedTokens.accessToken, refreshedTokens.refreshToken)
       } catch {
         // Remote revocation is best-effort after the local session has already ended.
       }
     }
-  }, [])
+  }, [authClient])
 
   useEffect(() => {
     if (didBootstrapRef.current) return
@@ -301,13 +297,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const externalTokens = parseStoredTokens(event.newValue)
-      if (externalTokens) adoptExternalSession(externalTokens)
+      const externalSession = parseStoredSession(event.newValue, config.authSource)
+      if (externalSession) adoptExternalSession(externalSession)
     }
 
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
-  }, [adoptExternalSession, clearSession])
+  }, [adoptExternalSession, clearSession, config.authSource])
 
   const value = useMemo<AuthContextValue>(() => ({
     status,
@@ -317,9 +313,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     showMemorySessionNotice,
     dismissMemorySessionNotice: () => setShowMemorySessionNotice(false),
     retrySession: restoreSession,
-    register: authApi.register,
-    activate: (code) => createSession(() => authApi.activate(code)),
-    login: (payload) => createSession(() => authApi.login(payload)),
+    register: (payload) => authClient.register(payload),
+    activate: (code) => createSession(() => authClient.activate(code)),
+    login: (payload) => createSession(() => authClient.login(payload)),
     logout: () => {
       const tokens = tokensRef.current
       setStatus('signing-out')
@@ -327,10 +323,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (tokens) void revokeRemoteSession(tokens)
       return Promise.resolve()
     },
-    enrollTotp: () => runAuthorized(authApi.enrollTotp),
-    confirmTotp: (totpToken) => runAuthorized((accessToken) => authApi.confirmTotp(accessToken, totpToken)),
-    disableTotp: (password) => runAuthorized((accessToken) => authApi.disableTotp(accessToken, password)),
+    enrollTotp: () => runAuthorized((accessToken) => authClient.enrollTotp(accessToken)),
+    confirmTotp: (totpToken) => runAuthorized(
+      (accessToken) => authClient.confirmTotp(accessToken, totpToken),
+    ),
+    disableTotp: (password) => runAuthorized(
+      (accessToken) => authClient.disableTotp(accessToken, password),
+    ),
   }), [
+    authClient,
     clearSession,
     createSession,
     externalSessionVersion,
@@ -343,5 +344,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     status,
   ])
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  const runtimeValue = useMemo<AuthRuntimeContextValue>(() => ({
+    mockOwnerKey,
+    runAuthorized,
+  }), [mockOwnerKey, runAuthorized])
+
+  return (
+    <AuthRuntimeContext.Provider value={runtimeValue}>
+      <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    </AuthRuntimeContext.Provider>
+  )
 }

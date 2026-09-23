@@ -22,6 +22,12 @@ function getRegistrationEmail(state: unknown) {
   return state.email.trim()
 }
 
+function getDemoActivationCode(state: unknown) {
+  if (typeof state !== 'object' || state === null) return ''
+  if (!('demoActivationCode' in state) || typeof state.demoActivationCode !== 'string') return ''
+  return uuidPattern.test(state.demoActivationCode) ? state.demoActivationCode : ''
+}
+
 function getInitialState(code: string, registrationEmail: string): ActivationState {
   if (code && uuidPattern.test(code)) return { kind: 'checking' }
   if (code) {
@@ -69,6 +75,7 @@ export function ActivatePage() {
   const [searchParams] = useSearchParams()
   const queryCode = searchParams.get('code')?.trim() ?? ''
   const registrationEmail = getRegistrationEmail(location.state)
+  const demoActivationCode = getDemoActivationCode(location.state)
   const [activationState, setActivationState] = useState<ActivationState>(() => (
     getInitialState(queryCode, registrationEmail)
   ))
@@ -123,6 +130,14 @@ export function ActivatePage() {
           <ActivationMark state="waiting" />
           <div className="activation-email">{registrationEmail}</div>
           <p>Перейдите по ссылке в письме — код подставится и проверится автоматически.</p>
+          {demoActivationCode && (
+            <Link
+              className="demo-activation-link"
+              to={`/activate?code=${encodeURIComponent(demoActivationCode)}`}
+            >
+              Открыть demo-ссылку активации
+            </Link>
+          )}
         </div>
         <p className="auth-switch">Уже активировали аккаунт? <Link to="/login">Войти</Link></p>
         <Link className="auth-back-link" to="/">← На главную</Link>

@@ -66,8 +66,15 @@ export function RegisterPage() {
     }
 
     try {
-      await register(payload)
-      navigate('/activate', { replace: true, state: { registrationComplete: true, email: payload.email } })
+      const response = await register(payload)
+      navigate('/activate', {
+        replace: true,
+        state: {
+          registrationComplete: true,
+          email: payload.email,
+          demoActivationCode: response.demo_activation_code,
+        },
+      })
     } catch (error) {
       setErrors(getFieldErrors(error))
       setFormError(getErrorMessage(error, 'Не удалось создать аккаунт. Попробуйте ещё раз.'))

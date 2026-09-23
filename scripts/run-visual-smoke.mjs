@@ -7,13 +7,40 @@ import { createServer } from 'vite'
 
 const HOST = '127.0.0.1'
 const SHUTDOWN_TIMEOUT_MS = 310_000
-const HARD_TIMEOUT_MS = 330_000
+const HARD_TIMEOUT_MS = 660_000
 const PROCESS_EXIT_GRACE_MS = 2_000
 const PROCESS_TREE_SETTLE_MS = 500
 const projectRoot = fileURLToPath(new URL('../', import.meta.url))
 const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url))
 const playwrightCli = fileURLToPath(import.meta.resolve('@playwright/test/cli'))
 const artifactsDir = fileURLToPath(new URL('../artifacts/visual-smoke/', import.meta.url))
+const testGroups = [
+  {
+    name: 'real/mock/mock',
+    authSource: 'real',
+    specs: [
+      'auth.spec.ts',
+      'auth-resilience.spec.ts',
+      'authorized-operation.spec.ts',
+      'service-contracts.spec.ts',
+    ],
+  },
+  {
+    name: 'mock/mock/mock',
+    authSource: 'mock',
+    specs: [
+      'landing.spec.ts',
+      'mock-domain.spec.ts',
+      'domain-resilience.spec.ts',
+      'arena-session-resilience.spec.ts',
+      'arena-audio-resilience.spec.ts',
+      'result-repeat-resilience.spec.ts',
+      'arena-text.spec.ts',
+      'arena-voice.spec.ts',
+      'result.spec.ts',
+    ],
+  },
+]
 
 function hasExited(childProcess) {
   return childProcess.exitCode !== null || childProcess.signalCode !== null
@@ -180,12 +207,7 @@ async function getAvailablePort() {
 async function run() {
   let server
   let playwrightProcess
-  let exitCode
-  let shutdownTimeout
-
-  const shutdownSignal = new Promise((resolve) => {
-    shutdownTimeout = setTimeout(() => resolve('timeout'), SHUTDOWN_TIMEOUT_MS)
-  })
+  let exitCode = 0
 
   const hardTimeout = setTimeout(() => {
     console.error(`[visual:smoke] Превышен общий лимит ${HARD_TIMEOUT_MS / 1000} секунд.`)
@@ -197,60 +219,73 @@ async function run() {
     await rm(artifactsDir, { recursive: true, force: true })
     await mkdir(artifactsDir, { recursive: true })
 
-    process.env.API_PROXY_TARGET ??= 'http://127.0.0.1:9'
-    process.env.VITE_API_TIMEOUT_MS ??= '600'
+    const args = process.argv.slice(2)
+    const selectedSpecs = args.filter((arg) => arg.endsWith('.spec.ts'))
+    for (const group of testGroups) {
+      const specs = selectedSpecs.length > 0
+        ? group.specs.filter((spec) => selectedSpecs.some((selected) => selected.endsWith(spec)))
+        : group.specs
+      if (specs.length === 0) continue
 
-    const port = await getAvailablePort()
-    server = await createServer({
-      root: projectRoot,
-      configFile,
-      logLevel: 'error',
-      server: {
-        host: HOST,
-        port,
-        strictPort: true,
-      },
-    })
-    await server.listen()
+      let shutdownTimeout
+      const shutdownSignal = new Promise((resolve) => {
+        shutdownTimeout = setTimeout(() => resolve('timeout'), SHUTDOWN_TIMEOUT_MS)
+      })
+      try {
+        process.env.API_PROXY_TARGET = group.authSource === 'real' ? 'http://127.0.0.1:9' : ''
+        process.env.VITE_AUTH_SOURCE = group.authSource
+        process.env.VITE_NEGOTIATION_SOURCE = 'mock'
+        process.env.VITE_AUDIO_SOURCE = 'mock'
+        process.env.VITE_API_TIMEOUT_MS = '600'
 
-    const address = server.httpServer?.address()
-    if (!address || typeof address === 'string') {
-      throw new Error('Vite did not expose a TCP port')
-    }
+        const port = await getAvailablePort()
+        server = await createServer({
+          root: projectRoot,
+          configFile,
+          logLevel: 'error',
+          server: { host: HOST, port, strictPort: true },
+        })
+        await server.listen()
+        const address = server.httpServer?.address()
+        if (!address || typeof address === 'string') {
+          throw new Error('Vite did not expose a TCP port')
+        }
 
-    const baseURL = `http://${HOST}:${address.port}`
-    console.log(`[visual:smoke] Vite ready at ${baseURL}`)
+        const baseURL = `http://${HOST}:${address.port}`
+        console.log(`[visual:smoke] ${group.name}: Vite ready at ${baseURL}`)
+        playwrightProcess = spawn(process.execPath, [
+          playwrightCli,
+          'test',
+          ...specs,
+          ...args.filter((arg) => !arg.endsWith('.spec.ts')),
+        ], {
+          cwd: projectRoot,
+          detached: process.platform !== 'win32',
+          env: { ...process.env, PW_BASE_URL: baseURL },
+          stdio: 'inherit',
+          windowsHide: true,
+        })
 
-    playwrightProcess = spawn(
-      process.execPath,
-      [playwrightCli, 'test', ...process.argv.slice(2)],
-      {
-        cwd: projectRoot,
-        detached: process.platform !== 'win32',
-        env: {
-          ...process.env,
-          PW_BASE_URL: baseURL,
-        },
-        stdio: 'inherit',
-      },
-    )
-
-    const playwrightExit = waitForExit(playwrightProcess)
-    const outcome = await Promise.race([playwrightExit, shutdownSignal])
-
-    if (outcome === 'timeout') {
-      console.error(
-        `[visual:smoke] Превышен лимит ${SHUTDOWN_TIMEOUT_MS / 1000} секунд, завершаю Playwright.`,
-      )
-      exitCode = 124
-      await terminateProcessTree(playwrightProcess)
-      await playwrightExit.catch(() => undefined)
-    } else {
-      exitCode = outcome
+        const playwrightExit = waitForExit(playwrightProcess)
+        const outcome = await Promise.race([playwrightExit, shutdownSignal])
+        if (outcome === 'timeout') {
+          console.error(`[visual:smoke] ${group.name}: превышен лимит ${SHUTDOWN_TIMEOUT_MS / 1000} секунд.`)
+          exitCode = 124
+          await terminateProcessTree(playwrightProcess)
+          await playwrightExit.catch(() => undefined)
+        } else if (outcome !== 0) {
+          exitCode = outcome
+        }
+      } finally {
+        clearTimeout(shutdownTimeout)
+        await server?.close()
+        server = undefined
+        playwrightProcess = undefined
+      }
     }
   } catch (error) {
     console.error('[visual:smoke] Runner failed:', error)
-    exitCode ??= 1
+    exitCode = 1
   } finally {
     try {
       await server?.close()
@@ -260,7 +295,6 @@ async function run() {
         exitCode = 1
       }
     }
-    clearTimeout(shutdownTimeout)
     if (!playwrightProcess?.pid || hasExited(playwrightProcess)) {
       clearTimeout(hardTimeout)
     }

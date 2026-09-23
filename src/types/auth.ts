@@ -14,6 +14,7 @@ export interface AuthRegisterRequest {
 export interface AuthRegisterResponse {
   user_id: string
   status: 'pending_activation' | 'active' | 'suspended'
+  demo_activation_code?: string
 }
 
 export interface AuthLoginRequest {

@@ -1,4 +1,5 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { Link } from 'react-router-dom'
 
 import { useAuth } from '@/auth/useAuth'
 import { TotpModal } from '@/components/auth/TotpModal'
@@ -8,16 +9,23 @@ import { TrainingModal } from '@/components/home/TrainingModal'
 import { AppButton } from '@/components/ui/AppButton'
 import { ArrowIcon } from '@/components/ui/ArrowIcon'
 import { Logo } from '@/components/ui/Logo'
-import { caseCategories, recentTrainings, trainingCases } from '@/mocks/cases'
+import { caseCategories, trainingCases } from '@/mocks/cases'
+import { useDomainServices } from '@/services/domainServices'
 import type { CaseCategory, TrainingCase } from '@/types/case'
+import type { NegotiationSessionSummary } from '@/types/negotiation'
 
 export function HomePage() {
   const { dismissMemorySessionNotice, externalSessionVersion, logout, showMemorySessionNotice } = useAuth()
+  const { negotiationClient } = useDomainServices()
   const [category, setCategory] = useState<CaseCategory>('Все')
   const [selectedCase, setSelectedCase] = useState<TrainingCase | null>(null)
   const [securityModalVersion, setSecurityModalVersion] = useState<number | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [history, setHistory] = useState<NegotiationSessionSummary[]>([])
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(true)
   const recommendedCase = trainingCases[0]
+  const historyCountLabel = history.length === 1 ? 'сессия' : history.length >= 2 && history.length <= 4 ? 'сессии' : 'сессий'
   const visibleCases = useMemo(
     () => category === 'Все' ? trainingCases : trainingCases.filter((item) => item.category === category),
     [category],
@@ -28,6 +36,28 @@ export function HomePage() {
     setIsLoggingOut(true)
     await logout().catch(() => undefined)
   }
+
+  const loadHistory = useCallback(async () => {
+    try {
+      setHistory(await negotiationClient.listSessions())
+    } catch (caught) {
+      setHistoryError(caught instanceof Error ? caught.message : 'Не удалось загрузить историю.')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [negotiationClient])
+
+  useEffect(() => {
+    let active = true
+    void negotiationClient.listSessions().then((sessions) => {
+      if (active) setHistory(sessions)
+    }).catch((caught: unknown) => {
+      if (active) setHistoryError(caught instanceof Error ? caught.message : 'Не удалось загрузить историю.')
+    }).finally(() => {
+      if (active) setHistoryLoading(false)
+    })
+    return () => { active = false }
+  }, [negotiationClient])
 
   return (
     <div className="app-home">
@@ -72,7 +102,7 @@ export function HomePage() {
           </article>
 
           <article className="progress-card" id="progress">
-            <div className="progress-card__head"><div><span>Ваш прогресс</span><strong>Сентябрь</strong></div><span className="trend">↗ +8%</span></div>
+            <div className="progress-card__head"><div><span>Ваш прогресс · демо</span><strong>Сентябрь</strong></div><span className="trend">↗ +8%</span></div>
             <div className="progress-ring" style={{ '--progress': '72%' } as CSSProperties}><div><strong>7</strong><span>тренировок</span></div></div>
             <div className="progress-card__stats"><div><span>Средняя оценка</span><strong>74</strong></div><div><span>В практике</span><strong>1ч 24м</strong></div></div>
             <div className="progress-card__focus"><span>Фокус недели</span><strong>Больше открытых вопросов</strong><div><i /></div></div>
@@ -88,12 +118,15 @@ export function HomePage() {
         </section>
 
         <section className="recent-section">
-          <div className="recent-section__head"><div><p className="eyebrow">История</p><h2>Последние тренировки</h2></div><span>3 сессии в этом месяце</span></div>
+          <div className="recent-section__head"><div><p className="eyebrow">История · демо</p><h2>Последние тренировки</h2></div><span>{history.length} {historyCountLabel}</span></div>
           <div className="recent-table">
-            {recentTrainings.map((item) => (
-              <div className="recent-row" key={`${item.caseTitle}-${item.date}`}>
-                <div className="recent-row__icon">↗</div><div className="recent-row__name"><strong>{item.caseTitle}</strong><span>{item.date}</span></div><div className="recent-row__score"><span>Результат</span><strong>{item.score}<small>/100</small></strong></div><div className={`recent-row__change ${item.change === 0 ? 'is-neutral' : ''}`}>{item.change > 0 ? `+${item.change}` : '—'}</div>
-                <button type="button" onClick={() => setSelectedCase(trainingCases.find((trainingCase) => trainingCase.title === item.caseTitle) ?? recommendedCase)} aria-label={`Повторить «${item.caseTitle}»`}><ArrowIcon /></button>
+            {historyLoading && <p className="recent-empty" role="status">Загружаем историю…</p>}
+            {historyError && <div className="recent-empty" role="alert">{historyError} <button type="button" onClick={() => { setHistoryLoading(true); setHistoryError(null); void loadHistory() }}>Повторить</button></div>}
+            {!historyLoading && !historyError && history.length === 0 && <p className="recent-empty">Здесь появятся ваши тренировки. Выберите кейс и начните первый раунд.</p>}
+            {!historyLoading && !historyError && history.map((item) => (
+              <div className="recent-row" key={item.id}>
+                <div className="recent-row__icon">{item.mode === 'voice' ? '◉' : '↗'}</div><div className="recent-row__name"><strong>{trainingCases.find((trainingCase) => trainingCase.id === item.caseId)?.title ?? 'Переговоры'}</strong><span>{new Date(item.startedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })} · {item.mode === 'voice' ? 'голос' : 'текст'}</span><span className="recent-row__mobile-score">{item.score === undefined ? (item.status === 'active' ? 'В процессе' : 'Анализ') : `Результат ${item.score}/100`}</span></div><div className="recent-row__score"><span>{item.score === undefined ? 'Статус' : 'Результат'}</span><strong>{item.score === undefined ? (item.status === 'active' ? 'В процессе' : 'Анализ') : <>{item.score}<small>/100</small></>}</strong></div><div className={`recent-row__change ${item.score === undefined ? 'is-neutral' : ''}`}>{item.score === undefined ? (item.status === 'active' ? 'В процессе' : 'Анализ') : 'Готово'}</div>
+                <Link className="recent-row__link" to={item.status === 'active' ? `/arena/${item.id}` : `/result/${item.id}`} aria-label={`Открыть тренировку «${trainingCases.find((trainingCase) => trainingCase.id === item.caseId)?.title ?? 'Переговоры'}»`}><ArrowIcon /></Link>
               </div>
             ))}
           </div>
