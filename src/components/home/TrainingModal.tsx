@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { AppButton } from '@/components/ui/AppButton'
+import {
+  clearPendingSessionCreate,
+  getOrCreatePendingSessionCreate,
+  type PendingSessionCreate,
+} from '@/features/arena/pendingSessionCreate'
 import { useDomainServices } from '@/services/domainServices'
 import { isServiceError } from '@/types/api'
 import type { NegotiationMode } from '@/types/negotiation'
@@ -18,6 +23,8 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const [mode, setMode] = useState<NegotiationMode>('text')
   const [isStarting, setIsStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const pendingCreateRef = useRef<PendingSessionCreate | null>(null)
+  const startingRef = useRef(false)
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape' && !isStarting) onClose() }
@@ -31,34 +38,32 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   }, [isStarting, onClose])
 
   const startTraining = async () => {
-    if (isStarting) return
+    if (startingRef.current) return
     const storageKey = `arena.pending-create.${item.id}.${mode}`
-    let commandId: string
-    try {
-      commandId = window.sessionStorage.getItem(storageKey) ?? crypto.randomUUID()
-      window.sessionStorage.setItem(storageKey, commandId)
-    } catch {
-      commandId = crypto.randomUUID()
-    }
+    const command = getOrCreatePendingSessionCreate(storageKey, {
+      sourceContext: `training:${item.id}:${mode}`,
+      caseId: item.id,
+      mode,
+    }, pendingCreateRef.current)
+    pendingCreateRef.current = command
 
+    startingRef.current = true
     setIsStarting(true)
     setError(null)
     try {
       const session = await negotiationClient.createSession({
         caseId: item.id,
         mode,
-        clientCommandId: commandId,
+        clientCommandId: command.clientCommandId,
       })
-      try {
-        window.sessionStorage.removeItem(storageKey)
-      } catch {
-        // Session creation has already been confirmed; storage cleanup is best-effort.
-      }
+      clearPendingSessionCreate(storageKey)
+      pendingCreateRef.current = null
       navigate(`/arena/${session.id}`)
     } catch (caught) {
       setError(isServiceError(caught) || caught instanceof Error
         ? caught.message
         : 'Не удалось начать тренировку. Попробуйте ещё раз.')
+      startingRef.current = false
       setIsStarting(false)
     }
   }

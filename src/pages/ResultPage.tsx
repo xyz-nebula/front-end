@@ -3,6 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { AppButton } from '@/components/ui/AppButton'
 import { Logo } from '@/components/ui/Logo'
+import {
+  clearPendingSessionCreate,
+  getOrCreatePendingSessionCreate,
+  type PendingSessionCreate,
+} from '@/features/arena/pendingSessionCreate'
 import { trainingCases } from '@/mocks/cases'
 import { useDomainServices } from '@/services/domainServices'
 import type { NegotiationResultState, NegotiationSession } from '@/types/negotiation'
@@ -17,8 +22,10 @@ export function ResultPage() {
   const [result, setResult] = useState<NegotiationResultState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [retryVersion, setRetryVersion] = useState(0)
-  const [isRestarting, setIsRestarting] = useState(false)
+  const [restartingSessionId, setRestartingSessionId] = useState<string | null>(null)
   const generationRef = useRef(0)
+  const restartOperationRef = useRef<{ sessionId: string; generation: number } | null>(null)
+  const pendingRepeatRef = useRef<PendingSessionCreate | null>(null)
 
   useEffect(() => {
     const generation = ++generationRef.current
@@ -54,24 +61,42 @@ export function ResultPage() {
   }, [negotiationClient, retryVersion, sessionId])
 
   const repeatCase = useCallback(async () => {
-    if (!session || isRestarting) return
-    setIsRestarting(true)
+    if (!session || restartOperationRef.current?.sessionId === session.id) return
+    const storageKey = `arena.pending-repeat.${session.id}`
+    const command = getOrCreatePendingSessionCreate(storageKey, {
+      sourceContext: `repeat:${session.id}`,
+      caseId: session.caseId,
+      mode: session.mode,
+    }, pendingRepeatRef.current)
+    pendingRepeatRef.current = command
+    const generation = generationRef.current
+    const operation = { sessionId: session.id, generation }
+    restartOperationRef.current = operation
+    setRestartingSessionId(session.id)
     setError(null)
     try {
       const created = await negotiationClient.createSession({
-        caseId: session.caseId,
-        mode: session.mode,
-        clientCommandId: crypto.randomUUID(),
+        caseId: command.caseId,
+        mode: command.mode,
+        clientCommandId: command.clientCommandId,
       })
+      clearPendingSessionCreate(storageKey)
+      pendingRepeatRef.current = null
+      if (generation !== generationRef.current) return
       navigate(`/arena/${created.id}`)
     } catch (caught) {
+      if (generation !== generationRef.current) return
       setError(caught instanceof Error ? caught.message : 'Не удалось начать новый раунд.')
-      setIsRestarting(false)
+      if (restartOperationRef.current === operation) {
+        restartOperationRef.current = null
+        setRestartingSessionId(null)
+      }
     }
-  }, [isRestarting, navigate, negotiationClient, session])
+  }, [navigate, negotiationClient, session])
 
   const trainingCase = trainingCases.find((item) => item.id === session?.caseId)
   const ready = result?.status === 'ready' ? result.result : null
+  const isRestarting = restartingSessionId === session?.id
 
   return (
     <div className="result-page">
