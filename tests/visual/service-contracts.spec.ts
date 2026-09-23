@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 
 import { parseServiceConfig } from '../../src/services/config'
 import { AudioEngineClient } from '../../src/services/real/audioEngineClient'
@@ -168,4 +169,58 @@ test('real negotiation and audio stubs return feature-unavailable without networ
   expect(audio.subscribe(() => undefined)()).toBeUndefined()
   expect(audio.subscribeState(() => undefined)()).toBeUndefined()
   await expect(audio.disconnect()).resolves.toBeUndefined()
+})
+
+test('real stubs make no HTTP or WebSocket requests in the browser', async ({ page }) => {
+  const domainRequests: string[] = []
+  page.on('request', (request) => {
+    if (/\/api\/v1\/(negotiations|chat)\b/.test(request.url())) domainRequests.push(request.url())
+  })
+  page.on('websocket', (socket) => {
+    if (socket.url().includes('/v1/audio-stream')) domainRequests.push(socket.url())
+  })
+  await page.goto('/')
+
+  const result = await page.evaluate(async () => {
+    const [{ BackendNegotiationClient }, { AudioEngineClient }] = await Promise.all([
+      import('/src/services/real/backendNegotiationClient.ts'),
+      import('/src/services/real/audioEngineClient.ts'),
+    ])
+    const negotiation = new BackendNegotiationClient(async (operation) => operation('test-access-token'))
+    const audio = new AudioEngineClient()
+    const calls = [
+      negotiation.createSession({ caseId: 'case-1', mode: 'text', clientCommandId: 'create-1' }),
+      negotiation.getSession('session-1'),
+      negotiation.sendTextTurn({ sessionId: 'session-1', text: 'Текст', clientTurnId: 'turn-1' }),
+      negotiation.createAudioTicket('session-1'),
+      negotiation.finishSession({ sessionId: 'session-1', clientCommandId: 'finish-1' }),
+      negotiation.getResult('session-1'),
+      negotiation.listSessions(),
+      audio.connect({ sessionId: 'session-1', ticket: {
+        ticket: 'short-lived', expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        protocol: 'audio-engine.v1',
+      } }),
+    ]
+    const settled = await Promise.allSettled(calls)
+    return settled.map((entry) => entry.status === 'rejected'
+      ? (entry.reason as { reason?: string }).reason : 'resolved')
+  })
+
+  expect(result).toEqual(Array(8).fill('feature-unavailable'))
+  expect(domainRequests).toEqual([])
+})
+
+test('pages and arena hooks depend only on service ports', async () => {
+  for (const path of [
+    'src/pages/ArenaPage.tsx',
+    'src/pages/ResultPage.tsx',
+    'src/pages/HomePage.tsx',
+    'src/components/home/TrainingModal.tsx',
+    'src/features/arena/useArenaSession.ts',
+    'src/features/arena/useArenaAudio.ts',
+  ]) {
+    const source = await readFile(path, 'utf8')
+    expect(source, path).not.toMatch(/from ['"]@\/services\/(mock|real)\//)
+    expect(source, path).not.toMatch(/\b(import\.meta\.env|\/v1\/chat\/|is_ai)\b/)
+  }
 })

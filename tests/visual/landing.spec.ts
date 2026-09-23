@@ -393,20 +393,15 @@ test('mobile navigation opens and closes accessibly', async ({ page }) => {
 })
 
 test('product home remains separate from the landing redesign', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem('arena.auth.tokens.v1', JSON.stringify({
-      accessToken: 'landing-test-access',
-      refreshToken: 'landing-test-refresh',
-    }))
-  })
-  await page.route('**/api/v1/auth/token/refresh', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      access_token: 'landing-test-fresh-access',
-      refresh_token: 'landing-test-fresh-refresh',
-    }),
-  }))
+  await page.goto('/register')
+  await page.getByLabel('Имя', { exact: true }).fill('Ирина')
+  await page.getByLabel('Фамилия').fill('Петрова')
+  await page.getByLabel('Имя пользователя').fill('landing.user')
+  await page.getByLabel('Email').fill('landing@example.com')
+  await page.getByLabel('Пароль').fill('strong-password')
+  await page.getByRole('button', { name: 'Создать аккаунт' }).click()
+  await page.getByRole('link', { name: 'Открыть demo-ссылку активации' }).click()
+  await page.getByRole('link', { name: 'Перейти в приложение' }).click()
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await page.getByRole('link', { name: 'Начать поединок' }).click()

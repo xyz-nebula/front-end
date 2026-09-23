@@ -223,7 +223,7 @@ export class MockStorage {
   }
 
   private hasWebLocks(): boolean {
-    return typeof navigator !== 'undefined' && 'locks' in navigator
+    return typeof navigator !== 'undefined' && typeof navigator.locks?.request === 'function'
   }
 
   private claimFallbackLease(): void {

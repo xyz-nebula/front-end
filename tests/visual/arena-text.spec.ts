@@ -6,28 +6,10 @@ import {
   test,
 } from './helpers'
 
-const authStorageKey = 'arena.auth.tokens.v1'
-
-async function seedAuthenticatedSession(page: Parameters<typeof test>[0]['page']) {
-  await page.addInitScript(({ key }) => {
-    window.localStorage.setItem(key, JSON.stringify({
-      tokens: { accessToken: 'arena-access', refreshToken: 'arena-refresh' },
-      source: 'real',
-      mockOwnerKey: 'arena-text-owner',
-    }))
-  }, { key: authStorageKey })
-  await page.route('**/api/v1/auth/token/refresh', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({ access_token: 'fresh-arena-access', refresh_token: 'fresh-arena-refresh' }),
-  }))
-}
-
 test('text arena creates, restores and finishes one atomic conversation without duplicates', async ({ page }) => {
-  test.skip(process.env.VITE_AUTH_SOURCE !== 'real' || process.env.VITE_NEGOTIATION_SOURCE !== 'mock', 'Requires current real-auth/mock-domain smoke mode.')
+  test.skip(process.env.VITE_AUTH_SOURCE !== 'mock' || process.env.VITE_NEGOTIATION_SOURCE !== 'mock', 'Requires full mock mode.')
   test.setTimeout(45_000)
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  await seedAuthenticatedSession(page)
 
   const chatCrudRequests: string[] = []
   page.on('request', (request) => {
@@ -35,6 +17,15 @@ test('text arena creates, restores and finishes one atomic conversation without 
   })
 
   await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/register')
+  await page.getByLabel('Имя', { exact: true }).fill('Ирина')
+  await page.getByLabel('Фамилия').fill('Петрова')
+  await page.getByLabel('Имя пользователя').fill('text.user')
+  await page.getByLabel('Email').fill('text@example.com')
+  await page.getByLabel('Пароль').fill('strong-password')
+  await page.getByRole('button', { name: 'Создать аккаунт' }).click()
+  await page.getByRole('link', { name: 'Открыть demo-ссылку активации' }).click()
+  await page.getByRole('link', { name: 'Перейти в приложение' }).click()
   await page.goto('/home')
   await page.getByRole('button', { name: 'Начать кейс' }).click()
 
