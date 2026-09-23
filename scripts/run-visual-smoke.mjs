@@ -28,6 +28,7 @@ const testGroups = [
       'mock-domain.spec.ts',
       'domain-resilience.spec.ts',
       'arena-session-resilience.spec.ts',
+      'arena-audio-resilience.spec.ts',
       'arena-text.spec.ts',
       'arena-voice.spec.ts',
       'result.spec.ts',

@@ -31,7 +31,9 @@ export function useArenaAudio(
   const contextRef = useRef<AudioContext | null>(null)
   const sourceRef = useRef<AudioBufferSourceNode | null>(null)
   const eventIdsRef = useRef(new Set<string>())
-  const generationRef = useRef(0)
+  const committedMessageIdsRef = useRef(new Set<string>())
+  const contextGenerationRef = useRef(0)
+  const connectAttemptRef = useRef(0)
   const busyRef = useRef(false)
   const onCommittedRef = useRef(onCommitted)
   const onReconnectRef = useRef(onReconnect)
@@ -45,25 +47,32 @@ export function useArenaAudio(
     setIsPlaying(false)
   }, [])
 
-  const playFrame = useCallback((event: Extract<AudioEngineEvent, { type: 'audio_frame' }>) => {
+  const playFrame = useCallback((
+    event: Extract<AudioEngineEvent, { type: 'audio_frame' }>,
+    isCurrent: () => boolean,
+  ) => {
+    if (!isCurrent()) return
     try {
       const bytes = Uint8Array.from(atob(event.payload), (character) => character.charCodeAt(0))
       if (bytes.length < 2 || bytes.length % 2 !== 0) return
       const context = contextRef.current ?? new AudioContext()
       contextRef.current = context
-      void context.resume().catch(() => setError('Не удалось воспроизвести ответ. Текст ответа сохранён в диалоге.'))
+      void context.resume().catch(() => {
+        if (isCurrent()) setError('Не удалось воспроизвести ответ. Текст ответа сохранён в диалоге.')
+      })
       const buffer = context.createBuffer(1, bytes.length / 2, event.format.sampleRate)
       const samples = buffer.getChannelData(0)
       const view = new DataView(bytes.buffer)
       for (let index = 0; index < samples.length; index += 1) {
         samples[index] = view.getInt16(index * 2, true) / 32768
       }
+      if (!isCurrent()) return
       stopPlayback()
       const source = context.createBufferSource()
       source.buffer = buffer
       source.connect(context.destination)
       source.onended = () => {
-        if (sourceRef.current === source) {
+        if (isCurrent() && sourceRef.current === source) {
           sourceRef.current = null
           setIsPlaying(false)
         }
@@ -72,25 +81,41 @@ export function useArenaAudio(
       setIsPlaying(true)
       source.start()
     } catch {
-      setError('Не удалось воспроизвести ответ. Текст ответа сохранён в диалоге.')
+      if (isCurrent()) setError('Не удалось воспроизвести ответ. Текст ответа сохранён в диалоге.')
     }
   }, [stopPlayback])
 
   useEffect(() => {
     if (!enabled) return
+    const generation = ++contextGenerationRef.current
+    connectAttemptRef.current += 1
+    busyRef.current = false
+    eventIdsRef.current = new Set<string>()
+    committedMessageIdsRef.current = new Set<string>()
     const client = createAudioClient()
     clientRef.current = client
     const eventIds = eventIdsRef.current
+    const committedMessageIds = committedMessageIdsRef.current
+    const isCurrent = () => contextGenerationRef.current === generation && clientRef.current === client
+    queueMicrotask(() => {
+      if (!isCurrent()) return
+      setState('idle')
+      setPartial({ user: '', ai: '' })
+      setError(null)
+      stopPlayback()
+    })
     const unsubscribeEvent = client.subscribe((event) => {
+      if (!isCurrent()) return
       if (event.type === 'transcript_partial') {
         setPartial((current) => ({ ...current, [event.speaker]: event.text }))
       } else if (event.type === 'message_committed') {
-        if (eventIds.has(event.eventId)) return
+        if (eventIds.has(event.eventId) || committedMessageIds.has(event.message.id)) return
         eventIds.add(event.eventId)
+        committedMessageIds.add(event.message.id)
         setPartial((current) => ({ ...current, [event.message.speaker]: '' }))
         onCommittedRef.current(event.message)
       } else if (event.type === 'audio_frame') {
-        playFrame(event)
+        playFrame(event, isCurrent)
       } else if (event.type === 'error') {
         setPartial({ user: '', ai: '' })
         setError(event.message)
@@ -99,55 +124,69 @@ export function useArenaAudio(
         stopPlayback()
       }
     })
-    const unsubscribeState = client.subscribeState(setState)
+    const unsubscribeState = client.subscribeState((nextState) => {
+      if (isCurrent()) setState(nextState)
+    })
     return () => {
-      generationRef.current += 1
+      contextGenerationRef.current += 1
+      connectAttemptRef.current += 1
+      busyRef.current = false
       unsubscribeEvent()
       unsubscribeState()
       void client.disconnect()
-      clientRef.current = null
+      if (clientRef.current === client) clientRef.current = null
       eventIds.clear()
+      committedMessageIds.clear()
       sourceRef.current?.stop()
       sourceRef.current = null
       void contextRef.current?.close()
       contextRef.current = null
     }
-  }, [createAudioClient, enabled, playFrame, stopPlayback])
+  }, [createAudioClient, enabled, negotiationClient, playFrame, sessionId, stopPlayback])
 
   const connect = useCallback(async () => {
-    if (!enabled || !clientRef.current || busyRef.current) return
+    const client = clientRef.current
+    if (!enabled || !client || busyRef.current) return
+    const contextGeneration = contextGenerationRef.current
+    const attempt = ++connectAttemptRef.current
+    const isCurrent = () => contextGenerationRef.current === contextGeneration
+      && connectAttemptRef.current === attempt
+      && clientRef.current === client
     setError(null)
     try {
       const context = contextRef.current ?? new AudioContext()
       contextRef.current = context
-      void context.resume().catch(() => setError('Не удалось включить звук. Текст ответа будет доступен в диалоге.'))
+      void context.resume().catch(() => {
+        if (isCurrent()) setError('Не удалось включить звук. Текст ответа будет доступен в диалоге.')
+      })
     } catch {
       setError('Звук недоступен в этом браузере. Текст ответа будет доступен в диалоге.')
     }
     busyRef.current = true
-    const generation = ++generationRef.current
     setPartial({ user: '', ai: '' })
     eventIdsRef.current.clear()
     try {
       await onReconnectRef.current()
-      if (generation !== generationRef.current) return
+      if (!isCurrent()) return
       const ticket = await negotiationClient.createAudioTicket(sessionId)
-      if (generation !== generationRef.current) return
-      await clientRef.current?.connect({ sessionId, ticket })
+      if (!isCurrent()) return
+      await client.connect({ sessionId, ticket })
     } catch (caught) {
-      if (generation === generationRef.current) {
+      if (isCurrent()) {
         setError(caught instanceof Error ? caught.message : 'Не удалось подключить голосовой диалог.')
         setState('error')
       }
     } finally {
-      busyRef.current = false
+      if (isCurrent()) busyRef.current = false
     }
   }, [enabled, negotiationClient, sessionId])
 
   const stop = useCallback(async () => {
-    generationRef.current += 1
-    clientRef.current?.sendControl('stop')
-    await clientRef.current?.disconnect()
+    connectAttemptRef.current += 1
+    busyRef.current = false
+    const client = clientRef.current
+    client?.sendControl('stop')
+    await client?.disconnect()
     stopPlayback()
     setPartial({ user: '', ai: '' })
     setState('stopped')
