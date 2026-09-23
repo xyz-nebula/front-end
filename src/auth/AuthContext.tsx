@@ -17,6 +17,7 @@ import {
   writeStoredSession,
   type StoredAuthSession,
 } from '@/auth/storage'
+import { executeAuthorizedOperation } from '@/auth/authorizedOperation'
 import { AuthContext, type AuthContextValue } from '@/auth/useAuth'
 import { AuthRuntimeContext, type AuthRuntimeContextValue } from '@/auth/runtime'
 import { AuthClientError, isAuthClientError } from '@/services/contracts/authClient'
@@ -39,13 +40,6 @@ class StaleSessionCreationError extends Error {
   constructor() {
     super('Операция входа больше не актуальна.')
     this.name = 'StaleSessionCreationError'
-  }
-}
-
-class StaleAuthorizedOperationError extends Error {
-  constructor() {
-    super('Сессия изменилась во время выполнения операции.')
-    this.name = 'StaleAuthorizedOperationError'
   }
 }
 
@@ -264,43 +258,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new AuthClientError(401, 'Войдите, чтобы продолжить.')
     }
 
-    const assertSessionIsCurrent = () => {
-      if (sessionGenerationRef.current !== sessionGeneration) {
-        throw new StaleAuthorizedOperationError()
-      }
-    }
-
-    try {
-      assertSessionIsCurrent()
-      const result = await operation(initialTokens.accessToken)
-      assertSessionIsCurrent()
-      return result
-    } catch (error) {
-      assertSessionIsCurrent()
-      if (!isAuthClientError(error) || error.status !== 401) throw error
-    }
-
-    assertSessionIsCurrent()
-    const retryTokens = await refreshSession()
-    assertSessionIsCurrent()
-
-    const retryVersion = sessionVersionRef.current
-    try {
-      assertSessionIsCurrent()
-      const result = await operation(retryTokens.accessToken)
-      assertSessionIsCurrent()
-      return result
-    } catch (error) {
-      assertSessionIsCurrent()
-      if (
-        isAuthClientError(error)
-        && error.status === 401
-        && sessionVersionRef.current === retryVersion
-      ) {
-        clearSession()
-      }
-      throw error
-    }
+    return executeAuthorizedOperation(operation, {
+      accessToken: initialTokens.accessToken,
+      sessionGeneration,
+      getSessionGeneration: () => sessionGenerationRef.current,
+      getSessionVersion: () => sessionVersionRef.current,
+      refreshSession,
+      clearSession,
+    })
   }, [clearSession, refreshSession])
 
   const revokeRemoteSession = useCallback(async (tokens: AuthTokens) => {

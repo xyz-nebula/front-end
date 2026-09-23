@@ -6,7 +6,7 @@ import type {
   TotpEnrollResponse,
 } from '@/types/auth'
 
-import type { ApiErrorReason } from '@/types/api'
+import { isServiceError, type ApiErrorReason, type ServiceError } from '@/types/api'
 
 export class AuthClientError extends Error {
   readonly status: number
@@ -29,6 +29,18 @@ export class AuthClientError extends Error {
 
 export function isAuthClientError(error: unknown): error is AuthClientError {
   return error instanceof AuthClientError
+}
+
+export function isHttpUnauthorizedError(
+  error: unknown,
+): error is AuthClientError | ServiceError {
+  if (isAuthClientError(error)) {
+    return error.reason === 'http' && error.status === 401
+  }
+
+  return isServiceError(error)
+    && error.reason === 'http'
+    && error.status === 401
 }
 
 export interface AuthClient {

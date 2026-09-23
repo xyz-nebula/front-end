@@ -18,7 +18,12 @@ const testGroups = [
   {
     name: 'real/mock/mock',
     authSource: 'real',
-    specs: ['auth.spec.ts', 'auth-resilience.spec.ts', 'service-contracts.spec.ts'],
+    specs: [
+      'auth.spec.ts',
+      'auth-resilience.spec.ts',
+      'authorized-operation.spec.ts',
+      'service-contracts.spec.ts',
+    ],
   },
   {
     name: 'mock/mock/mock',
