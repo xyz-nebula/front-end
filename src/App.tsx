@@ -10,6 +10,7 @@ import { LoginPage } from '@/pages/LoginPage'
 import { HomePage } from '@/pages/HomePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { RegisterPage } from '@/pages/RegisterPage'
+import { ResultPage } from '@/pages/ResultPage'
 
 function ScrollToLocation() {
   const { hash, pathname } = useLocation()
@@ -38,6 +39,7 @@ export function App() {
         <Route path="/activate" element={<ActivationRoute><ActivatePage /></ActivationRoute>} />
         <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="/arena/:sessionId" element={<ProtectedRoute><ArenaPage /></ProtectedRoute>} />
+        <Route path="/result/:sessionId" element={<ProtectedRoute><ResultPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { Logo } from '@/components/ui/Logo'
 import type { TrainingCase } from '@/types/case'
+import type { NegotiationMode } from '@/types/negotiation'
 
 function formatElapsed(startedAt: string, now: number): string {
   const elapsedSeconds = Math.max(0, Math.floor((now - Date.parse(startedAt)) / 1000))
@@ -14,11 +15,12 @@ function formatElapsed(startedAt: string, now: number): string {
 interface ArenaHeaderProps {
   trainingCase: TrainingCase
   startedAt: string
+  mode: NegotiationMode
   finishDisabled: boolean
   onFinish: () => void
 }
 
-export function ArenaHeader({ trainingCase, startedAt, finishDisabled, onFinish }: ArenaHeaderProps) {
+export function ArenaHeader({ trainingCase, startedAt, mode, finishDisabled, onFinish }: ArenaHeaderProps) {
   const [now, setNow] = useState(() => Date.parse(startedAt))
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function ArenaHeader({ trainingCase, startedAt, finishDisabled, onFinish 
     <header className="arena-session-header">
       <div className="arena-session-header__brand"><Logo /><Link to="/home">← К кейсам</Link></div>
       <div className="arena-session-header__case">
-        <span>{trainingCase.category} · текстовый режим</span>
+        <span>{trainingCase.category} · {mode === 'voice' ? 'голосовой режим' : 'текстовый режим'}</span>
         <strong>{trainingCase.title}</strong>
       </div>
       <div className="arena-session-header__actions">

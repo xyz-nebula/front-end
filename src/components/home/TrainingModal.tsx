@@ -31,7 +31,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   }, [isStarting, onClose])
 
   const startTraining = async () => {
-    if (isStarting || mode !== 'text') return
+    if (isStarting) return
     const storageKey = `arena.pending-create.${item.id}.${mode}`
     let commandId: string
     try {
@@ -85,14 +85,14 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
             <input type="radio" name="training-mode" value="text" checked={mode === 'text'} onChange={() => setMode('text')} />
             <span aria-hidden="true">⌨</span><strong>Текст</strong><small>Обменивайтесь сообщениями в удобном темпе</small>
           </label>
-          <label className="is-disabled" aria-disabled="true">
-            <input type="radio" name="training-mode" value="voice" disabled />
-            <span aria-hidden="true">◉</span><strong>Голос</strong><small>Скоро — живой разговор с AI-оппонентом</small>
+          <label className={mode === 'voice' ? 'is-selected' : ''}>
+            <input type="radio" name="training-mode" value="voice" checked={mode === 'voice'} onChange={() => setMode('voice')} />
+            <span aria-hidden="true">◉</span><strong>Голос</strong><small>Демо-диалог с озвученным ответом оппонента</small>
           </label>
         </fieldset>
         <div className="training-modal__tip"><span>Совет</span>Сначала сформулируйте желаемый результат и минимально приемлемый исход.</div>
         {error && <div className="form-alert training-modal__error" role="alert">{error}</div>}
-        <AppButton type="button" className="training-modal__button" onClick={() => void startTraining()} disabled={isStarting || mode !== 'text'}>{isStarting ? 'Создаём арену…' : 'Начать тренировку'}</AppButton>
+        <AppButton type="button" className="training-modal__button" onClick={() => void startTraining()} disabled={isStarting}>{isStarting ? 'Создаём арену…' : 'Начать тренировку'}</AppButton>
         <small>Тренировка сохраняется автоматически — её можно продолжить после перезагрузки.</small>
       </section>
     </div>

@@ -1,19 +1,27 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { ArenaConversation } from '@/components/arena/ArenaConversation'
 import { ArenaHeader } from '@/components/arena/ArenaHeader'
 import { FinishDialog } from '@/components/arena/FinishDialog'
 import { TextComposer } from '@/components/arena/TextComposer'
+import { VoiceControls } from '@/components/arena/VoiceControls'
 import { AppButton } from '@/components/ui/AppButton'
 import { useArenaSession } from '@/features/arena/useArenaSession'
+import { useArenaAudio } from '@/features/arena/useArenaAudio'
 import { trainingCases } from '@/mocks/cases'
 
 export function ArenaPage() {
   const { sessionId = '' } = useParams()
+  const navigate = useNavigate()
   const arena = useArenaSession(sessionId)
+  const audio = useArenaAudio(sessionId, arena.session?.mode === 'voice' && arena.session.status === 'active', arena.addCommittedMessage, arena.refreshSession)
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const trainingCase = trainingCases.find((item) => item.id === arena.session?.caseId)
+
+  useEffect(() => {
+    if (arena.viewState === 'finished') navigate(`/result/${sessionId}`, { replace: true })
+  }, [arena.viewState, navigate, sessionId])
 
   if (arena.viewState === 'loading') {
     return (
@@ -39,13 +47,15 @@ export function ArenaPage() {
 
   const isFinished = arena.viewState === 'finished' || arena.session.status !== 'active'
   const isSending = arena.turnState === 'sending' || arena.turnState === 'thinking'
+  const isConnecting = audio.state === 'connecting' || audio.state === 'reconnecting'
 
   return (
     <div className="arena-page">
       <ArenaHeader
         trainingCase={trainingCase}
         startedAt={arena.session.startedAt}
-        finishDisabled={isSending || isFinished}
+        mode={arena.session.mode}
+        finishDisabled={isSending || isFinished || isConnecting}
         onFinish={() => setShowFinishDialog(true)}
       />
       <main className="arena-layout">
@@ -59,10 +69,12 @@ export function ArenaPage() {
         </aside>
         <section className="arena-dialog-panel">
           <div className="arena-dialog-panel__head"><div><span className="arena-live-dot" />Диалог активен</div><span>{arena.session.messages.length} реплик</span></div>
-          <ArenaConversation messages={arena.session.messages} opponent={trainingCase.opponent} isThinking={isSending} />
+          <ArenaConversation messages={arena.session.messages} opponent={trainingCase.opponent} isThinking={isSending} mode={arena.session.mode} />
           {arena.error && <div className="arena-inline-error" role="alert"><span>{arena.error}</span><button type="button" onClick={() => arena.turnState === 'error' ? void arena.sendTextTurn() : setShowFinishDialog(true)}>Повторить</button></div>}
           {isFinished ? (
-            <div className="arena-finished" role="status"><div><strong>Переговоры завершены</strong><span>Разбор уже готовится. Результаты появятся на следующем экране продукта.</span></div><Link to="/home">Вернуться к кейсам →</Link></div>
+            <div className="arena-finished" role="status"><div><strong>Переговоры завершены</strong><span>Открываем разбор…</span></div><Link to={`/result/${sessionId}`}>Посмотреть результат →</Link></div>
+          ) : arena.session.mode === 'voice' ? (
+            <VoiceControls state={audio.state} partial={audio.partial} error={audio.error} isPlaying={audio.isPlaying} disabled={arena.viewState !== 'ready'} onConnect={() => void audio.connect()} onPause={audio.pause} onResume={audio.resume} onStop={() => void audio.stop()} />
           ) : (
             <TextComposer
               value={arena.draft}
@@ -74,7 +86,7 @@ export function ArenaPage() {
           )}
         </section>
       </main>
-      {showFinishDialog && <FinishDialog onCancel={() => setShowFinishDialog(false)} onConfirm={() => { setShowFinishDialog(false); void arena.finishSession() }} />}
+      {showFinishDialog && <FinishDialog onCancel={() => setShowFinishDialog(false)} onConfirm={() => { setShowFinishDialog(false); void (async () => { if (arena.session?.mode === 'voice') await audio.stop(); await arena.finishSession() })() }} />}
     </div>
   )
 }

@@ -23,6 +23,20 @@ function splitSnapshots(text: string): string[] {
   return snapshots
 }
 
+function mockAudioPayload(): string {
+  const sampleCount = 6_000
+  const bytes = new Uint8Array(sampleCount * 2)
+  const view = new DataView(bytes.buffer)
+  for (let index = 0; index < sampleCount; index += 1) {
+    const fade = Math.min(1, index / 600, (sampleCount - index) / 600)
+    const sample = Math.round(Math.sin(2 * Math.PI * 440 * index / 24_000) * 4500 * fade)
+    view.setInt16(index * 2, sample, true)
+  }
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
 export class MockAudioClient implements AudioClient {
   private state: AudioConnectionState = 'idle'
   private readonly eventListeners = new Set<EventListener>()
@@ -74,10 +88,15 @@ export class MockAudioClient implements AudioClient {
     })
   }
 
-  private async requestMicrophone(): Promise<void> {
+  private async requestMicrophone(generation: number): Promise<void> {
     if (!this.options.requestMicrophone) return
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (generation !== this.generation) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
+      this.stream = stream
     } catch (error) {
       throw new ServiceError('Не удалось получить доступ к микрофону.', {
         reason: 'microphone-denied',
@@ -103,7 +122,8 @@ export class MockAudioClient implements AudioClient {
     try {
       const connection = await this.runtime.consumeAudioTicket(input.sessionId, input.ticket)
       if (generation !== this.generation) return
-      await this.requestMicrophone()
+      await this.requestMicrophone(generation)
+      if (generation !== this.generation) return
       if (!(await this.delay(generation))) return
       this.setState('connected')
       void this.runVoiceFlow(connection, generation)
@@ -178,7 +198,7 @@ export class MockAudioClient implements AudioClient {
         sequence: this.audioSequence,
         timestamp: Date.now(),
         format: AUDIO_FORMAT,
-        payload: 'AAAAAAAAAAA=',
+        payload: mockAudioPayload(),
       })
       await this.commit(connection, 'ai', aiText, generation)
     } catch (error) {

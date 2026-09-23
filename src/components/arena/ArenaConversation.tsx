@@ -1,14 +1,16 @@
 import { useEffect, useRef } from 'react'
 
 import type { NegotiationMessage } from '@/types/negotiation'
+import type { NegotiationMode } from '@/types/negotiation'
 
 interface ArenaConversationProps {
   messages: NegotiationMessage[]
   opponent: string
   isThinking: boolean
+  mode?: NegotiationMode
 }
 
-export function ArenaConversation({ messages, opponent, isThinking }: ArenaConversationProps) {
+export function ArenaConversation({ messages, opponent, isThinking, mode = 'text' }: ArenaConversationProps) {
   const endRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -21,7 +23,7 @@ export function ArenaConversation({ messages, opponent, isThinking }: ArenaConve
         <div className="arena-conversation__empty">
           <span>Ваш ход</span>
           <h2>Начните разговор</h2>
-          <p>Представьтесь, обозначьте цель встречи или задайте первый открытый вопрос.</p>
+          <p>{mode === 'voice' ? 'Начните голосовой раунд. Реплики появятся здесь после сохранения.' : 'Представьтесь, обозначьте цель встречи или задайте первый открытый вопрос.'}</p>
         </div>
       )}
       {messages.map((message) => (

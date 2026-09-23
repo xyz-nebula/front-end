@@ -1,0 +1,166 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import { useDomainServices } from '@/services/domainServices'
+import type { AudioClient } from '@/services/contracts/audioClient'
+import type { AudioConnectionState, AudioEngineEvent } from '@/types/audio'
+import type { NegotiationMessage } from '@/types/negotiation'
+
+interface ArenaAudioState {
+  state: AudioConnectionState
+  partial: { user: string; ai: string }
+  error: string | null
+  isPlaying: boolean
+  connect: () => Promise<void>
+  pause: () => void
+  resume: () => void
+  stop: () => Promise<void>
+}
+
+export function useArenaAudio(
+  sessionId: string,
+  enabled: boolean,
+  onCommitted: (message: NegotiationMessage) => void,
+  onReconnect: () => Promise<void>,
+): ArenaAudioState {
+  const { createAudioClient, negotiationClient } = useDomainServices()
+  const [state, setState] = useState<AudioConnectionState>('idle')
+  const [partial, setPartial] = useState({ user: '', ai: '' })
+  const [error, setError] = useState<string | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const clientRef = useRef<AudioClient | null>(null)
+  const contextRef = useRef<AudioContext | null>(null)
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null)
+  const eventIdsRef = useRef(new Set<string>())
+  const generationRef = useRef(0)
+  const busyRef = useRef(false)
+  const onCommittedRef = useRef(onCommitted)
+  const onReconnectRef = useRef(onReconnect)
+
+  useEffect(() => { onCommittedRef.current = onCommitted }, [onCommitted])
+  useEffect(() => { onReconnectRef.current = onReconnect }, [onReconnect])
+
+  const stopPlayback = useCallback(() => {
+    sourceRef.current?.stop()
+    sourceRef.current = null
+    setIsPlaying(false)
+  }, [])
+
+  const playFrame = useCallback((event: Extract<AudioEngineEvent, { type: 'audio_frame' }>) => {
+    try {
+      const bytes = Uint8Array.from(atob(event.payload), (character) => character.charCodeAt(0))
+      if (bytes.length < 2 || bytes.length % 2 !== 0) return
+      const context = contextRef.current ?? new AudioContext()
+      contextRef.current = context
+      void context.resume().catch(() => setError('Не удалось воспроизвести ответ. Текст ответа сохранён в диалоге.'))
+      const buffer = context.createBuffer(1, bytes.length / 2, event.format.sampleRate)
+      const samples = buffer.getChannelData(0)
+      const view = new DataView(bytes.buffer)
+      for (let index = 0; index < samples.length; index += 1) {
+        samples[index] = view.getInt16(index * 2, true) / 32768
+      }
+      stopPlayback()
+      const source = context.createBufferSource()
+      source.buffer = buffer
+      source.connect(context.destination)
+      source.onended = () => {
+        if (sourceRef.current === source) {
+          sourceRef.current = null
+          setIsPlaying(false)
+        }
+      }
+      sourceRef.current = source
+      setIsPlaying(true)
+      source.start()
+    } catch {
+      setError('Не удалось воспроизвести ответ. Текст ответа сохранён в диалоге.')
+    }
+  }, [stopPlayback])
+
+  useEffect(() => {
+    if (!enabled) return
+    const client = createAudioClient()
+    clientRef.current = client
+    const eventIds = eventIdsRef.current
+    const unsubscribeEvent = client.subscribe((event) => {
+      if (event.type === 'transcript_partial') {
+        setPartial((current) => ({ ...current, [event.speaker]: event.text }))
+      } else if (event.type === 'message_committed') {
+        if (eventIds.has(event.eventId)) return
+        eventIds.add(event.eventId)
+        setPartial((current) => ({ ...current, [event.message.speaker]: '' }))
+        onCommittedRef.current(event.message)
+      } else if (event.type === 'audio_frame') {
+        playFrame(event)
+      } else if (event.type === 'error') {
+        setPartial({ user: '', ai: '' })
+        setError(event.message)
+      } else if (event.type === 'closed') {
+        setPartial({ user: '', ai: '' })
+        stopPlayback()
+      }
+    })
+    const unsubscribeState = client.subscribeState(setState)
+    return () => {
+      generationRef.current += 1
+      unsubscribeEvent()
+      unsubscribeState()
+      void client.disconnect()
+      clientRef.current = null
+      eventIds.clear()
+      sourceRef.current?.stop()
+      sourceRef.current = null
+      void contextRef.current?.close()
+      contextRef.current = null
+    }
+  }, [createAudioClient, enabled, playFrame, stopPlayback])
+
+  const connect = useCallback(async () => {
+    if (!enabled || !clientRef.current || busyRef.current) return
+    setError(null)
+    try {
+      const context = contextRef.current ?? new AudioContext()
+      contextRef.current = context
+      void context.resume().catch(() => setError('Не удалось включить звук. Текст ответа будет доступен в диалоге.'))
+    } catch {
+      setError('Звук недоступен в этом браузере. Текст ответа будет доступен в диалоге.')
+    }
+    busyRef.current = true
+    const generation = ++generationRef.current
+    setPartial({ user: '', ai: '' })
+    eventIdsRef.current.clear()
+    try {
+      await onReconnectRef.current()
+      if (generation !== generationRef.current) return
+      const ticket = await negotiationClient.createAudioTicket(sessionId)
+      if (generation !== generationRef.current) return
+      await clientRef.current?.connect({ sessionId, ticket })
+    } catch (caught) {
+      if (generation === generationRef.current) {
+        setError(caught instanceof Error ? caught.message : 'Не удалось подключить голосовой диалог.')
+        setState('error')
+      }
+    } finally {
+      busyRef.current = false
+    }
+  }, [enabled, negotiationClient, sessionId])
+
+  const stop = useCallback(async () => {
+    generationRef.current += 1
+    clientRef.current?.sendControl('stop')
+    await clientRef.current?.disconnect()
+    stopPlayback()
+    setPartial({ user: '', ai: '' })
+    setState('stopped')
+  }, [stopPlayback])
+
+  return {
+    state,
+    partial,
+    error,
+    isPlaying,
+    connect,
+    pause: () => clientRef.current?.sendControl('pause'),
+    resume: () => clientRef.current?.sendControl('resume'),
+    stop,
+  }
+}

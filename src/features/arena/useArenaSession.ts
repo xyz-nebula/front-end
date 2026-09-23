@@ -22,6 +22,8 @@ interface UseArenaSessionValue {
   draft: string
   setDraft: (value: string) => void
   reload: () => Promise<void>
+  refreshSession: () => Promise<void>
+  addCommittedMessage: (message: NegotiationMessage) => void
   sendTextTurn: () => Promise<void>
   finishSession: () => Promise<void>
 }
@@ -187,6 +189,18 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
     }
   }, [executePendingTurn, finishWithCommand, negotiationClient, sessionId])
 
+  const refreshSession = useCallback(async () => {
+    const loaded = await negotiationClient.getSession(sessionId)
+    if (mountedRef.current) setSession(loaded)
+  }, [negotiationClient, sessionId])
+
+  const addCommittedMessage = useCallback((message: NegotiationMessage) => {
+    setSession((current) => current ? {
+      ...current,
+      messages: mergeMessages(current.messages, [message]),
+    } : current)
+  }, [])
+
   useEffect(() => {
     mountedRef.current = true
     const startupTimer = window.setTimeout(() => void reload(), 0)
@@ -221,6 +235,8 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
     draft,
     setDraft,
     reload,
+    refreshSession,
+    addCommittedMessage,
     sendTextTurn,
     finishSession,
   }
