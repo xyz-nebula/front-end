@@ -20,7 +20,7 @@ export function useArenaAudio(
   sessionId: string,
   enabled: boolean,
   onCommitted: (message: NegotiationMessage) => void,
-  onReconnect: () => Promise<void>,
+  onReconnect: () => Promise<{ messages: NegotiationMessage[] } | null>,
 ): ArenaAudioState {
   const { createAudioClient, negotiationClient } = useDomainServices()
   const [state, setState] = useState<AudioConnectionState>('idle')
@@ -39,6 +39,7 @@ export function useArenaAudio(
   const busyRef = useRef(false)
   const onCommittedRef = useRef(onCommitted)
   const onReconnectRef = useRef(onReconnect)
+  const transcriptSyncRef = useRef({ user: 0, ai: 0 })
 
   useEffect(() => { onCommittedRef.current = onCommitted }, [onCommitted])
   useEffect(() => { onReconnectRef.current = onReconnect }, [onReconnect])
@@ -116,6 +117,7 @@ export function useArenaAudio(
     const playbackSources = sourceRefs.current
     const eventIds = eventIdsRef.current
     const committedMessageIds = committedMessageIdsRef.current
+    const transcriptSync = transcriptSyncRef.current
     const isCurrent = () => contextGenerationRef.current === generation && clientRef.current === client
     queueMicrotask(() => {
       if (!isCurrent()) return
@@ -126,7 +128,28 @@ export function useArenaAudio(
     })
     const unsubscribeEvent = client.subscribe((event) => {
       if (!isCurrent()) return
-      if (event.type === 'transcript_partial') {
+      if (event.type === 'transcript') {
+        setPartial((current) => ({ ...current, [event.speaker]: event.text }))
+        const syncId = ++transcriptSync[event.speaker]
+        void (async () => {
+          for (const delay of [250, 500, 1_000, 1_500, 2_000]) {
+            await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
+            if (!isCurrent() || transcriptSync[event.speaker] !== syncId) return
+            const refreshed = await onReconnectRef.current()
+            if (!isCurrent() || transcriptSync[event.speaker] !== syncId) return
+            const persisted = refreshed?.messages.some(
+              (message) => message.speaker === event.speaker && message.text === event.text,
+            )
+            if (persisted) {
+              setPartial((current) => ({ ...current, [event.speaker]: '' }))
+              return
+            }
+          }
+          if (isCurrent() && transcriptSync[event.speaker] === syncId) {
+            setError('Реплика получена, но пока не появилась в истории. Обновите диалог позже.')
+          }
+        })()
+      } else if (event.type === 'transcript_partial') {
         setPartial((current) => ({ ...current, [event.speaker]: event.text }))
       } else if (event.type === 'message_committed') {
         if (eventIds.has(event.eventId) || committedMessageIds.has(event.message.id)) return
@@ -142,6 +165,8 @@ export function useArenaAudio(
       } else if (event.type === 'closed') {
         setPartial({ user: '', ai: '' })
         stopPlayback()
+      } else if (event.type === 'auth_error') {
+        setError('Обновляем авторизацию голосового подключения…')
       }
     })
     const unsubscribeState = client.subscribeState((nextState) => {
@@ -149,6 +174,8 @@ export function useArenaAudio(
     })
     return () => {
       contextGenerationRef.current += 1
+      transcriptSync.user += 1
+      transcriptSync.ai += 1
       connectAttemptRef.current += 1
       busyRef.current = false
       unsubscribeEvent()
@@ -199,9 +226,13 @@ export function useArenaAudio(
     try {
       await onReconnectRef.current()
       if (!isCurrent()) return
-      const ticket = await negotiationClient.createAudioTicket(sessionId)
+      await negotiationClient.activateSession(sessionId)
       if (!isCurrent()) return
-      await client.connect({ sessionId, ticket })
+      const ticket = client.requiresTicket
+        ? await negotiationClient.createAudioTicket(sessionId)
+        : undefined
+      if (!isCurrent()) return
+      await client.connect({ sessionId, ...(ticket ? { ticket } : {}) })
     } catch (caught) {
       if (isCurrent()) {
         setError(caught instanceof Error ? caught.message : 'Не удалось подключить голосовой диалог.')

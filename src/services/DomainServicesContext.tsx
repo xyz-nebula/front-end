@@ -9,7 +9,7 @@ export function DomainServicesProvider({ children }: { children: ReactNode }) {
   const { mockOwnerKey, runAuthorized } = useAuthRuntime()
   const value = useMemo<DomainServices>(() => ({
     negotiationClient: createNegotiationClient({ mockOwnerKey, runAuthorized }),
-    createAudioClient,
+    createAudioClient: () => createAudioClient({ mockOwnerKey, runAuthorized }),
   }), [createAudioClient, createNegotiationClient, mockOwnerKey, runAuthorized])
 
   return (

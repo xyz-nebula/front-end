@@ -16,7 +16,7 @@ export interface ServiceAdapters {
   config: ServiceConfig
   authClient: AuthClient
   createNegotiationClient: (context: DomainAdapterContext) => NegotiationClient
-  createAudioClient: () => AudioClient
+  createAudioClient: (context: DomainAdapterContext) => AudioClient
 }
 
 export const ServiceAdaptersContext = createContext<ServiceAdapters | null>(null)

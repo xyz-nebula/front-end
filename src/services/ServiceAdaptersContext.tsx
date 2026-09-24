@@ -42,8 +42,11 @@ export function ServiceAdaptersProvider({ children }: { children: ReactNode }) {
             })
           : new MockNegotiationClient(mockRuntime, context.mockOwnerKey, config.mockLatencyMs)
       },
-      createAudioClient: () => config.audioSource === 'real'
-        ? new AudioEngineClient()
+      createAudioClient: (context) => config.audioSource === 'real'
+        ? new AudioEngineClient({
+            wsPath: config.audioWsUrl,
+            runAuthorized: context.runAuthorized,
+          })
         : new MockAudioClient(mockRuntime, { latencyMs: config.mockLatencyMs }),
     }
   }, [])

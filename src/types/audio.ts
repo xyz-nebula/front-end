@@ -34,6 +34,11 @@ export type AudioControlAction = 'pause' | 'resume' | 'stop' | 'close'
 
 export type AudioEngineEvent =
   | {
+      type: 'transcript'
+      speaker: MessageSpeaker
+      text: string
+    }
+  | {
       type: 'transcript_partial'
       speaker: MessageSpeaker
       text: string
@@ -55,6 +60,11 @@ export type AudioEngineEvent =
       code: string
       message: string
       recoverable: boolean
+    }
+  | {
+      type: 'auth_error'
+      code: 'invalid_protocol' | 'missing_token' | 'expired_token' | 'invalid_token'
+      message: string
     }
   | {
       type: 'closed'
