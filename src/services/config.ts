@@ -44,15 +44,16 @@ function parsePositiveInteger(name: string, value: string | undefined, fallback:
   return parsed
 }
 
-function parseWsUrl(value: string | undefined): string {
-  const candidate = value || 'ws://localhost:8000/v1/audio-stream'
-  try {
-    const url = new URL(candidate)
-    if (url.protocol !== 'ws:' && url.protocol !== 'wss:') throw new Error('invalid protocol')
-    return url.toString()
-  } catch {
-    return invalidConfig('VITE_AUDIO_WS_URL must be an absolute ws:// or wss:// URL.')
+function parseWsPath(value: string | undefined): string {
+  const candidate = value || '/audio/v1/audio-stream'
+  if (!candidate.startsWith('/') || candidate.startsWith('//')) {
+    return invalidConfig('VITE_AUDIO_WS_URL must be a same-origin path starting with "/".')
   }
+  const parsed = new URL(candidate, 'https://arena.invalid')
+  if (parsed.origin !== 'https://arena.invalid' || parsed.pathname !== candidate) {
+    return invalidConfig('VITE_AUDIO_WS_URL must not contain an origin, query, or fragment.')
+  }
+  return candidate
 }
 
 export function parseServiceConfig(env: ServiceEnv): ServiceConfig {
@@ -68,6 +69,6 @@ export function parseServiceConfig(env: ServiceEnv): ServiceConfig {
     apiBaseUrl: apiBaseUrl.replace(/\/$/, '') || '/',
     apiTimeoutMs: parsePositiveInteger('VITE_API_TIMEOUT_MS', env.VITE_API_TIMEOUT_MS, 20_000),
     mockLatencyMs: parsePositiveInteger('VITE_MOCK_LATENCY_MS', env.VITE_MOCK_LATENCY_MS, 350),
-    audioWsUrl: parseWsUrl(env.VITE_AUDIO_WS_URL),
+    audioWsUrl: parseWsPath(env.VITE_AUDIO_WS_URL),
   }
 }

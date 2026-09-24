@@ -92,6 +92,7 @@ test('service config requires explicit sources and rejects invalid values', () =
     authSource: 'mock',
     negotiationSource: 'real',
     audioSource: 'mock',
+    audioWsUrl: '/audio/v1/audio-stream',
     apiTimeoutMs: 20_000,
     mockLatencyMs: 350,
   })
@@ -102,6 +103,12 @@ test('service config requires explicit sources and rejects invalid values', () =
     VITE_NEGOTIATION_SOURCE: 'mock',
     VITE_AUDIO_SOURCE: 'mock',
   })).toThrow(/VITE_AUTH_SOURCE/)
+  expect(() => parseServiceConfig({
+    VITE_AUTH_SOURCE: 'mock',
+    VITE_NEGOTIATION_SOURCE: 'mock',
+    VITE_AUDIO_SOURCE: 'real',
+    VITE_AUDIO_WS_URL: 'wss://audio.example/v1/audio-stream',
+  })).toThrow(/same-origin path/)
 })
 
 test('real negotiation and audio stubs return feature-unavailable without network work', async () => {

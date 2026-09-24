@@ -78,7 +78,7 @@ function isAuthRegisterResponse(payload: unknown): payload is AuthRegisterRespon
   return isRecord(payload)
     && typeof payload.user_id === 'string'
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.user_id)
-    && isUserStatus(payload.status)
+    && (payload.status === undefined || isUserStatus(payload.status))
 }
 
 function isTotpEnrollResponse(payload: unknown): payload is TotpEnrollResponse {
@@ -172,7 +172,7 @@ export class BackendAuthClient implements AuthClient {
   async register(payload: Parameters<AuthClient['register']>[0]): ReturnType<AuthClient['register']> {
     const response = await this.request('/v1/auth/register', { method: 'POST', body: payload })
     if (!isAuthRegisterResponse(response)) throw this.invalidResponse()
-    return response
+    return { ...response, status: response.status ?? 'pending_activation' }
   }
 
   activate(code: string): Promise<AuthTokens> {
