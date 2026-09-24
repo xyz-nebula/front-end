@@ -53,6 +53,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
     try {
       const session = await negotiationClient.createSession({
         caseId: item.id,
+        caseName: item.title,
         mode,
         clientCommandId: command.clientCommandId,
       })

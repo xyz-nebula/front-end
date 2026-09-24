@@ -111,6 +111,57 @@ test('service config requires explicit sources and rejects invalid values', () =
   })).toThrow(/same-origin path/)
 })
 
+test('real negotiation client creates, activates, reads and lists remote chats', async () => {
+  const originalFetch = globalThis.fetch
+  const requests: Array<{ url: string; method: string; body?: string }> = []
+  globalThis.fetch = async (input, init) => {
+    const url = String(input)
+    requests.push({ url, method: init?.method ?? 'GET', ...(init?.body ? { body: String(init.body) } : {}) })
+    if (url.endsWith('/v1/chats/') && init?.method === 'POST') {
+      return new Response(JSON.stringify({
+        uuid: chatFixture.uuid,
+        name: chatFixture.name,
+        status: chatFixture.status,
+        created_at: chatFixture.created_at,
+      }), { status: 200 })
+    }
+    if (url.endsWith('/v1/chats/') && (init?.method ?? 'GET') === 'GET') {
+      return new Response(JSON.stringify(chatListFixture), { status: 200 })
+    }
+    if (url.endsWith('/v1/chats/active')) return new Response(null, { status: 204 })
+    const id = url.split('/').at(-1)
+    const item = chatListFixture.find((candidate) => candidate.uuid === id)
+    return new Response(JSON.stringify({
+      ...chatFixture,
+      uuid: item?.uuid ?? chatFixture.uuid,
+      name: item?.name ?? chatFixture.name,
+    }), { status: 200 })
+  }
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+    const created = await client.createSession({
+      caseId: 'salary-review', caseName: 'Повышение зарплаты', mode: 'voice', clientCommandId: 'create-1',
+    })
+    await client.activateSession(created.id)
+    const loaded = await client.getSession(created.id)
+    const listed = await client.listSessions()
+
+    expect(created.mode).toBe('voice')
+    expect(loaded.messages).toHaveLength(2)
+    expect(listed).toHaveLength(2)
+    expect(requests[0]).toMatchObject({
+      url: '/api/v1/chats/', method: 'POST', body: JSON.stringify({ name: 'Повышение зарплаты' }),
+    })
+    expect(requests.some((request) => request.url === '/api/v1/chats/active' && request.method === 'PUT')).toBe(true)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('real negotiation and audio stubs return feature-unavailable without network work', async () => {
   const negotiation = new BackendNegotiationClient()
   const audio = new AudioEngineClient()

@@ -126,9 +126,11 @@ export function parseChat(value: unknown): ParsedChat {
 export function parseChatWithMessages(value: unknown): ParsedChatWithMessages {
   const dto = record(value, 'chat')
   if (!Array.isArray(dto.messages)) return invalidResponse('chat.messages')
+  const messages = dto.messages.map((message, index) => parseMessage(message, `chat.messages[${index}]`))
+  const uniqueMessages = [...new Map(messages.map((message) => [message.id, message])).values()]
   return {
     ...parseChatBase(dto, 'chat'),
-    messages: dto.messages.map((message, index) => parseMessage(message, `chat.messages[${index}]`)),
+    messages: uniqueMessages.sort((left, right) => left.sequence - right.sequence),
   }
 }
 
