@@ -16,6 +16,7 @@ export interface NegotiationSession {
   name?: string
   mode: NegotiationMode
   status: NegotiationStatus
+  backendStatus?: 'ongoing' | 'victory' | 'defeat'
   startedAt: string
   finishedAt?: string
   messages: NegotiationMessage[]
@@ -37,6 +38,7 @@ export interface NegotiationSessionSummary {
   name?: string
   mode: NegotiationMode
   status: NegotiationStatus
+  backendStatus?: 'ongoing' | 'victory' | 'defeat'
   startedAt: string
   finishedAt?: string
   score?: number

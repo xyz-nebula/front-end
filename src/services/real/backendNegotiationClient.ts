@@ -12,6 +12,7 @@ import {
 } from '@/services/real/targetContract'
 import { featureUnavailable, isServiceError, ServiceError } from '@/types/api'
 import type {
+  NegotiationResultState,
   NegotiationSession,
   NegotiationSessionSummary,
   NegotiationStatus,
@@ -43,6 +44,7 @@ function mapSession(chat: ParsedChatWithMessages): NegotiationSession {
     name: chat.name,
     mode: 'voice',
     status: mapStatus(chat.status),
+    backendStatus: chat.status,
     startedAt: chat.createdAt,
     messages: chat.messages,
   }
@@ -55,6 +57,7 @@ function mapSummary(chat: ParsedChat): NegotiationSessionSummary {
     name: chat.name,
     mode: 'voice',
     status: mapStatus(chat.status),
+    backendStatus: chat.status,
     startedAt: chat.createdAt,
   }
 }
@@ -172,12 +175,27 @@ export class BackendNegotiationClient implements NegotiationClient {
     throw featureUnavailable('audio')
   }
 
-  async finishSession(): ReturnType<NegotiationClient['finishSession']> {
-    throw featureUnavailable('negotiation')
+  async finishSession(input: Parameters<NegotiationClient['finishSession']>[0]): ReturnType<NegotiationClient['finishSession']> {
+    return this.demoResult(input.sessionId)
   }
 
-  async getResult(): ReturnType<NegotiationClient['getResult']> {
-    throw featureUnavailable('negotiation')
+  async getResult(sessionId: string): ReturnType<NegotiationClient['getResult']> {
+    return this.demoResult(sessionId)
+  }
+
+  private demoResult(sessionId: string): NegotiationResultState {
+    return {
+      status: 'ready',
+      result: {
+        sessionId,
+        outcome: 'victory',
+        score: 74,
+        summary: 'Демонстрационный разбор показывает будущий формат обратной связи и не является ответом сервиса.',
+        strengths: ['Вы обозначили позицию и поддерживали диалог', 'Разговор сохранён в истории чата'],
+        improvements: ['Задавайте больше открытых вопросов', 'Фиксируйте конкретные следующие шаги'],
+        recommendations: ['Просмотрите сохранённые реплики и подготовьте альтернативный вариант предложения'],
+      },
+    }
   }
 
   listSessions(): Promise<NegotiationSessionSummary[]> {

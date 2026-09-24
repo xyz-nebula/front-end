@@ -10,16 +10,35 @@ import { AppButton } from '@/components/ui/AppButton'
 import { useArenaSession } from '@/features/arena/useArenaSession'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
 import { trainingCases } from '@/mocks/cases'
+import { useDomainServices } from '@/services/domainServices'
+import type { TrainingCase } from '@/types/case'
+
+function fallbackCase(title: string): TrainingCase {
+  return {
+    id: title,
+    title,
+    description: 'Голосовой разговор с AI. Сценарий и роль оппонента пока не привязаны к карточке.',
+    category: 'Карьера',
+    duration: 'Без ограничения',
+    difficulty: 'Средне',
+    opponent: 'AI-оппонент',
+    accent: 'violet',
+    icon: 'dialogue',
+  }
+}
 
 export function ArenaPage() {
   const { sessionId = '' } = useParams()
   const navigate = useNavigate()
+  const { isRealVoice } = useDomainServices()
   const arena = useArenaSession(sessionId)
   const audio = useArenaAudio(sessionId, arena.session?.mode === 'voice' && arena.session.status === 'active', arena.addCommittedMessage, arena.refreshSession)
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const [finishError, setFinishError] = useState<string | null>(null)
-  const trainingCase = trainingCases.find((item) => item.id === arena.session?.caseId)
+  const trainingCase = trainingCases.find(
+    (item) => item.id === arena.session?.caseId || item.title === arena.session?.name,
+  ) ?? (arena.session ? fallbackCase(arena.session.name ?? 'Переговоры с AI') : undefined)
 
   useEffect(() => {
     if (arena.viewState === 'finished') navigate(`/result/${sessionId}`, { replace: true })
@@ -40,7 +59,7 @@ export function ArenaPage() {
       <main className="arena-state">
         <span className="arena-state__mark" aria-hidden="true">!</span>
         <p className="eyebrow">Не удалось открыть арену</p>
-        <h1>{trainingCase === undefined && arena.session ? 'Кейс не найден' : 'Связь прервалась'}</h1>
+        <h1>Связь прервалась</h1>
         <p>{arena.error ?? 'Эта тренировка больше недоступна.'}</p>
         <div><AppButton type="button" onClick={() => void arena.reload()}>Повторить</AppButton><AppButton to="/home" variant="secondary">К кейсам</AppButton></div>
       </main>
@@ -83,6 +102,7 @@ export function ArenaPage() {
           <div className="arena-brief__opponent"><span>{trainingCase.opponent.charAt(0)}</span><div><small>Ваш AI-оппонент</small><strong>{trainingCase.opponent}</strong></div></div>
           <h1>{trainingCase.title}</h1>
           <p>{trainingCase.description}</p>
+          {isRealVoice && <p className="arena-brief__real-note">Карточка задаёт название чата. AI пока не получает её роль и сценарий.</p>}
           <dl><div><dt>Сложность</dt><dd>{trainingCase.difficulty}</dd></div><div><dt>Время</dt><dd>{trainingCase.duration}</dd></div></dl>
           <blockquote>«Сначала выясните ограничения собеседника, затем предлагайте решение»</blockquote>
         </aside>
@@ -93,7 +113,7 @@ export function ArenaPage() {
           {isFinished ? (
             <div className="arena-finished" role="status"><div><strong>Переговоры завершены</strong><span>Открываем разбор…</span></div><Link to={`/result/${sessionId}`}>Посмотреть результат →</Link></div>
           ) : arena.session.mode === 'voice' ? (
-            <VoiceControls state={audio.state} partial={audio.partial} error={audio.error} isPlaying={audio.isPlaying} disabled={arena.viewState !== 'ready'} onConnect={() => void audio.connect()} onPause={audio.pause} onResume={audio.resume} onStop={() => void audio.stop()} />
+            <VoiceControls state={audio.state} partial={audio.partial} error={audio.error} isPlaying={audio.isPlaying} disabled={arena.viewState !== 'ready'} isDemo={!isRealVoice} onConnect={() => void audio.connect()} onPause={audio.pause} onResume={audio.resume} onStop={() => void audio.stop()} />
           ) : (
             <TextComposer
               value={arena.draft}

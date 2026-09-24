@@ -19,8 +19,8 @@ interface TrainingModalProps {
 
 export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const navigate = useNavigate()
-  const { negotiationClient } = useDomainServices()
-  const [mode, setMode] = useState<NegotiationMode>('text')
+  const { isRealVoice, negotiationClient } = useDomainServices()
+  const [mode, setMode] = useState<NegotiationMode>(isRealVoice ? 'voice' : 'text')
   const [isStarting, setIsStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pendingCreateRef = useRef<PendingSessionCreate | null>(null)
@@ -86,16 +86,17 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
           <div><span>Формат</span><strong>{mode === 'text' ? 'Текстовый диалог' : 'Голосовой диалог'}</strong></div>
         </div>
         <fieldset className="training-modal__modes" disabled={isStarting}>
-          <legend>Выберите формат</legend>
-          <label className={mode === 'text' ? 'is-selected' : ''}>
+          <legend>{isRealVoice ? 'Доступный формат' : 'Выберите формат'}</legend>
+          {!isRealVoice && <label className={mode === 'text' ? 'is-selected' : ''}>
             <input type="radio" name="training-mode" value="text" checked={mode === 'text'} onChange={() => setMode('text')} />
             <span aria-hidden="true">⌨</span><strong>Текст</strong><small>Обменивайтесь сообщениями в удобном темпе</small>
-          </label>
+          </label>}
           <label className={mode === 'voice' ? 'is-selected' : ''}>
             <input type="radio" name="training-mode" value="voice" checked={mode === 'voice'} onChange={() => setMode('voice')} />
-            <span aria-hidden="true">◉</span><strong>Голос</strong><small>Демо-диалог с озвученным ответом оппонента</small>
+            <span aria-hidden="true">◉</span><strong>Голос</strong><small>{isRealVoice ? 'Разговор через микрофон с AI-оппонентом' : 'Демо-диалог с озвученным ответом оппонента'}</small>
           </label>
         </fieldset>
+        {isRealVoice && <div className="training-modal__real-note" role="note">Карточка задаёт название разговора. Роль и сценарий пока не передаются AI-оппоненту.</div>}
         <div className="training-modal__tip"><span>Совет</span>Сначала сформулируйте желаемый результат и минимально приемлемый исход.</div>
         {error && <div className="form-alert training-modal__error" role="alert">{error}</div>}
         <AppButton type="button" className="training-modal__button" onClick={() => void startTraining()} disabled={isStarting}>{isStarting ? 'Создаём арену…' : 'Начать тренировку'}</AppButton>

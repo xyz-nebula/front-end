@@ -5,12 +5,13 @@ import { DomainServicesContext, type DomainServices } from '@/services/domainSer
 import { useServiceAdapters } from '@/services/serviceAdapters'
 
 export function DomainServicesProvider({ children }: { children: ReactNode }) {
-  const { createAudioClient, createNegotiationClient } = useServiceAdapters()
+  const { config, createAudioClient, createNegotiationClient } = useServiceAdapters()
   const { mockOwnerKey, runAuthorized } = useAuthRuntime()
   const value = useMemo<DomainServices>(() => ({
     negotiationClient: createNegotiationClient({ mockOwnerKey, runAuthorized }),
     createAudioClient: () => createAudioClient({ mockOwnerKey, runAuthorized }),
-  }), [createAudioClient, createNegotiationClient, mockOwnerKey, runAuthorized])
+    isRealVoice: config.negotiationSource === 'real' && config.audioSource === 'real',
+  }), [config.audioSource, config.negotiationSource, createAudioClient, createNegotiationClient, mockOwnerKey, runAuthorized])
 
   return (
     <DomainServicesContext.Provider value={value}>

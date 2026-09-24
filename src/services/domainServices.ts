@@ -6,6 +6,7 @@ import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 export interface DomainServices {
   negotiationClient: NegotiationClient
   createAudioClient: () => AudioClient
+  isRealVoice: boolean
 }
 
 export const DomainServicesContext = createContext<DomainServices | null>(null)

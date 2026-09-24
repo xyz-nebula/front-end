@@ -6,6 +6,7 @@ interface VoiceControlsProps {
   error: string | null
   isPlaying: boolean
   disabled: boolean
+  isDemo?: boolean
   onConnect: () => void
   onPause: () => void
   onResume: () => void
@@ -23,7 +24,7 @@ const stateLabels: Record<AudioConnectionState, string> = {
 }
 
 export function VoiceControls({
-  state, partial, error, isPlaying, disabled, onConnect, onPause, onResume, onStop,
+  state, partial, error, isPlaying, disabled, isDemo = true, onConnect, onPause, onResume, onStop,
 }: VoiceControlsProps) {
   const connecting = state === 'connecting' || state === 'reconnecting'
   const active = state === 'connected' || state === 'paused'
@@ -44,7 +45,9 @@ export function VoiceControls({
         {state === 'paused' && <button type="button" onClick={onResume} disabled={disabled}>Продолжить</button>}
         {active && <button type="button" onClick={onStop}>Остановить</button>}
       </div>
-      <small>Демо-режим: реплики и голос оппонента имитируются локально.</small>
+      <small>{isDemo
+        ? 'Демо-режим: реплики и голос оппонента имитируются локально.'
+        : 'Голос передаётся AI-сервису, а сохранённые транскрипции появляются в истории.'}</small>
     </div>
   )
 }
