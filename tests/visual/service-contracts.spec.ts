@@ -6,82 +6,65 @@ import { AudioEngineClient } from '../../src/services/real/audioEngineClient'
 import { BackendNegotiationClient } from '../../src/services/real/backendNegotiationClient'
 import {
   parseAudioEngineEvent,
-  parseAudioTicket,
   parseBackendError,
-  parseNegotiationResultState,
-  parseNegotiationSession,
-  parseSessionList,
-  parseTextTurnResult,
-  toAudioInputFrameDto,
-  toCreateSessionDto,
-  toTextTurnDto,
+  parseChatList,
+  parseChatWithMessages,
+  toActivateChatDto,
+  toAudioControlDto,
+  toAudioInputDto,
+  toCreateChatDto,
 } from '../../src/services/real/targetContract'
 import { AUDIO_FORMAT } from '../../src/types/audio'
 import { isServiceError } from '../../src/types/api'
 import {
+  audioInputFixture,
   audioEventFixtures,
-  audioTicketFixture,
   backendErrorFixture,
-  resultFixtures,
-  sessionFixture,
-  sessionListFixture,
-  textTurnFixture,
-  transcriptCommitFixture,
+  chatFixture,
+  chatListFixture,
 } from '../fixtures/serviceContracts'
 
-test('target backend DTO fixtures validate and map to camelCase', () => {
-  const session = parseNegotiationSession(sessionFixture)
-  const turn = parseTextTurnResult(textTurnFixture)
-  const ticket = parseAudioTicket(audioTicketFixture)
-  const resultStates = resultFixtures.map(parseNegotiationResultState)
-  const sessions = parseSessionList(sessionListFixture)
+test('remote backend DTO fixtures validate and map to frontend naming', () => {
+  const chat = parseChatWithMessages(chatFixture)
+  const list = parseChatList(chatListFixture)
 
-  expect(session.caseId).toBe('supplier-deadline')
-  expect(session.messages.map((message) => message.sequence)).toEqual([1, 2])
-  expect(turn.userMessage.speaker).toBe('user')
-  expect(turn.aiMessage.speaker).toBe('ai')
-  expect(ticket).toEqual({
-    ticket: audioTicketFixture.ticket,
-    expiresAt: audioTicketFixture.expires_at,
-    protocol: 'audio-engine.v1',
-  })
-  expect(resultStates.map((state) => state.status)).toEqual(['processing', 'ready', 'failed'])
-  expect(sessions[0].finishedAt).toBe(sessionListFixture[0].finished_at)
+  expect(chat).toMatchObject({ id: chatFixture.uuid, name: 'Срок поставки', status: 'ongoing' })
+  expect(chat.messages.map((message) => [message.sequence, message.speaker])).toEqual([
+    [1, 'user'],
+    [2, 'ai'],
+  ])
+  expect(list).toEqual(chatListFixture.map((item) => ({ id: item.uuid, name: item.name })))
   const backendError = parseBackendError(backendErrorFixture, 409)
   expect(backendError).toMatchObject({
     reason: 'http',
     status: 409,
-    code: 'SESSION_ALREADY_FINISHED',
-    field: 'session_id',
+    code: 'chat_not_found',
   })
-  expect(transcriptCommitFixture.event_id).toBe('audio-event-1')
 })
 
 test('target audio event fixtures validate and preserve event semantics', () => {
   const events = audioEventFixtures.map(parseAudioEngineEvent)
 
   expect(events.map((event) => event.type)).toEqual([
-    'transcript_partial',
-    'message_committed',
+    'transcript',
     'audio_frame',
     'error',
-    'closed',
+    'auth_error',
   ])
   expect(events[0]).toEqual({
-    type: 'transcript_partial',
+    type: 'transcript',
     speaker: 'user',
     text: 'Предлагаю согласовать',
   })
-  expect(events[1]).toMatchObject({ eventId: 'audio-event-1' })
-  expect(events[4]).toMatchObject({ reconnectAllowed: true })
+  expect(events[3]).toMatchObject({ code: 'expired_token' })
 })
 
 test('invalid DTO and event payloads fail with a typed invalid-response error', () => {
   for (const parse of [
-    () => parseNegotiationSession({ ...sessionFixture, messages: 'invalid' }),
-    () => parseAudioTicket({ ...audioTicketFixture, protocol: 'legacy' }),
+    () => parseChatWithMessages({ ...chatFixture, messages: 'invalid' }),
+    () => parseChatList([{ uuid: 'not-a-uuid', name: 'Chat' }]),
     () => parseAudioEngineEvent({ type: 'audio_frame', sequence: 1 }),
-    () => parseNegotiationResultState({ status: 'ready' }),
+    () => parseAudioEngineEvent({ type: 'auth_error', code: 'unknown', message: 'No' }),
   ]) {
     expect(parse).toThrow(/Некорректный ответ сервиса/)
     try {
@@ -94,23 +77,10 @@ test('invalid DTO and event payloads fail with a typed invalid-response error', 
 })
 
 test('request serializers keep the target snake_case boundary', () => {
-  expect(toCreateSessionDto({ caseId: 'case-1', mode: 'voice' })).toEqual({
-    case_id: 'case-1',
-    mode: 'voice',
-  })
-  expect(toTextTurnDto('Добрый день')).toEqual({ text: 'Добрый день' })
-  expect(toAudioInputFrameDto({
-    sequence: 1,
-    timestamp: 1_795_507_202_000,
-    format: AUDIO_FORMAT,
-    payload: 'AAECAw==',
-  })).toEqual({
-    type: 'audio_input',
-    sequence: 1,
-    timestamp: 1_795_507_202_000,
-    format: { codec: 'pcm_s16le', sample_rate: 24_000, channels: 1, bit_depth: 16 },
-    payload: 'AAECAw==',
-  })
+  expect(toCreateChatDto('Срок поставки')).toEqual({ name: 'Срок поставки' })
+  expect(toActivateChatDto(chatFixture.uuid)).toEqual({ uuid: chatFixture.uuid })
+  expect(toAudioInputDto(audioInputFixture.audio)).toEqual(audioInputFixture)
+  expect(toAudioControlDto('pause')).toEqual({ type: 'control', action: 'pause' })
 })
 
 test('service config requires explicit sources and rejects invalid values', () => {
@@ -146,7 +116,11 @@ test('real negotiation and audio stubs return feature-unavailable without networ
     negotiation.finishSession({ sessionId: 'session-1', clientCommandId: 'command-2' }),
     negotiation.getResult('session-1'),
     negotiation.listSessions(),
-    audio.connect({ sessionId: 'session-1', ticket: parseAudioTicket(audioTicketFixture) }),
+    audio.connect({ sessionId: 'session-1', ticket: {
+      ticket: 'short-lived',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      protocol: 'audio-engine.v1',
+    } }),
   ]
   const results = await Promise.allSettled(calls)
 
