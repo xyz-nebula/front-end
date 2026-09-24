@@ -30,6 +30,7 @@ function unauthorized(message: string, code: string): ServiceError {
 
 export class AudioEngineClient implements AudioClient {
   readonly requiresTicket = false
+  readonly acceptsAudioInput = true
   private state: AudioConnectionState = 'idle'
   private readonly eventListeners = new Set<EventListener>()
   private readonly stateListeners = new Set<StateListener>()

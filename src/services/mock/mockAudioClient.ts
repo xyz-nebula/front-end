@@ -39,6 +39,7 @@ function mockAudioPayload(): string {
 
 export class MockAudioClient implements AudioClient {
   readonly requiresTicket = true
+  readonly acceptsAudioInput = false
   private state: AudioConnectionState = 'idle'
   private readonly eventListeners = new Set<EventListener>()
   private readonly stateListeners = new Set<StateListener>()
