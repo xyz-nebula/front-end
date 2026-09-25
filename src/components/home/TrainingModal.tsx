@@ -60,7 +60,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const navigate = useNavigate()
   const { isRealVoice, negotiationClient } = useDomainServices()
   const [mode, setMode] = useState<NegotiationMode>(isRealVoice ? 'voice' : 'text')
-  const [role, setRole] = useState<0 | 1>(0)
+  const [role, setRole] = useState<0 | 1 | null>(null)
   const [isStarting, setIsStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pendingCreateRef = useRef<PendingSessionCreate | null>(null)
@@ -81,7 +81,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   }, [isStarting, onClose])
 
   const startTraining = async () => {
-    if (startingRef.current) return
+    if (startingRef.current || role === null) return
     const storageKey = `arena.pending-create.${item.id}.${mode}`
     const command = getOrCreatePendingSessionCreate(storageKey, {
       sourceContext: `training:${item.id}:${mode}`,
@@ -125,10 +125,10 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
             <h3>Выберите свою роль</h3>
             <p>Вторая роль автоматически станет AI-оппонентом.</p>
             <div className="home-case-modal__roles" role="radiogroup" aria-label="Выберите свою роль">
-              {brief.roles.map((title, index) => <label className={`home-case-modal__role ${role === index ? 'is-selected' : ''}`} key={title}>
+              {brief.roles.map((title, index) => <label className={`home-case-modal__role ${role === index ? 'is-selected' : role !== null ? 'is-opponent' : ''}`} key={title}>
                 <input type="radio" name="case-role" checked={role === index} onChange={() => setRole(index as 0 | 1)} disabled={isStarting} />
                 <img src={/руководител|директор/i.test(title) ? directorArtwork : profileArtwork} alt="" />
-                <span className="home-case-modal__role-copy"><span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span><strong>{title}</strong><small>{brief.summaries[index]}</small></span>
+                <span className="home-case-modal__role-copy">{role !== null && <span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span>}<strong>{title}</strong><small>{brief.summaries[index]}</small></span>
                 <span className="home-case-modal__radio-mark" aria-hidden="true">{role === index ? '✓' : ''}</span>
               </label>)}
             </div>
@@ -141,7 +141,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
           </fieldset>
           {error && <div className="form-alert home-case-modal__error" role="alert">{error}</div>}
         </div>
-        <div className="home-case-modal__footer"><button className="arena-home__primary-button" type="button" onClick={() => void startTraining()} disabled={isStarting}>{isStarting ? 'Создаём арену…' : 'Начать тренировку'} <span aria-hidden="true">→</span></button></div>
+        <div className="home-case-modal__footer"><button className="arena-home__primary-button" type="button" onClick={() => void startTraining()} disabled={isStarting || role === null}>{isStarting ? 'Создаём арену…' : 'Начать тренировку'} <span aria-hidden="true">→</span></button></div>
       </section>
     </div>
   )

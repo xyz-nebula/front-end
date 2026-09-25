@@ -30,6 +30,7 @@ test('text arena creates, restores and finishes one atomic conversation without 
   await page.getByRole('button', { name: 'Начать кейс' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Повышение зарплаты' })
+  await dialog.getByRole('radio', { name: /Сотрудник/ }).check()
   await expect(dialog.getByText('Текст', { exact: true })).toBeVisible()
   await expect(dialog.getByText('Голос', { exact: true })).toBeVisible()
   await expect(dialog.getByRole('radio', { name: /Голос/ })).toBeEnabled()

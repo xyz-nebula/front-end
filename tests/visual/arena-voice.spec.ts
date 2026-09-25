@@ -19,6 +19,7 @@ test('mock registration, voice reconnect, committed history and result survive r
 
   await page.getByRole('button', { name: 'Начать кейс' }).click()
   const modal = page.getByRole('dialog', { name: 'Повышение зарплаты' })
+  await modal.getByRole('radio', { name: /Сотрудник/ }).check()
   await modal.getByText('Голос', { exact: true }).click()
   await modal.getByRole('button', { name: 'Начать тренировку' }).click()
   await expect(page).toHaveURL(/\/arena\/[0-9a-f-]+$/)
