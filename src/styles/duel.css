@@ -20,7 +20,6 @@
 .arena-page .duel-header__profile { position: relative; }
 .arena-page .duel-header__profile > button { display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .arena-page .duel-header__profile img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; background: #ddecff; }
-.arena-page .duel-header__profile > button span { color: #51658a; font-size: 26px; transform: translateY(-4px); }
 .arena-page .duel-header__profile-menu { position: absolute; top: calc(100% + 12px); right: 0; display: grid; gap: 10px; width: 190px; padding: 16px; border: 1px solid var(--duel-line); border-radius: 14px; background: #fff; box-shadow: 0 14px 40px #20427b29; font-size: 14px; }
 .arena-page .duel-header__profile-menu a { color: var(--duel-blue); font-weight: 700; }
 .arena-page .duel-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 16px 13px; }

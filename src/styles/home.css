@@ -19,7 +19,6 @@
 .arena-home__profile { position: relative; }
 .arena-home__profile-toggle { display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .arena-home__profile-toggle img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; background: #ddecff; }
-.arena-home__profile-toggle span { color: #51658a; font-size: 26px; line-height: 1; transform: translateY(-4px); }
 .arena-home__profile-menu { position: absolute; z-index: 10; top: calc(100% + 13px); right: 0; width: 230px; padding: 10px; border: 1px solid var(--home-line); border-radius: 15px; background: #fff; box-shadow: 0 14px 40px rgba(32, 66, 123, .16); }
 .arena-home__profile-name { display: block; padding: 8px 10px 12px; font-weight: 760; }
 .arena-home__profile-name small { display: block; margin-top: 3px; color: var(--home-muted); font-size: 12px; font-weight: 450; }
@@ -191,7 +190,6 @@
   .arena-home__streak strong { font-size: 12px; }
   .arena-home__profile-toggle { gap: 5px; }
   .arena-home__profile-toggle img { width: 40px; height: 40px; }
-  .arena-home__profile-toggle span { font-size: 20px; }
   .arena-home__main { padding-top: 24px; padding-bottom: 42px; }
   .arena-home__welcome { margin-bottom: 22px; }
   .arena-home__welcome h1 { font-size: clamp(32px, 8.7vw, 44px); }

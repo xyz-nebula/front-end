@@ -105,7 +105,7 @@ export function HomePage() {
             <span className="arena-home__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span><span>Серия: <strong>4 дня</strong></span></span>
             <div className="arena-home__profile" ref={profileRef}>
               <button className="arena-home__profile-toggle" type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}>
-                <img src={profileArtwork} alt="" /><span aria-hidden="true">⌄</span>
+                <img src={profileArtwork} alt="" />
               </button>
               {profileOpen && <div className="arena-home__profile-menu">
                 <span className="arena-home__profile-name">Кирилл <small>Демо-профиль</small></span>

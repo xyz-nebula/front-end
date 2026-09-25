@@ -49,7 +49,7 @@ export function ArenaHeader({ title, userRole, opponentRole, startedAt, mode, au
           <div className="duel-header__actions">
             <span className="duel-header__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span> Серия: <strong>4 дня</strong></span>
             <div className="duel-header__profile">
-              <button type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}><img src={profileArtwork} alt="" /><span aria-hidden="true">⌄</span></button>
+              <button type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}><img src={profileArtwork} alt="" /></button>
               {profileOpen && <div className="duel-header__profile-menu"><span>Кирилл · демо-профиль</span><Link to="/home">К кейсам</Link></div>}
             </div>
           </div>
