@@ -1,0 +1,47 @@
+import { artifactsDir, captureScreenshot, expect, expectNoHorizontalOverflow, test } from './helpers'
+
+async function enterHome(page: import('@playwright/test').Page) {
+  await page.goto('/register')
+  await page.getByLabel('Имя', { exact: true }).fill('Кирилл')
+  await page.getByLabel('Фамилия').fill('Тестовый')
+  await page.getByLabel('Имя пользователя').fill('home.visual')
+  await page.getByLabel('Email').fill('home.visual@example.com')
+  await page.getByLabel('Пароль').fill('strong-password')
+  await page.getByRole('button', { name: 'Создать аккаунт' }).click()
+  await page.getByRole('link', { name: 'Открыть demo-ссылку активации' }).click()
+  await page.getByRole('link', { name: 'Перейти в приложение' }).click()
+  await expect(page).toHaveURL(/\/home$/)
+  await expect(page.getByRole('heading', { name: 'Кейсы' })).toBeVisible()
+}
+
+test('home dashboard and case dialog fit desktop and mobile', async ({ page }) => {
+  test.skip(process.env.VITE_AUTH_SOURCE !== 'mock', 'Requires mock auth.')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await enterHome(page)
+  await expect(page.getByText('Здесь появятся ваши тренировки.')).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await page.screenshot({ path: `${artifactsDir}/home-dashboard-desktop.png`, animations: 'disabled', fullPage: true })
+
+  await page.getByRole('button', { name: 'Выбрать кейс «Сложный сотрудник»' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Сложный сотрудник' })
+  await expect(dialog.getByRole('radio', { name: /Руководитель/ })).toBeChecked()
+  await dialog.getByRole('radio', { name: /Сотрудник/ }).check()
+  await expect(dialog.getByRole('radio', { name: /Сотрудник/ })).toBeChecked()
+  await expect(dialog.getByText('Текст', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('Голос', { exact: true })).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/home-case-dialog-desktop.png`)
+  await dialog.getByRole('button', { name: 'Закрыть' }).click()
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await page.screenshot({ path: `${artifactsDir}/home-dashboard-mobile.png`, animations: 'disabled', fullPage: true })
+  await page.getByRole('button', { name: 'Выбрать кейс «Сложный сотрудник»' }).click()
+  await expect(dialog).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/home-case-dialog-mobile.png`)
+  await dialog.getByRole('button', { name: 'Закрыть' }).click()
+  await page.getByRole('button', { name: 'Все кейсы' }).click()
+  await expect(page.locator('.home-case-card')).toHaveCount(6)
+  await expectNoHorizontalOverflow(page)
+})

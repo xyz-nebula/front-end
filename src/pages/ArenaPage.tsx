@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { ArenaConversation } from '@/components/arena/ArenaConversation'
 import { ArenaHeader } from '@/components/arena/ArenaHeader'
+import { DuelPreparation } from '@/components/arena/DuelPreparation'
 import { FinishDialog } from '@/components/arena/FinishDialog'
 import { TextComposer } from '@/components/arena/TextComposer'
 import { VoiceControls } from '@/components/arena/VoiceControls'
@@ -10,6 +11,7 @@ import { AppButton } from '@/components/ui/AppButton'
 import { useArenaSession } from '@/features/arena/useArenaSession'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
 import { trainingCases } from '@/mocks/cases'
+import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { useDomainServices } from '@/services/domainServices'
 import type { TrainingCase } from '@/types/case'
 
@@ -69,6 +71,7 @@ export function ArenaPage() {
   const isFinished = arena.viewState === 'finished' || arena.session.status !== 'active'
   const isSending = arena.turnState === 'sending' || arena.turnState === 'thinking'
   const isConnecting = audio.state === 'connecting' || audio.state === 'reconnecting'
+  const preparation = getDuelPreparation(trainingCase.id)
 
   const confirmFinish = async () => {
     if (isFinishing) return
@@ -90,26 +93,25 @@ export function ArenaPage() {
   return (
     <div className="arena-page">
       <ArenaHeader
-        trainingCase={trainingCase}
+        title={trainingCase.title}
+        userRole={preparation?.userRole ?? 'Вы'}
+        opponentRole={preparation?.opponentRole ?? trainingCase.opponent}
         startedAt={arena.session.startedAt}
         mode={arena.session.mode}
+        audioState={audio.state}
+        isDemoVoice={!isRealVoice}
+        isSending={isSending}
         finishDisabled={isSending || isFinished || isConnecting}
         onFinish={() => setShowFinishDialog(true)}
       />
-      <main className="arena-layout">
-        <aside className="arena-brief">
-          <p className="eyebrow">Бриф перед встречей</p>
-          <div className="arena-brief__opponent"><span>{trainingCase.opponent.charAt(0)}</span><div><small>Ваш AI-оппонент</small><strong>{trainingCase.opponent}</strong></div></div>
-          <h1>{trainingCase.title}</h1>
-          <p>{trainingCase.description}</p>
-          {isRealVoice && <p className="arena-brief__real-note">Карточка задаёт название чата. AI пока не получает её роль и сценарий.</p>}
-          <dl><div><dt>Сложность</dt><dd>{trainingCase.difficulty}</dd></div><div><dt>Время</dt><dd>{trainingCase.duration}</dd></div></dl>
-          <blockquote>«Сначала выясните ограничения собеседника, затем предлагайте решение»</blockquote>
-        </aside>
+      <main className="duel-shell arena-layout">
         <section className="arena-dialog-panel">
-          <div className="arena-dialog-panel__head"><div><span className="arena-live-dot" />Диалог активен</div><span>{arena.session.messages.length} реплик</span></div>
-          <ArenaConversation messages={arena.session.messages} opponent={trainingCase.opponent} isThinking={isSending} mode={arena.session.mode} />
+          <h2 className="arena-dialog-panel__title">Диалог</h2>
+          <ArenaConversation messages={arena.session.messages} opponent={preparation?.opponentRole ?? trainingCase.opponent} isThinking={isSending} mode={arena.session.mode} />
           {arena.error && <div className="arena-inline-error" role="alert"><span>{arena.error}</span><button type="button" onClick={() => arena.turnState === 'error' ? void arena.sendTextTurn() : setShowFinishDialog(true)}>Повторить</button></div>}
+        </section>
+        <DuelPreparation data={preparation} description={trainingCase.description} isRealVoice={isRealVoice} />
+        <div className="duel-controls">
           {isFinished ? (
             <div className="arena-finished" role="status"><div><strong>Переговоры завершены</strong><span>Открываем разбор…</span></div><Link to={`/result/${sessionId}`}>Посмотреть результат →</Link></div>
           ) : arena.session.mode === 'voice' ? (
@@ -123,7 +125,7 @@ export function ArenaPage() {
               onSubmit={() => void arena.sendTextTurn()}
             />
           )}
-        </section>
+        </div>
       </main>
       {showFinishDialog && <FinishDialog
         busy={isFinishing}

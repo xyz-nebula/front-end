@@ -63,7 +63,8 @@ async function replaceSessionExternally(page: Page, accessToken: string, refresh
 }
 
 async function openEnrollment(page: Page) {
-  await page.getByRole('button', { name: '2FA' }).click()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Настроить 2FA' }).click()
   await page.getByRole('button', { name: /Подключить 2FA/ }).click()
 }
 
@@ -218,6 +219,7 @@ test('does not restore a pending login after logout', async ({ page }) => {
     value: { accessToken: 'temporary-access', refreshToken: 'temporary-refresh' },
   })
   await expect(page).toHaveURL(/\/home$/)
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
   await expect(page).toHaveURL(/\/auth$/)
   expect(await readStoredTokens(page)).toBeNull()
@@ -249,7 +251,7 @@ test('keeps tokens after a transient bootstrap failure and recovers on retry', a
   await page.getByRole('button', { name: 'Повторить' }).click()
 
   await expect(page).toHaveURL(/\/home$/)
-  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
   expect(await readStoredTokens(page)).toContain('recovered-refresh')
 })
 
@@ -290,6 +292,7 @@ test('optimistic logout clears the UI and storage before a hanging request finis
   })
   await login(page)
 
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
 
   await expect(page).toHaveURL(/\/auth$/)
@@ -315,6 +318,7 @@ test('retries remote logout after refreshing a rejected snapshot', async ({ page
   }))
   await login(page)
 
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
 
   await expect(page).toHaveURL(/\/auth$/)
@@ -407,7 +411,8 @@ test('discards a late protected success from the previous session', async ({ pag
   releaseEnrollment()
   await delay(100)
 
-  await page.getByRole('button', { name: '2FA' }).click()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Настроить 2FA' }).click()
   await expect(page.getByRole('heading', { name: 'Двухфакторная защита' })).toBeVisible()
   await expect(page.getByText('ACCOUNT_A_LATE_SECRET')).toHaveCount(0)
 })
@@ -462,7 +467,7 @@ test('migrates legacy auth storage and preserves its mock owner key across refre
   })
 
   await page.goto('/home')
-  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
   const migrated = await page.evaluate((key) => JSON.parse(
     window.localStorage.getItem(key) ?? 'null',
   ) as unknown, storageKey) as {
@@ -476,7 +481,7 @@ test('migrates legacy auth storage and preserves its mock owner key across refre
   expect(migrated.tokens.refreshToken).toBe('rotated-refresh-1')
 
   await page.reload()
-  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
   const refreshed = await page.evaluate((key) => JSON.parse(
     window.localStorage.getItem(key) ?? 'null',
   ) as unknown, storageKey) as {
@@ -626,6 +631,7 @@ test('synchronizes login, token rotation, and logout between tabs', async ({ pag
   expect(otherAuthorization).toBe('Bearer rotated-access')
 
   await closeSecurityModal(page)
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
   await expect(page).toHaveURL(/\/auth$/)
   await expect(otherPage).toHaveURL(/\/login$/)
@@ -704,8 +710,8 @@ test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, 
     otherPage.goto('/home'),
   ])
 
-  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
-  await expect(otherPage.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
+  await expect(otherPage.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
   await expect.poll(() => readStoredTokens(page)).toContain('rotated-refresh')
   await expect.poll(() => readStoredTokens(otherPage)).toContain('rotated-refresh')
   const diagnostics = { lockOrder, refreshTokenKinds, bothTabsHadInitialStorage }

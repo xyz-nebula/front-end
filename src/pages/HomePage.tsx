@@ -1,45 +1,66 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useAuth } from '@/auth/useAuth'
 import { TotpModal } from '@/components/auth/TotpModal'
 import { CaseCard } from '@/components/home/CaseCard'
-import { CaseIcon } from '@/components/home/CaseIcon'
 import { TrainingModal } from '@/components/home/TrainingModal'
-import { AppButton } from '@/components/ui/AppButton'
-import { ArrowIcon } from '@/components/ui/ArrowIcon'
-import { Logo } from '@/components/ui/Logo'
-import { caseCategories, trainingCases } from '@/mocks/cases'
+import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
+import heroArtwork from '@/assets/home/hero-negotiation.webp'
+import profileArtwork from '@/assets/home/profile-kirill.webp'
+import { caseArtwork } from '@/mocks/caseArtwork'
+import { trainingCases } from '@/mocks/cases'
 import { useDomainServices } from '@/services/domainServices'
-import type { CaseCategory, TrainingCase } from '@/types/case'
+import type { TrainingCase } from '@/types/case'
 import type { NegotiationSessionSummary } from '@/types/negotiation'
+import '@/styles/home.css'
+
+const featuredIds = ['salary-review', 'difficult-employee', 'team-conflict']
+
+function trainingTitle(item: NegotiationSessionSummary) {
+  return trainingCases.find((trainingCase) => trainingCase.id === item.caseId || trainingCase.title === item.name)?.title
+    ?? item.name ?? 'Переговоры с AI'
+}
+
+function trainingStatus(item: NegotiationSessionSummary) {
+  if (item.status === 'active') return 'В процессе'
+  if (item.score !== undefined) return `Результат ${item.score}/100`
+  if (item.backendStatus === 'victory') return 'Договорённость достигнута'
+  if (item.backendStatus === 'defeat') return 'Решение отложено'
+  return 'Завершено'
+}
 
 export function HomePage() {
   const { dismissMemorySessionNotice, externalSessionVersion, logout, showMemorySessionNotice } = useAuth()
-  const { isRealVoice, negotiationClient } = useDomainServices()
-  const [category, setCategory] = useState<CaseCategory>('Все')
+  const { negotiationClient } = useDomainServices()
   const [selectedCase, setSelectedCase] = useState<TrainingCase | null>(null)
   const [securityModalVersion, setSecurityModalVersion] = useState<number | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [showAllCases, setShowAllCases] = useState(false)
+  const [showAllHistory, setShowAllHistory] = useState(false)
   const [history, setHistory] = useState<NegotiationSessionSummary[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [historyLoading, setHistoryLoading] = useState(true)
+  const profileRef = useRef<HTMLDivElement>(null)
   const recommendedCase = trainingCases[0]
-  const historyCountLabel = history.length === 1 ? 'сессия' : history.length >= 2 && history.length <= 4 ? 'сессии' : 'сессий'
-  const visibleCases = useMemo(
-    () => category === 'Все' ? trainingCases : trainingCases.filter((item) => item.category === category),
-    [category],
-  )
+  const activeSession = history.find((item) => item.status === 'active')
+  const activeCase = activeSession && trainingCases.find((item) => item.id === activeSession.caseId)
+  const displayedCase = activeCase ?? recommendedCase
+  const featuredCases = useMemo(() => featuredIds.map((id) => trainingCases.find((item) => item.id === id)).filter((item): item is TrainingCase => Boolean(item)), [])
+  const visibleCases = showAllCases ? trainingCases : featuredCases
+  const visibleHistory = showAllHistory ? history : history.slice(0, 3)
 
   const handleLogout = async () => {
     if (isLoggingOut) return
     setIsLoggingOut(true)
-    await logout().catch(() => undefined)
+    await logout().catch(() => setIsLoggingOut(false))
   }
 
   const loadHistory = useCallback(async () => {
     try {
       setHistory(await negotiationClient.listSessions())
+      setHistoryError(null)
     } catch (caught) {
       setHistoryError(caught instanceof Error ? caught.message : 'Не удалось загрузить историю.')
     } finally {
@@ -59,91 +80,98 @@ export function HomePage() {
     return () => { active = false }
   }, [negotiationClient])
 
+  useEffect(() => {
+    if (!profileOpen) return
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (event.target instanceof Node && !profileRef.current?.contains(event.target)) setProfileOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProfileOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [profileOpen])
+
   return (
-    <div className="app-home">
-      <header className="app-header">
-        <div className="app-shell app-header__inner">
-          <Logo />
-          <nav aria-label="Навигация приложения"><a className="is-active" href="#cases">Тренировки</a><a href="#progress">Мой прогресс</a></nav>
-          <div className="app-header__actions">
-            <button type="button" onClick={() => setSecurityModalVersion(externalSessionVersion)}><span className="app-header__shield" aria-hidden="true">✦</span><span>2FA</span></button>
-            <button type="button" onClick={() => void handleLogout()} disabled={isLoggingOut}>{isLoggingOut ? 'Выходим…' : 'Выйти'}</button>
+    <div className="arena-home">
+      <header className="arena-home__header">
+        <div className="arena-home__shell arena-home__header-inner">
+          <Link className="arena-home__brand" to="/" aria-label="Арена — на главную"><ArenaCubeMark /><span>АРЕНА</span></Link>
+          <div className="arena-home__header-actions">
+            <span className="arena-home__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span><span>Серия: <strong>4 дня</strong></span></span>
+            <div className="arena-home__profile" ref={profileRef}>
+              <button className="arena-home__profile-toggle" type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}>
+                <img src={profileArtwork} alt="" /><span aria-hidden="true">⌄</span>
+              </button>
+              {profileOpen && <div className="arena-home__profile-menu">
+                <span className="arena-home__profile-name">Кирилл <small>Демо-профиль</small></span>
+                <button type="button" onClick={() => { setProfileOpen(false); setSecurityModalVersion(externalSessionVersion) }}>Настроить 2FA</button>
+                <button type="button" disabled={isLoggingOut} onClick={() => void handleLogout()}>{isLoggingOut ? 'Выходим…' : 'Выйти'}</button>
+              </div>}
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="app-shell home-main">
-        {showMemorySessionNotice && (
-          <div className="memory-session-notice" role="status">
-            <span aria-hidden="true">!</span>
-            <p><strong>Сессия действует только в этой вкладке.</strong> После перезагрузки потребуется войти снова.</p>
-            <button type="button" onClick={dismissMemorySessionNotice} aria-label="Закрыть уведомление">×</button>
-          </div>
-        )}
-        <section className="welcome-section">
-          <div><p>Добро пожаловать на Арену <span>✦</span></p><h1>Какой разговор<br />потренируем сегодня?</h1></div>
-          <AppButton type="button" icon={<ArrowIcon />} onClick={() => setSelectedCase(recommendedCase)}>Начать тренировку</AppButton>
+      <main className="arena-home__shell arena-home__main">
+        {showMemorySessionNotice && <div className="memory-session-notice" role="status"><span aria-hidden="true">!</span><p><strong>Сессия действует только в этой вкладке.</strong> После перезагрузки потребуется войти снова.</p><button type="button" onClick={dismissMemorySessionNotice} aria-label="Закрыть уведомление">×</button></div>}
+
+        <section className="arena-home__welcome">
+          <h1>Добро пожаловать, Кирилл</h1>
+          <p>Продолжай тренировки и развивай переговорные навыки</p>
         </section>
 
-        <section className="home-overview">
-          <article className="recommended-card">
-            <div className="recommended-card__copy">
-              <span className="recommended-card__label"><i /> Рекомендуем сегодня</span>
-              <p>{recommendedCase.category} · {recommendedCase.duration}</p>
-              <h2>{recommendedCase.title}</h2>
-              <p className="recommended-card__description">Встреча с руководителем уже близко. Потренируй аргументы и подготовься к неудобным вопросам.</p>
-              <AppButton type="button" variant="light" icon={<ArrowIcon />} onClick={() => setSelectedCase(recommendedCase)}>Начать кейс</AppButton>
+        <div className="arena-home__overview">
+          <section className="arena-home__continue" aria-labelledby="continue-title">
+            <div className="arena-home__continue-head"><h2 id="continue-title">{activeSession ? 'Продолжить тренировку' : 'Начать тренировку'}</h2><span>▣ &nbsp;{activeSession ? 'В процессе' : 'Рекомендуем'}</span></div>
+            <div className="arena-home__continue-body">
+              <img src={activeSession ? caseArtwork[displayedCase.id] : heroArtwork} alt="" />
+              <div className="arena-home__continue-info">
+                <h3>{displayedCase.title}</h3>
+                <p>{displayedCase.category} · {displayedCase.duration}</p>
+                <div className="arena-home__preparation"><span>Подготовка: <strong>65%</strong></span><div role="meter" aria-label="Демо: прогресс подготовки" aria-valuenow={65} aria-valuemin={0} aria-valuemax={100}><i /></div></div>
+                {activeSession
+                  ? <Link className="arena-home__primary-button" to={`/arena/${activeSession.id}`}>Продолжить <span aria-hidden="true">→</span></Link>
+                  : <button className="arena-home__primary-button" type="button" onClick={() => setSelectedCase(recommendedCase)}>Начать кейс <span aria-hidden="true">→</span></button>}
+              </div>
             </div>
-            <div className="recommended-card__visual">
-              <div className="recommended-card__target"><span>Ваша цель</span><strong>Договориться о пересмотре условий</strong></div>
-              <div className="recommended-card__person"><div className="avatar avatar--large">А</div><div><span>Ваш оппонент</span><strong>{recommendedCase.opponent}</strong></div></div>
-              <div className="recommended-card__orb"><CaseIcon name={recommendedCase.icon} /></div>
-            </div>
-          </article>
+          </section>
 
-          <article className="progress-card" id="progress">
-            <div className="progress-card__head"><div><span>Ваш прогресс · демо</span><strong>Сентябрь</strong></div><span className="trend">↗ +8%</span></div>
-            <div className="progress-ring" style={{ '--progress': '72%' } as CSSProperties}><div><strong>7</strong><span>тренировок</span></div></div>
-            <div className="progress-card__stats"><div><span>Средняя оценка</span><strong>74</strong></div><div><span>В практике</span><strong>1ч 24м</strong></div></div>
-            <div className="progress-card__focus"><span>Фокус недели</span><strong>Больше открытых вопросов</strong><div><i /></div></div>
-          </article>
+          <section className="arena-home__progress" aria-labelledby="progress-title">
+            <h2 id="progress-title">Мой прогресс</h2>
+            <div className="arena-home__level"><div><strong>Уровень 4</strong><span>720 / 900 XP</span><div className="arena-home__bar"><i /></div></div><img src={profileArtwork} alt="" /></div>
+            <div className="arena-home__progress-stats"><div><span className="arena-home__bars" aria-hidden="true"><i /><i /><i /></span><p><strong>12</strong><span>тренировок</span></p></div><div><span aria-hidden="true">🔥</span><p><strong>Серия: 4 дня</strong><span>Отличная динамика!</span></p></div></div>
+          </section>
+        </div>
+
+        <section className="arena-home__cases" id="cases" aria-labelledby="home-cases-title">
+          <div className="arena-home__section-head"><h2 id="home-cases-title">Кейсы</h2><button type="button" onClick={() => setShowAllCases((value) => !value)} aria-expanded={showAllCases}>{showAllCases ? 'Свернуть' : 'Все кейсы'} <span aria-hidden="true">→</span></button></div>
+          <div className="arena-home__case-grid">{visibleCases.map((item) => <CaseCard key={item.id} item={item} onSelect={setSelectedCase} />)}</div>
         </section>
 
-        <section className="catalog-section" id="cases">
-          <div className="catalog-section__head"><div><p className="eyebrow">Библиотека практики</p><h2>Выбери ситуацию</h2></div><p>Каждый кейс можно проходить снова — оппонент будет реагировать по-новому.</p></div>
-          <div className="category-tabs" role="tablist" aria-label="Категории кейсов">
-            {caseCategories.map((item) => <button key={item} type="button" role="tab" aria-selected={category === item} className={category === item ? 'is-active' : ''} onClick={() => setCategory(item)}>{item}</button>)}
-          </div>
-          <div className="case-grid">{visibleCases.map((item) => <CaseCard key={item.id} item={item} onSelect={setSelectedCase} />)}</div>
-        </section>
-
-        <section className="recent-section">
-          <div className="recent-section__head"><div><p className="eyebrow">{isRealVoice ? 'История переговоров' : 'История · демо'}</p><h2>Последние тренировки</h2></div><span>{history.length} {historyCountLabel}</span></div>
-          <div className="recent-table">
-            {historyLoading && <p className="recent-empty" role="status">Загружаем историю…</p>}
-            {historyError && <div className="recent-empty" role="alert">{historyError} <button type="button" onClick={() => { setHistoryLoading(true); setHistoryError(null); void loadHistory() }}>Повторить</button></div>}
-            {!historyLoading && !historyError && history.length === 0 && <p className="recent-empty">Здесь появятся ваши тренировки. Выберите кейс и начните первый раунд.</p>}
-            {!historyLoading && !historyError && history.map((item) => {
-              const title = trainingCases.find(
-                (trainingCase) => trainingCase.id === item.caseId || trainingCase.title === item.name,
-              )?.title ?? item.name ?? 'Переговоры с AI'
-              const status = item.score !== undefined
-                ? `Результат ${item.score}/100`
-                : item.backendStatus === 'victory'
-                  ? 'Победа'
-                  : item.backendStatus === 'defeat'
-                    ? 'Поражение'
-                    : item.status === 'active' ? 'В процессе' : 'Завершено'
-              return <div className="recent-row" key={item.id}>
-                <div className="recent-row__icon">{item.mode === 'voice' ? '◉' : '↗'}</div><div className="recent-row__name"><strong>{title}</strong><span>{new Date(item.startedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })} · {item.mode === 'voice' ? 'голос' : 'текст'}</span><span className="recent-row__mobile-score">{status}</span></div><div className="recent-row__score"><span>{item.score === undefined ? 'Статус' : 'Результат'}</span><strong>{item.score === undefined ? status : <>{item.score}<small>/100</small></>}</strong></div><div className={`recent-row__change ${item.score === undefined ? 'is-neutral' : ''}`}>{item.score === undefined ? status : 'Готово'}</div>
-                <Link className="recent-row__link" to={item.status === 'active' ? `/arena/${item.id}` : `/result/${item.id}`} aria-label={`Открыть тренировку «${title}»`}><ArrowIcon /></Link>
+        <section className="arena-home__history" aria-labelledby="home-history-title">
+          <div className="arena-home__section-head"><h2 id="home-history-title">Последние тренировки</h2>{history.length > 3 && <button type="button" onClick={() => setShowAllHistory((value) => !value)} aria-expanded={showAllHistory}>{showAllHistory ? 'Свернуть' : 'Все поединки'} <span aria-hidden="true">→</span></button>}</div>
+          <div className="arena-home__history-list">
+            {historyLoading && <p className="arena-home__history-state" role="status">Загружаем историю…</p>}
+            {historyError && <div className="arena-home__history-state" role="alert">{historyError} <button type="button" onClick={() => { setHistoryLoading(true); setHistoryError(null); void loadHistory() }}>Повторить</button></div>}
+            {!historyLoading && !historyError && history.length === 0 && <p className="arena-home__history-state">Здесь появятся ваши тренировки. Выберите кейс и начните первый раунд.</p>}
+            {!historyLoading && !historyError && visibleHistory.map((item) => {
+              const title = trainingTitle(item)
+              return <div className="arena-home__history-row" key={item.id}>
+                <img src={caseArtwork[item.caseId] ?? heroArtwork} alt="" />
+                <div className="arena-home__history-title"><strong>{title}</strong><span>{item.mode === 'voice' ? 'Голос' : 'Текст'}</span></div>
+                <span className={`arena-home__history-status ${item.status === 'active' ? 'is-active' : item.backendStatus === 'victory' ? 'is-success' : item.backendStatus === 'defeat' ? 'is-failure' : 'is-neutral'}`}>{trainingStatus(item)}</span>
+                <time dateTime={item.startedAt}>{new Date(item.startedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</time>
+                <Link to={item.status === 'active' ? `/arena/${item.id}` : `/result/${item.id}`} aria-label={`Открыть тренировку «${title}»`}>{item.status === 'active' ? 'Продолжить' : 'Разбор'} <span aria-hidden="true">→</span></Link>
               </div>
             })}
           </div>
         </section>
       </main>
-
-      <footer className="app-home__footer"><div className="app-shell"><Logo /><span>Тренируйся сегодня — говори увереннее завтра.</span><span>Прототип · 2026</span></div></footer>
       {selectedCase && <TrainingModal item={selectedCase} onClose={() => setSelectedCase(null)} />}
       {securityModalVersion === externalSessionVersion && <TotpModal onClose={() => setSecurityModalVersion(null)} />}
     </div>

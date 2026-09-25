@@ -39,6 +39,7 @@ test('text arena creates, restores and finishes one atomic conversation without 
   await dialog.getByRole('button', { name: 'Начать тренировку' }).click()
   await expect(page).toHaveURL(/\/arena\/[0-9a-f-]+$/)
   await expect(page.getByRole('heading', { name: 'Начните разговор' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Моя подготовка' })).toBeVisible()
 
   const composer = page.getByLabel('Ваша реплика')
   await composer.fill('Хочу обсудить пересмотр зарплаты: за полгода я взял на себя два новых направления.')
@@ -82,6 +83,7 @@ test('text arena creates, restores and finishes one atomic conversation without 
 
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.getByRole('heading', { name: 'Повышение зарплаты' })).toBeVisible()
+  await expect(page.getByLabel('Ваша реплика')).toBeVisible()
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/arena-text-mobile.png`)
 

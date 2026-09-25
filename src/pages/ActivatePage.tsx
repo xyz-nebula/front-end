@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 
 import { getErrorMessage, getFieldErrors } from '@/auth/errors'
 import { useAuth } from '@/auth/useAuth'
-import { AuthShell } from '@/components/auth/AuthShell'
-import { AppButton } from '@/components/ui/AppButton'
-import { ArrowIcon } from '@/components/ui/ArrowIcon'
+import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
+import '@/styles/activation.css'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -14,6 +13,13 @@ type ActivationState =
   | { kind: 'checking' }
   | { kind: 'success' }
   | { kind: 'error'; message: string; canRetry: boolean }
+
+interface ActivationLayoutProps {
+  state: ActivationState['kind']
+  title: string
+  description: string
+  children: ReactNode
+}
 
 function getRegistrationEmail(state: unknown) {
   if (typeof state !== 'object' || state === null) return ''
@@ -46,26 +52,37 @@ function getInitialState(code: string, registrationEmail: string): ActivationSta
 }
 
 function ActivationMark({ state }: { state: ActivationState['kind'] }) {
-  if (state === 'checking') {
-    return <div className="activation-mark activation-mark--checking" aria-hidden="true"><span /></div>
-  }
-
   return (
-    <div className={`activation-mark activation-mark--${state}`} aria-hidden="true">
+    <div className={`activation-page__mark activation-page__mark--${state}`} aria-hidden="true">
       {state === 'waiting' && (
-        <svg viewBox="0 0 32 32">
-          <rect x="4.5" y="7.5" width="23" height="17" rx="3" />
-          <path d="m6 10 10 7.5L26 10" />
+        <svg viewBox="0 0 48 48">
+          <rect x="6" y="11" width="36" height="27" rx="4" />
+          <path d="m8 15 16 12 16-12" />
         </svg>
       )}
-      {state === 'success' && <svg viewBox="0 0 32 32"><path d="m8 16.5 5.2 5.2L24.5 10" /></svg>}
-      {state === 'error' && (
-        <svg viewBox="0 0 32 32">
-          <path d="M16 8v10" />
-          <path d="M16 23.5h.01" />
-        </svg>
-      )}
+      {state === 'checking' && <span className="activation-page__spinner" />}
+      {state === 'success' && <svg viewBox="0 0 48 48"><path d="m10 24 10 10 19-21" /></svg>}
+      {state === 'error' && <svg viewBox="0 0 48 48"><path d="M24 11v17" /><path d="M24 36h.01" /></svg>}
     </div>
+  )
+}
+
+function ActivationLayout({ state, title, description, children }: ActivationLayoutProps) {
+  return (
+    <main className={`activation-page activation-page--${state}`}>
+      <header className="activation-page__header">
+        <Link className="activation-page__brand" to="/" aria-label="Арена переговоров — на главную">
+          <ArenaCubeMark className="activation-page__brand-mark" />
+          <span>Арена переговоров</span>
+        </Link>
+      </header>
+      <section className="activation-page__card" aria-labelledby="activation-title">
+        <ActivationMark state={state} />
+        <h1 id="activation-title">{title}</h1>
+        <p className="activation-page__description">{description}</p>
+        {children}
+      </section>
+    </main>
   )
 }
 
@@ -79,6 +96,7 @@ export function ActivatePage() {
   const [activationState, setActivationState] = useState<ActivationState>(() => (
     getInitialState(queryCode, registrationEmail)
   ))
+  const [showResendNotice, setShowResendNotice] = useState(false)
   const attemptedQueryCodeRef = useRef<string | null>(null)
   const requestIdRef = useRef(0)
 
@@ -104,10 +122,7 @@ export function ActivatePage() {
       const fieldMessage = getFieldErrors(error).code
       setActivationState({
         kind: 'error',
-        message: fieldMessage ?? getErrorMessage(
-          error,
-          'Не удалось активировать аккаунт. Попробуйте ещё раз или запросите новую ссылку.',
-        ),
+        message: fieldMessage ?? getErrorMessage(error, 'Не удалось активировать аккаунт. Попробуйте ещё раз.'),
         canRetry: true,
       })
     }
@@ -121,87 +136,62 @@ export function ActivatePage() {
 
   if (activationState.kind === 'waiting') {
     return (
-      <AuthShell
-        eyebrow="Активация"
-        title="Проверьте почту"
-        description="Мы отправили письмо со ссылкой для активации аккаунта."
-      >
-        <div className="activation-state activation-state--waiting">
-          <ActivationMark state="waiting" />
-          <div className="activation-email">{registrationEmail}</div>
-          <p>Перейдите по ссылке в письме — код подставится и проверится автоматически.</p>
-          {demoActivationCode && (
-            <Link
-              className="demo-activation-link"
-              to={`/activate?code=${encodeURIComponent(demoActivationCode)}`}
-            >
-              Открыть demo-ссылку активации
-            </Link>
-          )}
+      <ActivationLayout state="waiting" title="Проверьте почту" description="Мы отправили письмо со ссылкой для активации аккаунта.">
+        <div className="activation-page__email">{registrationEmail}</div>
+        <div className="activation-page__instructions">
+          <p>Перейдите по ссылке в письме, чтобы подтвердить электронную почту.</p>
+          <p>После подтверждения можно будет продолжить работу в Арене.</p>
         </div>
-        <p className="auth-switch">Уже активировали аккаунт? <Link to="/login">Войти</Link></p>
-        <Link className="auth-back-link" to="/">← На главную</Link>
-      </AuthShell>
+        {demoActivationCode && (
+          <Link className="activation-page__demo-link" to={`/activate?code=${encodeURIComponent(demoActivationCode)}`}>
+            Открыть demo-ссылку активации
+          </Link>
+        )}
+        <div className="activation-page__waiting-actions">
+          <p>Не получили письмо? <button type="button" onClick={() => setShowResendNotice(true)}>Отправить повторно</button></p>
+          {showResendNotice && (
+            <p className="activation-page__notice" role="status">Письмо отправлено при регистрации. Повторная отправка пока недоступна.</p>
+          )}
+          <p>Уже подтвердили почту? <Link to="/login">Войти</Link></p>
+        </div>
+        <Link className="activation-page__back" to="/"><span aria-hidden="true">←</span> На главную</Link>
+      </ActivationLayout>
     )
   }
 
   if (activationState.kind === 'checking') {
     return (
-      <AuthShell
-        eyebrow="Активация"
-        title="Активируем аккаунт"
-        description="Проверяем код из ссылки. Обычно это занимает несколько секунд."
-      >
-        <div className="activation-state" role="status" aria-live="polite">
-          <ActivationMark state="checking" />
+      <ActivationLayout state="checking" title="Активируем аккаунт" description="Проверяем код из ссылки. Обычно это занимает несколько секунд.">
+        <div className="activation-page__message" role="status" aria-live="polite">
           <strong>Проверяем ссылку…</strong>
-          <p>Не закрывайте страницу, пока мы подтверждаем ваш email.</p>
+          <p>Не закрывайте страницу, пока мы подтверждаем вашу почту.</p>
         </div>
-      </AuthShell>
+      </ActivationLayout>
     )
   }
 
   if (activationState.kind === 'success') {
     return (
-      <AuthShell
-        eyebrow="Готово"
-        title="Аккаунт активирован"
-        description="Email подтверждён, а сессия уже сохранена. Можно переходить к тренировкам."
-      >
-        <div className="activation-state activation-state--success" role="status">
-          <ActivationMark state="success" />
-          <strong>Добро пожаловать на Арену</strong>
-          <p>Вы успешно активировали аккаунт.</p>
+      <ActivationLayout state="success" title="Аккаунт активирован" description="Электронная почта подтверждена. Теперь можно перейти к тренировкам.">
+        <div className="activation-page__message activation-page__message--success" role="status">
+          <strong>Добро пожаловать в Арену</strong>
+          <p>Ваш аккаунт готов к работе.</p>
         </div>
-        <AppButton to="/home" className="activation-action" icon={<ArrowIcon />}>
-          Перейти в приложение
-        </AppButton>
-      </AuthShell>
+        <Link className="activation-page__action" to="/home">Перейти в приложение <span aria-hidden="true">→</span></Link>
+      </ActivationLayout>
     )
   }
 
   return (
-    <AuthShell
-      eyebrow="Ошибка активации"
-      title="Ссылка не сработала"
-      description="Не удалось подтвердить email по этой ссылке."
-    >
-      <div className="activation-state activation-state--error">
-        <ActivationMark state="error" />
-        <div className="form-alert" role="alert">{activationState.message}</div>
-      </div>
+    <ActivationLayout state="error" title="Ссылка не сработала" description="Не удалось подтвердить почту по этой ссылке.">
+      <div className="activation-page__error" role="alert">{activationState.message}</div>
       {activationState.canRetry && (
-        <AppButton
-          type="button"
-          className="activation-action"
-          icon={<ArrowIcon />}
-          onClick={() => void submitActivation(queryCode)}
-        >
-          Попробовать снова
-        </AppButton>
+        <button className="activation-page__action" type="button" onClick={() => void submitActivation(queryCode)}>
+          Попробовать снова <span aria-hidden="true">→</span>
+        </button>
       )}
-      <p className="auth-switch">Аккаунт уже активирован? <Link to="/login">Войти</Link></p>
-      <Link className="auth-back-link" to="/">← На главную</Link>
-    </AuthShell>
+      <p className="activation-page__error-login">Аккаунт уже активирован? <Link to="/login">Войти</Link></p>
+      <Link className="activation-page__back" to="/"><span aria-hidden="true">←</span> На главную</Link>
+    </ActivationLayout>
   )
 }

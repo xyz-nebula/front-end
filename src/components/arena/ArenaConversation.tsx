@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 
+import profileArtwork from '@/assets/home/profile-kirill.webp'
+import directorArtwork from '@/assets/home/role-director.webp'
 import type { NegotiationMessage } from '@/types/negotiation'
 import type { NegotiationMode } from '@/types/negotiation'
 
@@ -28,9 +30,7 @@ export function ArenaConversation({ messages, opponent, isThinking, mode = 'text
       )}
       {messages.map((message) => (
         <article className={`arena-message arena-message--${message.speaker}`} key={message.id}>
-          <div className="arena-message__avatar" aria-hidden="true">
-            {message.speaker === 'user' ? 'Вы' : opponent.charAt(0)}
-          </div>
+          <img className="arena-message__avatar" src={message.speaker === 'user' ? profileArtwork : directorArtwork} alt="" />
           <div>
             <span>{message.speaker === 'user' ? 'Вы' : opponent}</span>
             <p>{message.text}</p>
@@ -39,7 +39,7 @@ export function ArenaConversation({ messages, opponent, isThinking, mode = 'text
       ))}
       {isThinking && (
         <article className="arena-message arena-message--ai arena-message--thinking" role="status">
-          <div className="arena-message__avatar" aria-hidden="true">{opponent.charAt(0)}</div>
+          <img className="arena-message__avatar" src={directorArtwork} alt="" />
           <div><span>{opponent}</span><p><i /><i /><i /><b>Формулирует ответ…</b></p></div>
         </article>
       )}
