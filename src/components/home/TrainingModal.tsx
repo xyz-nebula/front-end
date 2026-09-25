@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import profileArtwork from '@/assets/home/profile-kirill.webp'
@@ -19,6 +19,8 @@ interface CaseBrief {
   roles: [string, string]
   summaries: [string, string]
 }
+
+const SWIPE_CLOSE_THRESHOLD = 90
 
 const caseBriefs: Record<string, CaseBrief> = {
   'salary-review': {
@@ -66,6 +68,9 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const pendingCreateRef = useRef<PendingSessionCreate | null>(null)
   const startingRef = useRef(false)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const dragStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
   const brief = caseBriefs[item.id]
 
   useEffect(() => {
@@ -112,9 +117,57 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
     }
   }
 
+  const handleDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (isStarting || !event.isPrimary) return
+    dragStartRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // Synthetic pointer events used by tests do not create an active browser pointer.
+    }
+    setIsDragging(true)
+    setDragOffset(0)
+  }
+
+  const handleDragMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = dragStartRef.current
+    if (!start || start.pointerId !== event.pointerId) return
+    const deltaX = event.clientX - start.x
+    const deltaY = event.clientY - start.y
+    setDragOffset(deltaY > 0 && Math.abs(deltaX) < deltaY ? deltaY : 0)
+  }
+
+  const finishDrag = (event: ReactPointerEvent<HTMLDivElement>, cancelled = false) => {
+    const start = dragStartRef.current
+    if (!start || start.pointerId !== event.pointerId) return
+    const deltaX = event.clientX - start.x
+    const deltaY = event.clientY - start.y
+    dragStartRef.current = null
+    setIsDragging(false)
+    if (!cancelled && !isStarting && deltaY >= SWIPE_CLOSE_THRESHOLD && deltaY > Math.abs(deltaX)) {
+      onClose()
+      return
+    }
+    setDragOffset(0)
+  }
+
   return (
     <div className="home-case-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && !isStarting && onClose()}>
-      <section className="home-case-modal" role="dialog" aria-modal="true" aria-labelledby="training-modal-title">
+      <section
+        className={`home-case-modal ${isDragging ? 'is-dragging' : ''}`}
+        style={{ '--modal-drag-offset': `${dragOffset}px` } as CSSProperties}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="training-modal-title"
+      >
+        <div
+          className="home-case-modal__drag-handle"
+          aria-hidden="true"
+          onPointerDown={handleDragStart}
+          onPointerMove={handleDragMove}
+          onPointerUp={finishDrag}
+          onPointerCancel={(event) => finishDrag(event, true)}
+        ><span /></div>
         <div className="home-case-modal__scroll">
           <button className="home-case-modal__close" ref={closeButtonRef} type="button" onClick={onClose} disabled={isStarting} aria-label="Закрыть">×</button>
           <div className="home-case-modal__badges"><span>{item.category}</span><span>{item.difficulty}</span><span>{item.duration}</span></div>
