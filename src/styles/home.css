@@ -34,6 +34,12 @@
 .arena-home__continue, .arena-home__progress, .home-case-card, .arena-home__history-list { border: 1px solid var(--home-line); background: #fff; box-shadow: 0 9px 30px rgba(46, 99, 181, .035); }
 .arena-home__continue, .arena-home__progress { min-width: 0; min-height: 305px; border-radius: 18px; }
 .arena-home__continue { padding: 20px 25px 18px; }
+.arena-home__continue-skeleton { display: grid; height: 100%; gap: 22px; }
+.arena-home__continue-skeleton > div { display: grid; grid-template-columns: 45% 1fr; gap: 28px; min-height: 210px; }
+.arena-home__continue-skeleton span { display: block; border-radius: 12px; background: linear-gradient(100deg, #edf3fb 20%, #f8fbff 40%, #edf3fb 60%); background-size: 220% 100%; animation: home-skeleton 1.4s ease-in-out infinite; }
+.arena-home__skeleton-title { width: 34%; height: 29px; }
+.arena-home__skeleton-copy { align-self: center; height: 145px; }
+@keyframes home-skeleton { to { background-position-x: -220%; } }
 .arena-home__continue-head { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
 .arena-home__continue-head h2, .arena-home__progress h2 { margin: 0; font-size: clamp(23px, 2vw, 30px); line-height: 1.18; font-weight: 790; letter-spacing: -.035em; }
 .arena-home__continue-head > span { flex: none; padding: 9px 13px; border-radius: 11px; color: #075bcf; background: #eaf3ff; font-size: 14px; font-weight: 560; }
@@ -197,6 +203,9 @@
   .arena-home__overview { gap: 13px; }
   .arena-home__continue, .arena-home__progress { border-radius: 19px; }
   .arena-home__continue { padding: 18px 16px 20px; }
+  .arena-home__continue-skeleton { gap: 18px; }
+  .arena-home__continue-skeleton > div { grid-template-columns: 1fr; grid-template-rows: 190px 1fr; gap: 12px; }
+  .arena-home__skeleton-title { width: 60%; height: 24px; }
   .arena-home__continue-head h2, .arena-home__progress h2 { font-size: 23px; }
   .arena-home__continue-head > span { padding: 8px; font-size: 12px; }
   .arena-home__continue-body { grid-template-columns: 1fr; gap: 6px; margin-top: 8px; }

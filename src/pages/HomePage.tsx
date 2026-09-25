@@ -126,19 +126,24 @@ export function HomePage() {
         </section>
 
         <div className="arena-home__overview">
-          <section className="arena-home__continue" aria-labelledby="continue-title">
-            <div className="arena-home__continue-head"><h2 id="continue-title">{activeSession ? 'Продолжить тренировку' : 'Начать тренировку'}</h2><span>▣ &nbsp;{activeSession ? 'В процессе' : 'Рекомендуем'}</span></div>
-            <div className="arena-home__continue-body">
-              <img src={activeSession ? caseArtwork[displayedCase.id] : heroArtwork} alt="" />
-              <div className="arena-home__continue-info">
-                <h3>{displayedCase.title}</h3>
-                <p>{displayedCase.category} · {displayedCase.duration}</p>
-                <div className="arena-home__preparation"><span>Подготовка: <strong>65%</strong></span><div role="meter" aria-label="Демо: прогресс подготовки" aria-valuenow={65} aria-valuemin={0} aria-valuemax={100}><i /></div></div>
-                {activeSession
-                  ? <Link className="arena-home__primary-button" to={`/arena/${activeSession.id}`}>Продолжить <span aria-hidden="true">→</span></Link>
-                  : <button className="arena-home__primary-button" type="button" onClick={() => setSelectedCase(recommendedCase)}>Начать кейс <span aria-hidden="true">→</span></button>}
+          <section className="arena-home__continue" aria-labelledby={historyLoading ? undefined : 'continue-title'} aria-label={historyLoading ? 'Тренировка' : undefined}>
+            {historyLoading ? <div className="arena-home__continue-skeleton" role="status" aria-label="Загружаем тренировку">
+              <span className="arena-home__skeleton-title" />
+              <div><span className="arena-home__skeleton-image" /><span className="arena-home__skeleton-copy" /></div>
+            </div> : <>
+              <div className="arena-home__continue-head"><h2 id="continue-title">{activeSession ? 'Продолжить тренировку' : 'Начать тренировку'}</h2><span>▣ &nbsp;{activeSession ? 'В процессе' : 'Рекомендуем'}</span></div>
+              <div className="arena-home__continue-body">
+                <img src={activeSession ? caseArtwork[displayedCase.id] : heroArtwork} alt="" />
+                <div className="arena-home__continue-info">
+                  <h3>{displayedCase.title}</h3>
+                  <p>{displayedCase.category} · {displayedCase.duration}</p>
+                  <div className="arena-home__preparation"><span>Подготовка: <strong>65%</strong></span><div role="meter" aria-label="Демо: прогресс подготовки" aria-valuenow={65} aria-valuemin={0} aria-valuemax={100}><i /></div></div>
+                  {activeSession
+                    ? <Link className="arena-home__primary-button" to={`/arena/${activeSession.id}`}>Продолжить <span aria-hidden="true">→</span></Link>
+                    : <button className="arena-home__primary-button" type="button" onClick={() => setSelectedCase(recommendedCase)}>Начать кейс <span aria-hidden="true">→</span></button>}
+                </div>
               </div>
-            </div>
+            </>}
           </section>
 
           <section className="arena-home__progress" aria-labelledby="progress-title">

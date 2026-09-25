@@ -11,7 +11,11 @@ async function enterHome(page: import('@playwright/test').Page) {
   await page.getByRole('link', { name: 'Открыть demo-ссылку активации' }).click()
   await page.getByRole('link', { name: 'Перейти в приложение' }).click()
   await expect(page).toHaveURL(/\/home$/)
+  const continueCard = page.locator('.arena-home__continue')
+  await expect(continueCard.getByRole('status', { name: 'Загружаем тренировку' })).toBeVisible()
+  await expect(continueCard.getByText('Повышение зарплаты')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Кейсы' })).toBeVisible()
+  await expect(continueCard.getByRole('status', { name: 'Загружаем тренировку' })).toHaveCount(0)
 }
 
 test('home dashboard and case dialog fit desktop and mobile', async ({ page }) => {
