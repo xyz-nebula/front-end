@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useAuth } from '@/auth/useAuth'
@@ -14,8 +14,6 @@ import { useDomainServices } from '@/services/domainServices'
 import type { TrainingCase } from '@/types/case'
 import type { NegotiationSessionSummary } from '@/types/negotiation'
 import '@/styles/home.css'
-
-const featuredIds = ['salary-review', 'difficult-employee', 'team-conflict']
 
 function trainingTitle(item: NegotiationSessionSummary) {
   return trainingCases.find((trainingCase) => trainingCase.id === item.caseId || trainingCase.title === item.name)?.title
@@ -46,7 +44,6 @@ export function HomePage() {
   const [securityModalVersion, setSecurityModalVersion] = useState<number | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [showAllCases, setShowAllCases] = useState(false)
   const [showAllHistory, setShowAllHistory] = useState(false)
   const [history, setHistory] = useState<NegotiationSessionSummary[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
@@ -56,8 +53,6 @@ export function HomePage() {
   const activeSession = history.find((item) => item.status === 'active')
   const activeCase = activeSession && trainingCases.find((item) => item.id === activeSession.caseId)
   const displayedCase = activeCase ?? recommendedCase
-  const featuredCases = useMemo(() => featuredIds.map((id) => trainingCases.find((item) => item.id === id)).filter((item): item is TrainingCase => Boolean(item)), [])
-  const visibleCases = showAllCases ? trainingCases : featuredCases
   const visibleHistory = showAllHistory ? history : history.slice(0, 3)
 
   const handleLogout = async () => {
@@ -163,8 +158,8 @@ export function HomePage() {
         </div>
 
         <section className="arena-home__cases" id="cases" aria-labelledby="home-cases-title">
-          <div className="arena-home__section-head"><h2 id="home-cases-title">Кейсы</h2><button type="button" onClick={() => setShowAllCases((value) => !value)} aria-expanded={showAllCases}>{showAllCases ? 'Свернуть' : 'Все кейсы'} <span aria-hidden="true">→</span></button></div>
-          <div className="arena-home__case-grid">{visibleCases.map((item) => <CaseCard key={item.id} item={item} onSelect={setSelectedCase} />)}</div>
+          <div className="arena-home__section-head"><h2 id="home-cases-title">Кейсы</h2></div>
+          <div className="arena-home__case-grid">{trainingCases.map((item) => <CaseCard key={item.id} item={item} onSelect={setSelectedCase} />)}</div>
         </section>
 
         <section className="arena-home__history" aria-labelledby="home-history-title">
