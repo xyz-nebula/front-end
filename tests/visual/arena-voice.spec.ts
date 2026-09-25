@@ -1,4 +1,4 @@
-import { artifactsDir, captureScreenshot, expect, expectNoHorizontalOverflow, test } from './helpers'
+import { artifactsDir, captureScreenshot, expect, expectNoDocumentVerticalOverflow, expectNoHorizontalOverflow, test } from './helpers'
 
 test('mock registration, voice reconnect, committed history and result survive reload', async ({ page }) => {
   test.skip(process.env.VITE_AUTH_SOURCE !== 'mock' || process.env.VITE_NEGOTIATION_SOURCE !== 'mock' || process.env.VITE_AUDIO_SOURCE !== 'mock', 'Requires full mock mode.')
@@ -32,20 +32,24 @@ test('mock registration, voice reconnect, committed history and result survive r
   await expect(page.getByText('BATNA')).toBeVisible()
   await page.getByRole('button', { name: /Свернуть/ }).click()
   await page.getByRole('button', { name: 'Начать разговор' }).click()
-  await expect(page.locator('.voice-controls__partial')).toBeVisible()
+  await expect(page.locator('.arena-message--user.arena-message--partial')).toBeVisible()
+  await expect(page.locator('.voice-controls__partial')).toHaveCount(0)
+  await captureScreenshot(page, `${artifactsDir}/arena-voice-partial-desktop.png`)
   const beforeCommit = await page.evaluate(() => {
     const data = JSON.parse(window.localStorage.getItem('arena.mock.data.v1') ?? '{}') as { sessions?: Array<{ messages: unknown[] }> }
     return data.sessions?.[0]?.messages.length ?? 0
   })
   expect(beforeCommit).toBe(0)
+  await expect(page.locator('.arena-message--ai.arena-message--partial')).toBeVisible()
+  await expect(page.locator('.arena-message--partial')).toHaveCount(0)
   await expect(page.locator('.arena-message')).toHaveCount(2)
-  await expect(page.locator('.voice-controls__partial')).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/arena-voice-committed-desktop.png`)
 
   await page.getByRole('button', { name: 'Остановить' }).click()
   await page.getByRole('button', { name: 'Подключиться снова' }).click()
-  await expect(page.locator('.arena-message')).toHaveCount(4)
+  await expect(page.locator('.arena-message:not(.arena-message--partial)')).toHaveCount(4, { timeout: 10_000 })
+  await expect(page.locator('.arena-message--partial')).toHaveCount(0)
   const persisted = await page.evaluate(() => {
     const data = JSON.parse(window.localStorage.getItem('arena.mock.data.v1') ?? '{}') as { sessions?: Array<{ messages: Array<{ id: string; sequence: number }> }>; audioTickets?: Array<{ ticket: string }> }
     return { messages: data.sessions?.[0]?.messages ?? [], tickets: data.audioTickets?.length ?? 0 }
@@ -55,6 +59,7 @@ test('mock registration, voice reconnect, committed history and result survive r
   expect(persisted.tickets).toBe(2)
 
   await page.setViewportSize({ width: 390, height: 844 })
+  await page.evaluate(() => window.scrollTo(0, 0))
   const preparation = page.locator('.duel-preparation')
   await expect(preparation.getByRole('button', { name: /Моя подготовка/ })).toHaveAttribute('aria-expanded', 'false')
   await preparation.getByRole('button', { name: /Моя подготовка/ }).click()
@@ -63,6 +68,11 @@ test('mock registration, voice reconnect, committed history and result survive r
   await captureScreenshot(page, `${artifactsDir}/arena-voice-preparation-mobile.png`)
   await preparation.getByRole('button', { name: /Моя подготовка/ }).click()
   await captureScreenshot(page, `${artifactsDir}/arena-voice-mobile.png`)
+  await expectNoDocumentVerticalOverflow(page)
+  await page.setViewportSize({ width: 360, height: 800 })
+  await expectNoHorizontalOverflow(page)
+  await expectNoDocumentVerticalOverflow(page)
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.reload()
   await expect(page.locator('.arena-message')).toHaveCount(4)
   await expect(page.getByRole('button', { name: 'Начать разговор' })).toBeVisible()

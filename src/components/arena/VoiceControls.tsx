@@ -2,7 +2,6 @@ import type { AudioConnectionState } from '@/types/audio'
 
 interface VoiceControlsProps {
   state: AudioConnectionState
-  partial: { user: string; ai: string }
   error: string | null
   isPlaying: boolean
   disabled: boolean
@@ -19,7 +18,7 @@ const stateLabels: Record<AudioConnectionState, string> = {
   reconnecting: 'Переподключаемся…', error: 'Связь прервалась',
 }
 
-export function VoiceControls({ state, partial, error, isPlaying, disabled, isDemo = true, onConnect, onPause, onResume, onStop }: VoiceControlsProps) {
+export function VoiceControls({ state, error, isPlaying, disabled, isDemo = true, onConnect, onPause, onResume, onStop }: VoiceControlsProps) {
   const connecting = state === 'connecting' || state === 'reconnecting'
   const active = state === 'connected' || state === 'paused'
   const primaryLabel = state === 'idle' ? 'Начать разговор'
@@ -30,10 +29,6 @@ export function VoiceControls({ state, partial, error, isPlaying, disabled, isDe
 
   return (
     <div className="voice-controls">
-      {(partial.user || partial.ai) && <div className="voice-controls__partial" aria-live="polite">
-        {partial.user && <p><strong>Вы · распознаём</strong>{partial.user}</p>}
-        {partial.ai && <p><strong>Оппонент · отвечает</strong>{partial.ai}</p>}
-      </div>}
       {error && <p className="voice-controls__error" role="alert">{error}</p>}
       <div className="voice-controls__main">
         <span className="voice-controls__wave" aria-hidden="true">▂▅▃▆▄▂▅▃▆▄</span>

@@ -32,6 +32,11 @@ export type AudioConnectionState =
 
 export type AudioControlAction = 'pause' | 'resume' | 'stop' | 'close'
 
+export interface AudioTranscriptDrafts {
+  user: string
+  ai: string
+}
+
 export type AudioEngineEvent =
   | {
       type: 'transcript'

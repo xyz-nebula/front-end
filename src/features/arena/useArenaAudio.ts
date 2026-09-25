@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useDomainServices } from '@/services/domainServices'
 import type { AudioClient } from '@/services/contracts/audioClient'
-import type { AudioConnectionState, AudioEngineEvent } from '@/types/audio'
+import type { AudioConnectionState, AudioEngineEvent, AudioTranscriptDrafts } from '@/types/audio'
 import type { NegotiationMessage } from '@/types/negotiation'
 
 interface ArenaAudioState {
   state: AudioConnectionState
-  partial: { user: string; ai: string }
+  partial: AudioTranscriptDrafts
   error: string | null
   isPlaying: boolean
   connect: () => Promise<void>

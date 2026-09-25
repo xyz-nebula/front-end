@@ -107,7 +107,7 @@ export function ArenaPage() {
       <main className="duel-shell arena-layout">
         <section className="arena-dialog-panel">
           <h2 className="arena-dialog-panel__title">Диалог</h2>
-          <ArenaConversation messages={arena.session.messages} opponent={preparation?.opponentRole ?? trainingCase.opponent} isThinking={isSending} mode={arena.session.mode} />
+          <ArenaConversation messages={arena.session.messages} opponent={preparation?.opponentRole ?? trainingCase.opponent} isThinking={isSending} mode={arena.session.mode} partial={audio.partial} />
           {arena.error && <div className="arena-inline-error" role="alert"><span>{arena.error}</span><button type="button" onClick={() => arena.turnState === 'error' ? void arena.sendTextTurn() : setShowFinishDialog(true)}>Повторить</button></div>}
         </section>
         <DuelPreparation data={preparation} description={trainingCase.description} isRealVoice={isRealVoice} />
@@ -115,7 +115,7 @@ export function ArenaPage() {
           {isFinished ? (
             <div className="arena-finished" role="status"><div><strong>Переговоры завершены</strong><span>Открываем разбор…</span></div><Link to={`/result/${sessionId}`}>Посмотреть результат →</Link></div>
           ) : arena.session.mode === 'voice' ? (
-            <VoiceControls state={audio.state} partial={audio.partial} error={audio.error} isPlaying={audio.isPlaying} disabled={arena.viewState !== 'ready'} isDemo={!isRealVoice} onConnect={() => void audio.connect()} onPause={audio.pause} onResume={audio.resume} onStop={() => void audio.stop()} />
+            <VoiceControls state={audio.state} error={audio.error} isPlaying={audio.isPlaying} disabled={arena.viewState !== 'ready'} isDemo={!isRealVoice} onConnect={() => void audio.connect()} onPause={audio.pause} onResume={audio.resume} onStop={() => void audio.stop()} />
           ) : (
             <TextComposer
               value={arena.draft}

@@ -2,6 +2,7 @@ import {
   artifactsDir,
   captureScreenshot,
   expect,
+  expectNoDocumentVerticalOverflow,
   expectNoHorizontalOverflow,
   test,
 } from './helpers'
@@ -83,10 +84,16 @@ test('text arena creates, restores and finishes one atomic conversation without 
   await captureScreenshot(page, `${artifactsDir}/arena-text-desktop.png`)
 
   await page.setViewportSize({ width: 390, height: 844 })
+  await page.evaluate(() => window.scrollTo(0, 0))
   await expect(page.getByRole('heading', { name: 'Повышение зарплаты' })).toBeVisible()
   await expect(page.getByLabel('Ваша реплика')).toBeVisible()
   await expectNoHorizontalOverflow(page)
+  await expectNoDocumentVerticalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/arena-text-mobile.png`)
+  await page.setViewportSize({ width: 360, height: 800 })
+  await expectNoHorizontalOverflow(page)
+  await expectNoDocumentVerticalOverflow(page)
+  await page.setViewportSize({ width: 390, height: 844 })
 
   await page.getByRole('button', { name: 'Завершить' }).click()
   await expect(page.getByRole('heading', { name: 'Закончить переговоры?' })).toBeVisible()

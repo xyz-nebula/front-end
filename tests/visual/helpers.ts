@@ -16,6 +16,12 @@ export async function expectNoHorizontalOverflow(page: Page) {
     .toBe(true)
 }
 
+export async function expectNoDocumentVerticalOverflow(page: Page) {
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight))
+    .toBe(true)
+}
+
 export async function captureScreenshot(page: Page, path: string) {
   await page.screenshot({
     path,
