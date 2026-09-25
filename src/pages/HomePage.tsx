@@ -30,6 +30,15 @@ function trainingStatus(item: NegotiationSessionSummary) {
   return 'Завершено'
 }
 
+function trainingCountLabel(count: number) {
+  const lastTwoDigits = count % 100
+  const lastDigit = count % 10
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'тренировок'
+  if (lastDigit === 1) return 'тренировка'
+  if (lastDigit >= 2 && lastDigit <= 4) return 'тренировки'
+  return 'тренировок'
+}
+
 export function HomePage() {
   const { dismissMemorySessionNotice, externalSessionVersion, logout, showMemorySessionNotice } = useAuth()
   const { negotiationClient } = useDomainServices()
@@ -149,7 +158,7 @@ export function HomePage() {
           <section className="arena-home__progress" aria-labelledby="progress-title">
             <h2 id="progress-title">Мой прогресс</h2>
             <div className="arena-home__level"><div><strong>Уровень 4</strong><span>720 / 900 XP</span><div className="arena-home__bar"><i /></div></div><img src={profileArtwork} alt="" /></div>
-            <div className="arena-home__progress-stats"><div><span className="arena-home__bars" aria-hidden="true"><i /><i /><i /></span><p><strong>12</strong><span>тренировок</span></p></div><div><span aria-hidden="true">🔥</span><p><strong>Серия: 4 дня</strong><span>Отличная динамика!</span></p></div></div>
+            <div className="arena-home__progress-stats"><div><span className="arena-home__bars" aria-hidden="true"><i /><i /><i /></span><p><strong>{historyLoading ? '—' : history.length}</strong><span>{historyLoading ? 'загрузка' : trainingCountLabel(history.length)}</span></p></div><div><span aria-hidden="true">🔥</span><p><strong>Серия: 4 дня</strong><span>Отличная динамика!</span></p></div></div>
           </section>
         </div>
 

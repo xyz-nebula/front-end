@@ -12,8 +12,10 @@ async function enterHome(page: import('@playwright/test').Page) {
   await page.getByRole('link', { name: 'Перейти в приложение' }).click()
   await expect(page).toHaveURL(/\/home$/)
   const continueCard = page.locator('.arena-home__continue')
+  const progressCard = page.locator('.arena-home__progress')
   await expect(continueCard.getByRole('status', { name: 'Загружаем тренировку' })).toBeVisible()
   await expect(continueCard.getByText('Повышение зарплаты')).toHaveCount(0)
+  await expect(progressCard.getByText('—', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Кейсы' })).toBeVisible()
   await expect(continueCard.getByRole('status', { name: 'Загружаем тренировку' })).toHaveCount(0)
 }
@@ -24,6 +26,7 @@ test('home dashboard and case dialog fit desktop and mobile', async ({ page }) =
   await page.setViewportSize({ width: 1440, height: 900 })
   await enterHome(page)
   await expect(page.getByText('Здесь появятся ваши тренировки.')).toBeVisible()
+  await expect(page.locator('.arena-home__progress')).toContainText('0тренировок')
   await expectNoHorizontalOverflow(page)
   await page.screenshot({ path: `${artifactsDir}/home-dashboard-desktop.png`, animations: 'disabled', fullPage: true })
 
@@ -48,4 +51,10 @@ test('home dashboard and case dialog fit desktop and mobile', async ({ page }) =
   await page.getByRole('button', { name: 'Все кейсы' }).click()
   await expect(page.locator('.home-case-card')).toHaveCount(6)
   await expectNoHorizontalOverflow(page)
+
+  await page.getByRole('button', { name: 'Выбрать кейс «Повышение зарплаты»' }).click()
+  await page.getByRole('dialog', { name: 'Повышение зарплаты' }).getByRole('button', { name: 'Начать тренировку' }).click()
+  await expect(page).toHaveURL(/\/arena\/[0-9a-f-]+$/)
+  await page.goto('/home')
+  await expect(page.locator('.arena-home__progress')).toContainText('1тренировка')
 })
