@@ -17,7 +17,7 @@ const POLL_DELAYS = [400, 700, 1_000, 1_500, 2_000, 3_000]
 export function ResultPage() {
   const { sessionId = '' } = useParams()
   const navigate = useNavigate()
-  const { negotiationClient } = useDomainServices()
+  const { isRealVoice, negotiationClient } = useDomainServices()
   const [session, setSession] = useState<NegotiationSession | null>(null)
   const [result, setResult] = useState<NegotiationResultState | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -94,7 +94,9 @@ export function ResultPage() {
     }
   }, [navigate, negotiationClient, session])
 
-  const trainingCase = trainingCases.find((item) => item.id === session?.caseId)
+  const trainingCase = trainingCases.find(
+    (item) => item.id === session?.caseId || item.title === session?.name,
+  )
   const ready = result?.status === 'ready' ? result.result : null
   const isRestarting = restartingSessionId === session?.id
 
@@ -105,6 +107,7 @@ export function ResultPage() {
         <p className="eyebrow">Разбор переговоров · демо</p>
         <h1>{ready ? 'Ваш результат' : 'Разбор тренировки'}</h1>
         <p className="result-main__case">{trainingCase?.title ?? 'Переговоры'}{session && ` · ${session.mode === 'voice' ? 'Голос' : 'Текст'}`}</p>
+        {isRealVoice && <p className="result-demo-note" role="note">Это демонстрационный разбор интерфейса. Оценка и рекомендации не получены от backend или AI-сервиса.</p>}
         {ready ? (
           <>
             <section className="result-hero" aria-label="Итог"><div><span>{ready.outcome === 'victory' ? 'Цель достигнута' : 'Есть над чем поработать'}</span><strong>{ready.score}<small>/100</small></strong></div><p>{ready.summary}</p></section>

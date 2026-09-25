@@ -36,11 +36,17 @@ export function ServiceAdaptersProvider({ children }: { children: ReactNode }) {
       authClient,
       createNegotiationClient: (context) => {
         return config.negotiationSource === 'real'
-          ? new BackendNegotiationClient(context.runAuthorized)
+          ? new BackendNegotiationClient(context.runAuthorized, {
+              baseUrl: config.apiBaseUrl,
+              timeoutMs: config.apiTimeoutMs,
+            })
           : new MockNegotiationClient(mockRuntime, context.mockOwnerKey, config.mockLatencyMs)
       },
-      createAudioClient: () => config.audioSource === 'real'
-        ? new AudioEngineClient()
+      createAudioClient: (context) => config.audioSource === 'real'
+        ? new AudioEngineClient({
+            wsPath: config.audioWsUrl,
+            runAuthorized: context.runAuthorized,
+          })
         : new MockAudioClient(mockRuntime, { latencyMs: config.mockLatencyMs }),
     }
   }, [])

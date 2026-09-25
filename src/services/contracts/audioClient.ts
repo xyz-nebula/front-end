@@ -7,9 +7,11 @@ import type {
 import type { AudioTicket } from '@/types/negotiation'
 
 export interface AudioClient {
+  readonly requiresTicket?: boolean
+  readonly acceptsAudioInput?: boolean
   getState(): AudioConnectionState
-  connect(input: { sessionId: string; ticket: AudioTicket }): Promise<void>
-  sendAudio(frame: AudioInputFrame): void
+  connect(input: { sessionId: string; ticket?: AudioTicket }): Promise<void>
+  sendAudio(frame: AudioInputFrame | string): void
   sendControl(action: AudioControlAction): void
   subscribe(listener: (event: AudioEngineEvent) => void): () => void
   subscribeState(listener: (state: AudioConnectionState) => void): () => void

@@ -1,38 +1,31 @@
-# Границы OpenAPI
+# Границы API-контрактов
 
-[`openapi.json`](../openapi.json) передан backend-разработчиком. Это reference
-и контракт для согласования запросов/ответов, а не frontend backlog и не
-разрешение реализовать все перечисленные возможности.
+Источниками истины служат актуальные спецификации в удалённых репозиториях backend и audio-engine. Корневой `openapi.json` устарел и не используется при разработке, тестировании или генерации fixtures.
 
-Сейчас контракт `src/services/contracts/authClient.ts` и real adapter
-`src/services/real/backendAuthClient.ts` используют только auth/TOTP. При
-стандартном префиксе `/api` это:
+## Browser-facing маршруты
 
-| Метод | Путь |
-| --- | --- |
-| POST | `/api/v1/auth/register` |
-| POST | `/api/v1/auth/register/activate` |
-| POST | `/api/v1/auth/login` |
-| POST | `/api/v1/auth/token/refresh` |
-| POST | `/api/v1/auth/logout` |
-| POST | `/api/v1/auth/totp/enroll` |
-| POST | `/api/v1/auth/totp/confirm` |
-| DELETE | `/api/v1/auth/totp` |
+Frontend всегда работает через same-origin-префиксы:
 
-Кейсы, прогресс и тренировки остаются mock-функциональностью. Наличие chat
-и health в контракте само по себе не разрешает их подключение. Новые endpoint'ы,
-LLM, backend, WebSocket и другие интеграции требуют отдельной задачи.
+- `/api/v1/*` — HTTP backend;
+- `/audio/v1/audio-stream` — WebSocket audio-engine.
 
-Целевые negotiation/audio DTO и events документированы в README и проверяются
-fixtures, но соответствующие real adapters остаются `feature-unavailable` и не
-выполняют HTTP/WebSocket-запросов. Объявленный `AudioClient.sendAudio` не означает
-наличие capture-пути: microphone → PCM pipeline пока не реализован.
+Vite в dev и reverse proxy в production удаляют `/api` или `/audio` перед передачей запроса сервису. Абсолютные адреса сервисов не попадают в клиентскую конфигурацию.
 
-Контракт не редактируется попутно с frontend-задачами. Его обновление выполняется
-только отдельной синхронизацией с backend; расхождения нужно описывать и
-согласовывать, а не подгонять JSON под UI.
+## Используемые backend API
 
-Dev-прокси и настройка backend описаны в
-[README](../README.md#существующий-api-авторизации), сессионные
-правила — в [auth.md](auth.md). Playwright перехватывает auth/API и не требует
-живого backend; это тестовые mocks, а не характеристика runtime-интеграции.
+Auth/TOTP реализованы в `BackendAuthClient`. Реальные переговоры используют:
+
+| Метод | Browser path | Назначение |
+| --- | --- | --- |
+| POST | `/api/v1/chats/` | Создать чат |
+| GET | `/api/v1/chats/` | Получить список чатов |
+| GET | `/api/v1/chats/{uuid}` | Получить чат и сообщения |
+| PUT | `/api/v1/chats/active` | Выбрать чат для audio-engine |
+
+Frontend не создаёт голосовые сообщения через публичный message endpoint. Финальные транскрипции сохраняет audio-engine, после чего frontend перечитывает detail чата.
+
+## Audio-engine
+
+WebSocket использует JWT текущей auth-сессии и события удалённого AsyncAPI. После `auth_error` допускаются один refresh и одно повторное подключение. В браузере не логируются JWT и полный WebSocket URL.
+
+Runtime-парсеры находятся в `src/services/real/targetContract.ts`, а изолированные DTO fixtures — в `tests/fixtures/serviceContracts.ts`. Спецификации целиком в frontend не копируются.

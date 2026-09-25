@@ -6,21 +6,13 @@ import { defineConfig, loadEnv } from 'vite'
 
 export default defineConfig(({ command, isPreview, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const apiProxyTarget = env.API_PROXY_TARGET
-  const needsApiProxy = command === 'serve'
-    && !isPreview
-    && env.VITE_AUTH_SOURCE === 'real'
+  const apiProxyTarget = env.API_PROXY_TARGET || 'http://localhost:8080'
+  const audioProxyTarget = env.AUDIO_PROXY_TARGET || 'http://localhost:8081'
 
-  if (needsApiProxy && !apiProxyTarget) {
-    throw new Error(
-      'API_PROXY_TARGET is required when VITE_AUTH_SOURCE=real. Copy .env.example to .env and set the backend URL.',
-    )
-  }
-
-  if (apiProxyTarget) {
-    const protocol = new URL(apiProxyTarget).protocol
-    if (protocol !== 'http:' && protocol !== 'https:') {
-      throw new Error('API_PROXY_TARGET must be an absolute HTTP(S) URL.')
+  for (const [name, target] of [['API_PROXY_TARGET', apiProxyTarget], ['AUDIO_PROXY_TARGET', audioProxyTarget]]) {
+    const url = new URL(target)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error(`${name} must be an absolute HTTP(S) URL.`)
     }
   }
 
@@ -33,12 +25,18 @@ export default defineConfig(({ command, isPreview, mode }) => {
     },
     server: {
       host: '127.0.0.1',
-      ...(apiProxyTarget && {
+      ...(command === 'serve' && !isPreview && {
         proxy: {
           '/api': {
             target: apiProxyTarget,
             changeOrigin: true,
-            secure: true,
+            rewrite: (path) => path.replace(/^\/api/, ''),
+          },
+          '/audio': {
+            target: audioProxyTarget,
+            changeOrigin: true,
+            ws: true,
+            rewrite: (path) => path.replace(/^\/audio/, ''),
           },
         },
       }),

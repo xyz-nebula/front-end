@@ -16,7 +16,7 @@ import type { NegotiationSessionSummary } from '@/types/negotiation'
 
 export function HomePage() {
   const { dismissMemorySessionNotice, externalSessionVersion, logout, showMemorySessionNotice } = useAuth()
-  const { negotiationClient } = useDomainServices()
+  const { isRealVoice, negotiationClient } = useDomainServices()
   const [category, setCategory] = useState<CaseCategory>('Все')
   const [selectedCase, setSelectedCase] = useState<TrainingCase | null>(null)
   const [securityModalVersion, setSecurityModalVersion] = useState<number | null>(null)
@@ -118,17 +118,27 @@ export function HomePage() {
         </section>
 
         <section className="recent-section">
-          <div className="recent-section__head"><div><p className="eyebrow">История · демо</p><h2>Последние тренировки</h2></div><span>{history.length} {historyCountLabel}</span></div>
+          <div className="recent-section__head"><div><p className="eyebrow">{isRealVoice ? 'История переговоров' : 'История · демо'}</p><h2>Последние тренировки</h2></div><span>{history.length} {historyCountLabel}</span></div>
           <div className="recent-table">
             {historyLoading && <p className="recent-empty" role="status">Загружаем историю…</p>}
             {historyError && <div className="recent-empty" role="alert">{historyError} <button type="button" onClick={() => { setHistoryLoading(true); setHistoryError(null); void loadHistory() }}>Повторить</button></div>}
             {!historyLoading && !historyError && history.length === 0 && <p className="recent-empty">Здесь появятся ваши тренировки. Выберите кейс и начните первый раунд.</p>}
-            {!historyLoading && !historyError && history.map((item) => (
-              <div className="recent-row" key={item.id}>
-                <div className="recent-row__icon">{item.mode === 'voice' ? '◉' : '↗'}</div><div className="recent-row__name"><strong>{trainingCases.find((trainingCase) => trainingCase.id === item.caseId)?.title ?? 'Переговоры'}</strong><span>{new Date(item.startedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })} · {item.mode === 'voice' ? 'голос' : 'текст'}</span><span className="recent-row__mobile-score">{item.score === undefined ? (item.status === 'active' ? 'В процессе' : 'Анализ') : `Результат ${item.score}/100`}</span></div><div className="recent-row__score"><span>{item.score === undefined ? 'Статус' : 'Результат'}</span><strong>{item.score === undefined ? (item.status === 'active' ? 'В процессе' : 'Анализ') : <>{item.score}<small>/100</small></>}</strong></div><div className={`recent-row__change ${item.score === undefined ? 'is-neutral' : ''}`}>{item.score === undefined ? (item.status === 'active' ? 'В процессе' : 'Анализ') : 'Готово'}</div>
-                <Link className="recent-row__link" to={item.status === 'active' ? `/arena/${item.id}` : `/result/${item.id}`} aria-label={`Открыть тренировку «${trainingCases.find((trainingCase) => trainingCase.id === item.caseId)?.title ?? 'Переговоры'}»`}><ArrowIcon /></Link>
+            {!historyLoading && !historyError && history.map((item) => {
+              const title = trainingCases.find(
+                (trainingCase) => trainingCase.id === item.caseId || trainingCase.title === item.name,
+              )?.title ?? item.name ?? 'Переговоры с AI'
+              const status = item.score !== undefined
+                ? `Результат ${item.score}/100`
+                : item.backendStatus === 'victory'
+                  ? 'Победа'
+                  : item.backendStatus === 'defeat'
+                    ? 'Поражение'
+                    : item.status === 'active' ? 'В процессе' : 'Завершено'
+              return <div className="recent-row" key={item.id}>
+                <div className="recent-row__icon">{item.mode === 'voice' ? '◉' : '↗'}</div><div className="recent-row__name"><strong>{title}</strong><span>{new Date(item.startedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })} · {item.mode === 'voice' ? 'голос' : 'текст'}</span><span className="recent-row__mobile-score">{status}</span></div><div className="recent-row__score"><span>{item.score === undefined ? 'Статус' : 'Результат'}</span><strong>{item.score === undefined ? status : <>{item.score}<small>/100</small></>}</strong></div><div className={`recent-row__change ${item.score === undefined ? 'is-neutral' : ''}`}>{item.score === undefined ? status : 'Готово'}</div>
+                <Link className="recent-row__link" to={item.status === 'active' ? `/arena/${item.id}` : `/result/${item.id}`} aria-label={`Открыть тренировку «${title}»`}><ArrowIcon /></Link>
               </div>
-            ))}
+            })}
           </div>
         </section>
       </main>

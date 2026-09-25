@@ -41,6 +41,12 @@ export class MockNegotiationClient implements NegotiationClient {
     return this.runtime.getSession(ownerKey, sessionId)
   }
 
+  async activateSession(sessionId: string): Promise<void> {
+    const ownerKey = this.requireOwner()
+    await this.delay()
+    this.runtime.getSession(ownerKey, sessionId)
+  }
+
   async sendTextTurn(input: Parameters<NegotiationClient['sendTextTurn']>[0]) {
     const ownerKey = this.requireOwner()
     await this.delay()

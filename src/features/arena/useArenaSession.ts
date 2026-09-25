@@ -32,7 +32,7 @@ interface UseArenaSessionValue {
   draft: string
   setDraft: (value: string) => void
   reload: () => Promise<void>
-  refreshSession: () => Promise<void>
+  refreshSession: () => Promise<NegotiationSession | null>
   addCommittedMessage: (message: NegotiationMessage) => void
   sendTextTurn: () => Promise<void>
   finishSession: () => Promise<boolean>
@@ -223,9 +223,11 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
     try {
       const loaded = await arenaContext.negotiationClient.getSession(arenaContext.sessionId)
       if (isCurrent(arenaContext)) setSession(loaded)
+      return isCurrent(arenaContext) ? loaded : null
     } catch (caught) {
-      if (!isCurrent(arenaContext)) return
+      if (!isCurrent(arenaContext)) return null
       setError(errorMessage(caught, 'Не удалось обновить переговоры.'))
+      return null
     }
   }, [arenaContext, isCurrent])
 

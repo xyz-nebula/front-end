@@ -10,11 +10,13 @@ import type {
 export interface NegotiationClient {
   createSession(input: {
     caseId: string
+    caseName?: string
     mode: NegotiationMode
     clientCommandId: string
   }): Promise<NegotiationSession>
 
   getSession(sessionId: string): Promise<NegotiationSession>
+  activateSession(sessionId: string): Promise<void>
 
   sendTextTurn(input: {
     sessionId: string

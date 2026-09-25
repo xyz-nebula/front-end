@@ -20,7 +20,7 @@ export function useArenaAudio(
   sessionId: string,
   enabled: boolean,
   onCommitted: (message: NegotiationMessage) => void,
-  onReconnect: () => Promise<void>,
+  onReconnect: () => Promise<{ messages: NegotiationMessage[] } | null>,
 ): ArenaAudioState {
   const { createAudioClient, negotiationClient } = useDomainServices()
   const [state, setState] = useState<AudioConnectionState>('idle')
@@ -29,6 +29,10 @@ export function useArenaAudio(
   const [isPlaying, setIsPlaying] = useState(false)
   const clientRef = useRef<AudioClient | null>(null)
   const contextRef = useRef<AudioContext | null>(null)
+  const captureStreamRef = useRef<MediaStream | null>(null)
+  const captureSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const captureNodeRef = useRef<AudioWorkletNode | null>(null)
+  const captureMuteRef = useRef<GainNode | null>(null)
   const sourceRefs = useRef(new Set<AudioBufferSourceNode>())
   const playbackEndRef = useRef(0)
   const playbackGenerationRef = useRef(0)
@@ -39,9 +43,100 @@ export function useArenaAudio(
   const busyRef = useRef(false)
   const onCommittedRef = useRef(onCommitted)
   const onReconnectRef = useRef(onReconnect)
+  const transcriptSyncRef = useRef({ user: 0, ai: 0 })
 
   useEffect(() => { onCommittedRef.current = onCommitted }, [onCommitted])
   useEffect(() => { onReconnectRef.current = onReconnect }, [onReconnect])
+
+  const stopCapture = useCallback(() => {
+    const node = captureNodeRef.current
+    if (node) {
+      node.port.onmessage = null
+      node.port.postMessage('reset')
+      node.disconnect()
+    }
+    captureSourceRef.current?.disconnect()
+    captureMuteRef.current?.disconnect()
+    captureStreamRef.current?.getTracks().forEach((track) => {
+      track.onended = null
+      track.stop()
+    })
+    captureNodeRef.current = null
+    captureSourceRef.current = null
+    captureMuteRef.current = null
+    captureStreamRef.current = null
+  }, [])
+
+  const startCapture = useCallback(async (client: AudioClient, isCurrent: () => boolean) => {
+    if (!client.acceptsAudioInput) return
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('Этот браузер не поддерживает захват звука.')
+    }
+    stopCapture()
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
+    } catch (error) {
+      throw new Error(
+        error instanceof DOMException && error.name === 'NotAllowedError'
+          ? 'Разрешите доступ к микрофону и подключитесь снова.'
+          : 'Не удалось подключить микрофон. Проверьте выбранное устройство.',
+        { cause: error },
+      )
+    }
+    if (!isCurrent()) {
+      stream.getTracks().forEach((track) => track.stop())
+      return
+    }
+    captureStreamRef.current = stream
+
+    const context = contextRef.current ?? new AudioContext()
+    contextRef.current = context
+    await context.audioWorklet.addModule('/pcm-capture-worklet.js')
+    if (!isCurrent()) {
+      stream.getTracks().forEach((track) => track.stop())
+      return
+    }
+    const source = context.createMediaStreamSource(stream)
+    const node = new AudioWorkletNode(context, 'pcm-capture-processor', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [1],
+      channelCount: 1,
+    })
+    const mute = context.createGain()
+    mute.gain.value = 0
+    source.connect(node).connect(mute).connect(context.destination)
+    node.port.onmessage = (message: MessageEvent<ArrayBuffer>) => {
+      if (!isCurrent()) return
+      try {
+        const bytes = new Uint8Array(message.data)
+        let binary = ''
+        for (const byte of bytes) binary += String.fromCharCode(byte)
+        client.sendAudio(btoa(binary))
+      } catch (caught) {
+        stopCapture()
+        setError(caught instanceof Error ? caught.message : 'Не удалось передать звук. Подключитесь снова.')
+      }
+    }
+    const handleEnded = () => {
+      if (!isCurrent()) return
+      stopCapture()
+      setError('Микрофон отключён. Подключите устройство и начните разговор снова.')
+    }
+    stream.getAudioTracks().forEach((track) => { track.onended = handleEnded })
+    captureSourceRef.current = source
+    captureNodeRef.current = node
+    captureMuteRef.current = mute
+    await context.resume()
+  }, [stopCapture])
 
   const stopPlayback = useCallback(() => {
     playbackGenerationRef.current += 1
@@ -116,6 +211,7 @@ export function useArenaAudio(
     const playbackSources = sourceRefs.current
     const eventIds = eventIdsRef.current
     const committedMessageIds = committedMessageIdsRef.current
+    const transcriptSync = transcriptSyncRef.current
     const isCurrent = () => contextGenerationRef.current === generation && clientRef.current === client
     queueMicrotask(() => {
       if (!isCurrent()) return
@@ -126,7 +222,28 @@ export function useArenaAudio(
     })
     const unsubscribeEvent = client.subscribe((event) => {
       if (!isCurrent()) return
-      if (event.type === 'transcript_partial') {
+      if (event.type === 'transcript') {
+        setPartial((current) => ({ ...current, [event.speaker]: event.text }))
+        const syncId = ++transcriptSync[event.speaker]
+        void (async () => {
+          for (const delay of [250, 500, 1_000, 1_500, 2_000]) {
+            await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
+            if (!isCurrent() || transcriptSync[event.speaker] !== syncId) return
+            const refreshed = await onReconnectRef.current()
+            if (!isCurrent() || transcriptSync[event.speaker] !== syncId) return
+            const persisted = refreshed?.messages.some(
+              (message) => message.speaker === event.speaker && message.text === event.text,
+            )
+            if (persisted) {
+              setPartial((current) => ({ ...current, [event.speaker]: '' }))
+              return
+            }
+          }
+          if (isCurrent() && transcriptSync[event.speaker] === syncId) {
+            setError('Реплика получена, но пока не появилась в истории. Обновите диалог позже.')
+          }
+        })()
+      } else if (event.type === 'transcript_partial') {
         setPartial((current) => ({ ...current, [event.speaker]: event.text }))
       } else if (event.type === 'message_committed') {
         if (eventIds.has(event.eventId) || committedMessageIds.has(event.message.id)) return
@@ -142,6 +259,8 @@ export function useArenaAudio(
       } else if (event.type === 'closed') {
         setPartial({ user: '', ai: '' })
         stopPlayback()
+      } else if (event.type === 'auth_error') {
+        setError('Обновляем авторизацию голосового подключения…')
       }
     })
     const unsubscribeState = client.subscribeState((nextState) => {
@@ -149,6 +268,8 @@ export function useArenaAudio(
     })
     return () => {
       contextGenerationRef.current += 1
+      transcriptSync.user += 1
+      transcriptSync.ai += 1
       connectAttemptRef.current += 1
       busyRef.current = false
       unsubscribeEvent()
@@ -157,6 +278,7 @@ export function useArenaAudio(
         // The transport may already be unavailable; local cleanup below is mandatory.
       })
       if (clientRef.current === client) clientRef.current = null
+      stopCapture()
       eventIds.clear()
       committedMessageIds.clear()
       playbackGenerationRef.current += 1
@@ -173,7 +295,19 @@ export function useArenaAudio(
       void contextRef.current?.close()
       contextRef.current = null
     }
-  }, [createAudioClient, enabled, negotiationClient, playFrame, sessionId, stopPlayback])
+  }, [createAudioClient, enabled, negotiationClient, playFrame, sessionId, stopCapture, stopPlayback])
+
+  useEffect(() => {
+    if (!enabled || !navigator.mediaDevices?.addEventListener) return
+    const handleDeviceChange = () => {
+      if (!captureStreamRef.current) return
+      stopCapture()
+      setError('Состав аудиоустройств изменился. Подключитесь к голосовому раунду снова.')
+      void clientRef.current?.disconnect()
+    }
+    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
+    return () => navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
+  }, [enabled, stopCapture])
 
   const connect = useCallback(async () => {
     const client = clientRef.current
@@ -199,18 +333,26 @@ export function useArenaAudio(
     try {
       await onReconnectRef.current()
       if (!isCurrent()) return
-      const ticket = await negotiationClient.createAudioTicket(sessionId)
+      await negotiationClient.activateSession(sessionId)
       if (!isCurrent()) return
-      await client.connect({ sessionId, ticket })
+      const ticket = client.requiresTicket
+        ? await negotiationClient.createAudioTicket(sessionId)
+        : undefined
+      if (!isCurrent()) return
+      await client.connect({ sessionId, ...(ticket ? { ticket } : {}) })
+      if (!isCurrent()) return
+      await startCapture(client, isCurrent)
     } catch (caught) {
       if (isCurrent()) {
+        stopCapture()
+        await client.disconnect().catch(() => undefined)
         setError(caught instanceof Error ? caught.message : 'Не удалось подключить голосовой диалог.')
         setState('error')
       }
     } finally {
       if (isCurrent()) busyRef.current = false
     }
-  }, [enabled, negotiationClient, sessionId])
+  }, [enabled, negotiationClient, sessionId, startCapture, stopCapture])
 
   const stop = useCallback(async () => {
     connectAttemptRef.current += 1
@@ -227,6 +369,7 @@ export function useArenaAudio(
     } catch {
       transportFailed = true
     } finally {
+      stopCapture()
       stopPlayback()
       setPartial({ user: '', ai: '' })
       setState('stopped')
@@ -234,9 +377,10 @@ export function useArenaAudio(
         setError('Аудиосвязь недоступна. Локальные ресурсы освобождены, тренировку можно завершить.')
       }
     }
-  }, [stopPlayback])
+  }, [stopCapture, stopPlayback])
 
   const pause = useCallback(() => {
+    captureNodeRef.current?.port.postMessage('pause')
     try {
       clientRef.current?.sendControl('pause')
     } catch {
@@ -252,6 +396,7 @@ export function useArenaAudio(
   }, [])
 
   const resume = useCallback(() => {
+    captureNodeRef.current?.port.postMessage('resume')
     try {
       clientRef.current?.sendControl('resume')
     } catch {

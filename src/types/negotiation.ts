@@ -13,8 +13,10 @@ export interface NegotiationMessage {
 export interface NegotiationSession {
   id: string
   caseId: string
+  name?: string
   mode: NegotiationMode
   status: NegotiationStatus
+  backendStatus?: 'ongoing' | 'victory' | 'defeat'
   startedAt: string
   finishedAt?: string
   messages: NegotiationMessage[]
@@ -33,8 +35,10 @@ export interface NegotiationResult {
 export interface NegotiationSessionSummary {
   id: string
   caseId: string
+  name?: string
   mode: NegotiationMode
   status: NegotiationStatus
+  backendStatus?: 'ongoing' | 'victory' | 'defeat'
   startedAt: string
   finishedAt?: string
   score?: number

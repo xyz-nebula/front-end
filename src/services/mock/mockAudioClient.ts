@@ -38,6 +38,8 @@ function mockAudioPayload(): string {
 }
 
 export class MockAudioClient implements AudioClient {
+  readonly requiresTicket = true
+  readonly acceptsAudioInput = false
   private state: AudioConnectionState = 'idle'
   private readonly eventListeners = new Set<EventListener>()
   private readonly stateListeners = new Set<StateListener>()
@@ -107,7 +109,7 @@ export class MockAudioClient implements AudioClient {
     }
   }
 
-  async connect(input: { sessionId: string; ticket: AudioTicket }): Promise<void> {
+  async connect(input: { sessionId: string; ticket?: AudioTicket }): Promise<void> {
     const reconnecting = this.state !== 'idle'
     this.generation += 1
     const generation = this.generation
@@ -120,6 +122,11 @@ export class MockAudioClient implements AudioClient {
     this.setState(reconnecting ? 'reconnecting' : 'connecting')
 
     try {
+      if (!input.ticket) {
+        throw new ServiceError('Mock audio ticket не найден.', {
+          reason: 'expired-audio-ticket', code: 'MOCK_AUDIO_TICKET_REQUIRED', recoverable: true,
+        })
+      }
       const connection = await this.runtime.consumeAudioTicket(input.sessionId, input.ticket)
       if (generation !== this.generation) return
       await this.requestMicrophone(generation)
@@ -215,7 +222,7 @@ export class MockAudioClient implements AudioClient {
     }
   }
 
-  sendAudio(frame: AudioInputFrame): void {
+  sendAudio(frame: AudioInputFrame | string): void {
     void frame
     if (this.state !== 'connected' && this.state !== 'paused') {
       throw new ServiceError('Audio connection не установлено.', {
