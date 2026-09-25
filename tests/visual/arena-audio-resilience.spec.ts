@@ -10,7 +10,7 @@ test('audio client and pending connection work stay bound to the current arena c
   expect(result).toEqual({
     whileBConnects: {
       reconnectBCalls: 1,
-      partial: { user: '', ai: '' },
+      partial: { user: null, ai: null },
       clientAConnects: 0,
     },
     afterReconnect: {
@@ -22,6 +22,32 @@ test('audio client and pending connection work stay bound to the current arena c
     afterUserChange: { clientBDisconnects: 1, clientBListeners: 0 },
     afterUnmount: { disconnects: 1, listeners: 0 },
   })
+})
+
+test('transcript deltas type into one bubble and committed text does not flash or duplicate', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(async () => {
+    const { runTranscriptStreamingScenario } = await import('/tests/visual/arena-audio-harness.tsx')
+    return runTranscriptStreamingScenario()
+  })
+
+  expect(result.duringDelta).toMatchObject({
+    target: 'Добрый день',
+    bubbles: 1,
+    hasEmptyState: true,
+  })
+  expect(result.duringDelta.displayed).not.toBe('Добрый день')
+  expect(result.duringDelta.displayed?.length).toBeGreaterThan(0)
+  expect(result.immediatelyAfterCommit).toMatchObject({ phase: 'finishing', bubbles: 1 })
+  expect(result.immediatelyAfterCommit.displayed).not.toBe('Добрый день')
+  expect(result.afterCommit).toEqual({
+    partial: null,
+    texts: ['Добрый день'],
+    bubbles: 1,
+  })
+  expect(result.userSnapshot.target).toBe('Моя реплика')
+  expect(result.userSnapshot.displayed?.length).toBeGreaterThan(0)
+  expect(result.userSnapshot.displayed).not.toBe('Моя реплика')
 })
 
 test('queues PCM frames and invalidates scheduled playback during cleanup', async ({ page }) => {

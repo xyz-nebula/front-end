@@ -72,7 +72,7 @@ Backend-контур:
 
 Для истории frontend ограниченно параллельно загружает detail каждого чата. История backend является источником истины: сообщения дедуплицируются по `uuid` и сортируются по `sequence`. Frontend не отправляет голосовые транскрипты в message endpoint.
 
-Audio-engine подключается через `/audio/v1/audio-stream?token=...`. Входные чанки — base64 mono PCM s16le, 24 кГц. Поддерживаются `audio`, `control`, `audio_frame`, `transcript`, `error` и `auth_error`. После финального транскрипта frontend перечитывает backend-чат, чтобы получить сохранённые `uuid` и `sequence`.
+Audio-engine подключается через `/audio/v1/audio-stream?token=...`. Входные чанки — base64 mono PCM s16le, 24 кГц. Поддерживаются `audio`, `control`, `audio_frame`, `transcript`, `error` и `auth_error`; поле `text` события `transcript` содержит очередную текстовую дельту. После финального транскрипта frontend перечитывает backend-чат, чтобы получить сохранённые `uuid` и `sequence`.
 
 ## Маршруты и документация
 

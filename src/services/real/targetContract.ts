@@ -29,7 +29,7 @@ export interface AudioFormatDto {
 }
 
 export type RemoteAudioEngineEvent =
-  | { type: 'transcript'; speaker: MessageSpeaker; text: string }
+  | { type: 'transcript_delta'; speaker: MessageSpeaker; text: string }
   | { type: 'audio_frame'; sequence: number; timestamp: number; format: AudioFormat; payload: string }
   | { type: 'error'; code: string; message: string }
   | {
@@ -59,6 +59,10 @@ function record(value: unknown, path: string): Record<string, unknown> {
 
 function nonEmptyString(value: unknown, path: string): string {
   return typeof value === 'string' && value.trim().length > 0 ? value : invalidResponse(path)
+}
+
+function nonEmptyChunk(value: unknown, path: string): string {
+  return typeof value === 'string' && value.length > 0 ? value : invalidResponse(path)
 }
 
 function uuid(value: unknown, path: string): string {
@@ -139,7 +143,11 @@ export function parseAudioEngineEvent(value: unknown): RemoteAudioEngineEvent {
   const type = oneOf(dto.type, ['transcript', 'audio_frame', 'error', 'auth_error'], 'audioEvent.type')
   if (type === 'transcript') {
     const role = oneOf(dto.role, ['user', 'assistant'], 'audioEvent.role')
-    return { type, speaker: role === 'assistant' ? 'ai' : 'user', text: nonEmptyString(dto.text, 'audioEvent.text') }
+    return {
+      type: 'transcript_delta',
+      speaker: role === 'assistant' ? 'ai' : 'user',
+      text: nonEmptyChunk(dto.text, 'audioEvent.text'),
+    }
   }
   if (type === 'audio_frame') {
     return {

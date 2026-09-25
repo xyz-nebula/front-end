@@ -68,5 +68,6 @@ export const MESSAGE_RECONCILIATION = {
   persistedIdentity: 'message.id',
   ordering: 'message.sequence',
   audioEventIdentity: 'eventId-per-connection',
-  partialTranscript: 'replace-snapshot',
+  remoteTranscript: 'append-delta',
+  mockPartialTranscript: 'replace-snapshot',
 } as const

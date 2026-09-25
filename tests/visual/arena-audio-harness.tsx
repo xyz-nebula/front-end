@@ -1,6 +1,7 @@
-import { act, useLayoutEffect } from 'react'
+import { act, useLayoutEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
+import { ArenaConversation } from '@/components/arena/ArenaConversation'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
 import type { AudioClient } from '@/services/contracts/audioClient'
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
@@ -71,8 +72,8 @@ function ticket(value: string): AudioTicket {
   return { ticket: value, expiresAt: '2026-09-23T09:00:00.000Z', protocol: 'audio-engine.v1' }
 }
 
-function message(id: string, text: string): NegotiationMessage {
-  return { id, sequence: 1, speaker: 'ai', text, createdAt: '2026-09-23T08:00:00.000Z' }
+function message(id: string, text: string, speaker: NegotiationMessage['speaker'] = 'ai'): NegotiationMessage {
+  return { id, sequence: 1, speaker, text, createdAt: '2026-09-23T08:00:00.000Z' }
 }
 
 interface RenderInput {
@@ -190,4 +191,89 @@ export async function runAudioContextScenario() {
   ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
 
   return { whileBConnects, afterReconnect, afterUserChange, afterUnmount }
+}
+
+export async function runTranscriptStreamingScenario() {
+  ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  const audioClient = new TestAudioClient()
+  let latest: AudioValue | null = null
+
+  function Probe() {
+    const [messages, setMessages] = useState<NegotiationMessage[]>([])
+    const value = useArenaAudio(
+      'streaming-arena',
+      true,
+      (next) => setMessages((current) => [...current.filter((item) => item.id !== next.id), next]),
+      async () => null,
+    )
+    useLayoutEffect(() => { latest = value }, [value])
+    return <ArenaConversation messages={messages} opponent="Оппонент" isThinking={false} mode="voice" partial={value.partial} />
+  }
+
+  await act(async () => {
+    root.render(
+      <DomainServicesContext.Provider value={{
+        negotiationClient: negotiationClient(() => Promise.resolve(ticket('streaming-ticket'))),
+        createAudioClient: () => audioClient,
+      }}>
+        <Probe />
+      </DomainServicesContext.Provider>,
+    )
+  })
+  const value = () => {
+    if (!latest) throw new Error('Streaming harness has not rendered')
+    return latest
+  }
+  const wait = async (milliseconds: number) => {
+    await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, milliseconds)) })
+  }
+
+  await act(async () => {
+    audioClient.emit({ type: 'transcript_delta', speaker: 'ai', text: 'Доб' })
+    audioClient.emit({ type: 'transcript_delta', speaker: 'ai', text: 'рый' })
+    audioClient.emit({ type: 'transcript_delta', speaker: 'ai', text: ' ' })
+    audioClient.emit({ type: 'transcript_delta', speaker: 'ai', text: 'день' })
+  })
+  await wait(45)
+  const duringDelta = {
+    displayed: value().partial.ai?.text,
+    target: value().partial.ai?.targetText,
+    bubbles: host.querySelectorAll('.arena-message').length,
+    hasEmptyState: Boolean(host.querySelector('.arena-conversation__empty')),
+  }
+
+  await act(async () => {
+    audioClient.emit({
+      type: 'message_committed', eventId: 'committed-ai',
+      message: message('streamed-ai', 'Добрый день'),
+    })
+  })
+  const immediatelyAfterCommit = {
+    displayed: value().partial.ai?.text,
+    phase: value().partial.ai?.phase,
+    bubbles: host.querySelectorAll('.arena-message').length,
+  }
+  await wait(300)
+  const afterCommit = {
+    partial: value().partial.ai,
+    texts: Array.from(host.querySelectorAll('.arena-message p'), (node) => node.textContent),
+    bubbles: host.querySelectorAll('.arena-message').length,
+  }
+
+  await act(async () => {
+    audioClient.emit({ type: 'transcript_partial', speaker: 'user', text: 'Моя реплика' })
+  })
+  await wait(45)
+  const userSnapshot = {
+    displayed: value().partial.user?.text,
+    target: value().partial.user?.targetText,
+  }
+
+  await act(async () => root.unmount())
+  host.remove()
+  ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
+  return { duringDelta, immediatelyAfterCommit, afterCommit, userSnapshot }
 }

@@ -14,12 +14,15 @@ interface ArenaConversationProps {
   partial?: AudioTranscriptDrafts
 }
 
-export function ArenaConversation({ messages, opponent, isThinking, mode = 'text', partial = { user: '', ai: '' } }: ArenaConversationProps) {
+export function ArenaConversation({ messages, opponent, isThinking, mode = 'text', partial = { user: null, ai: null } }: ArenaConversationProps) {
   const endRef = useRef<HTMLDivElement | null>(null)
+  const streamingMessageIds = new Set(
+    (['user', 'ai'] as const).flatMap((speaker) => partial[speaker]?.committedMessageId ?? []),
+  )
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  }, [isThinking, messages, partial.ai, partial.user])
+  }, [isThinking, messages, partial.ai?.text, partial.user?.text])
 
   return (
     <section className="arena-conversation" aria-label="Диалог переговоров" aria-live="polite">
@@ -30,7 +33,7 @@ export function ArenaConversation({ messages, opponent, isThinking, mode = 'text
           <p>{mode === 'voice' ? 'Начните голосовой раунд. Реплики появятся здесь после сохранения.' : 'Представьтесь, обозначьте цель встречи или задайте первый открытый вопрос.'}</p>
         </div>
       )}
-      {messages.map((message) => (
+      {messages.filter((message) => !streamingMessageIds.has(message.id)).map((message) => (
         <article className={`arena-message arena-message--${message.speaker}`} key={message.id}>
           <img className="arena-message__avatar" src={message.speaker === 'user' ? profileArtwork : directorArtwork} alt="" />
           <div>
@@ -39,12 +42,12 @@ export function ArenaConversation({ messages, opponent, isThinking, mode = 'text
           </div>
         </article>
       ))}
-      {(['user', 'ai'] as const).map((speaker) => partial[speaker] && (
-        <article className={`arena-message arena-message--${speaker} arena-message--partial`} key={`partial-${speaker}`} role="status">
+      {(['user', 'ai'] as const).map((speaker) => partial[speaker]?.text && (
+        <article className={`arena-message arena-message--${speaker} arena-message--partial`} key={`partial-${speaker}`} aria-live="off">
           <img className="arena-message__avatar" src={speaker === 'user' ? profileArtwork : directorArtwork} alt="" />
           <div>
             <span>{speaker === 'user' ? 'Вы · распознаём' : `${opponent} · отвечает`}</span>
-            <p>{partial[speaker]}<i className="arena-message__typing-cursor" aria-hidden="true" /></p>
+            <p>{partial[speaker]?.text}<i className="arena-message__typing-cursor" aria-hidden="true" /></p>
           </div>
         </article>
       ))}

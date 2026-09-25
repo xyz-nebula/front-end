@@ -46,17 +46,23 @@ test('target audio event fixtures validate and preserve event semantics', () => 
   const events = audioEventFixtures.map(parseAudioEngineEvent)
 
   expect(events.map((event) => event.type)).toEqual([
-    'transcript',
+    'transcript_delta',
     'audio_frame',
     'error',
     'auth_error',
   ])
   expect(events[0]).toEqual({
-    type: 'transcript',
+    type: 'transcript_delta',
     speaker: 'user',
     text: 'Предлагаю согласовать',
   })
   expect(events[3]).toMatchObject({ code: 'expired_token' })
+
+  expect(parseAudioEngineEvent({ type: 'transcript', role: 'assistant', text: ' ' })).toEqual({
+    type: 'transcript_delta',
+    speaker: 'ai',
+    text: ' ',
+  })
 })
 
 test('invalid DTO and event payloads fail with a typed invalid-response error', () => {

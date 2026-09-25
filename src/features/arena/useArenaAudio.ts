@@ -3,7 +3,23 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDomainServices } from '@/services/domainServices'
 import type { AudioClient } from '@/services/contracts/audioClient'
 import type { AudioConnectionState, AudioEngineEvent, AudioTranscriptDrafts } from '@/types/audio'
-import type { NegotiationMessage } from '@/types/negotiation'
+import type { MessageSpeaker, NegotiationMessage } from '@/types/negotiation'
+
+const TYPING_INTERVAL_MS = 30
+const FINISHING_INTERVAL_MS = 12
+const STREAM_SETTLE_MS = 40
+
+interface TranscriptStream {
+  targetText: string
+  text: string
+  phase: 'receiving' | 'finishing'
+  committedMessageId?: string
+  timer?: number
+}
+
+function emptyDrafts(): AudioTranscriptDrafts {
+  return { user: null, ai: null }
+}
 
 interface ArenaAudioState {
   state: AudioConnectionState
@@ -24,7 +40,7 @@ export function useArenaAudio(
 ): ArenaAudioState {
   const { createAudioClient, negotiationClient } = useDomainServices()
   const [state, setState] = useState<AudioConnectionState>('idle')
-  const [partial, setPartial] = useState({ user: '', ai: '' })
+  const [partial, setPartial] = useState<AudioTranscriptDrafts>(emptyDrafts)
   const [error, setError] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const clientRef = useRef<AudioClient | null>(null)
@@ -44,6 +60,7 @@ export function useArenaAudio(
   const onCommittedRef = useRef(onCommitted)
   const onReconnectRef = useRef(onReconnect)
   const transcriptSyncRef = useRef({ user: 0, ai: 0 })
+  const clearStreamsRef = useRef<() => void>(() => undefined)
 
   useEffect(() => { onCommittedRef.current = onCommitted }, [onCommitted])
   useEffect(() => { onReconnectRef.current = onReconnect }, [onReconnect])
@@ -212,18 +229,88 @@ export function useArenaAudio(
     const eventIds = eventIdsRef.current
     const committedMessageIds = committedMessageIdsRef.current
     const transcriptSync = transcriptSyncRef.current
+    const streams: Record<MessageSpeaker, TranscriptStream> = {
+      user: { targetText: '', text: '', phase: 'receiving' },
+      ai: { targetText: '', text: '', phase: 'receiving' },
+    }
+    const publishStream = (speaker: MessageSpeaker) => {
+      const stream = streams[speaker]
+      setPartial((current) => ({
+        ...current,
+        [speaker]: stream.text || stream.targetText ? {
+          text: stream.text,
+          targetText: stream.targetText,
+          phase: stream.phase,
+          ...(stream.committedMessageId ? { committedMessageId: stream.committedMessageId } : {}),
+        } : null,
+      }))
+    }
+    const clearStream = (speaker: MessageSpeaker) => {
+      const stream = streams[speaker]
+      if (stream.timer !== undefined) window.clearTimeout(stream.timer)
+      streams[speaker] = { targetText: '', text: '', phase: 'receiving' }
+      setPartial((current) => ({ ...current, [speaker]: null }))
+    }
+    const scheduleTyping = (speaker: MessageSpeaker) => {
+      const stream = streams[speaker]
+      if (stream.timer !== undefined) return
+      const tick = () => {
+        if (!isCurrent()) return
+        const current = streams[speaker]
+        current.timer = undefined
+        if (!current.targetText.startsWith(current.text)) {
+          const retainedLength = Math.min(current.text.length, current.targetText.length)
+          current.text = current.targetText.slice(0, retainedLength)
+        }
+        const remaining = current.targetText.length - current.text.length
+        if (remaining > 0) {
+          const step = current.phase === 'finishing' ? Math.max(1, Math.ceil(remaining / 12)) : 1
+          current.text = current.targetText.slice(0, current.text.length + step)
+          publishStream(speaker)
+          current.timer = window.setTimeout(
+            tick,
+            current.phase === 'finishing' ? FINISHING_INTERVAL_MS : TYPING_INTERVAL_MS,
+          )
+        } else if (current.committedMessageId) {
+          current.timer = window.setTimeout(() => {
+            if (isCurrent() && streams[speaker] === current) clearStream(speaker)
+          }, STREAM_SETTLE_MS)
+        }
+      }
+      stream.timer = window.setTimeout(tick, 0)
+    }
+    const updateStream = (speaker: MessageSpeaker, targetText: string, append: boolean) => {
+      const stream = streams[speaker]
+      stream.targetText = append ? stream.targetText + targetText : targetText
+      if (!stream.targetText) return
+      publishStream(speaker)
+      scheduleTyping(speaker)
+    }
+    const commitStream = (message: NegotiationMessage) => {
+      const stream = streams[message.speaker]
+      stream.targetText = message.text
+      stream.committedMessageId = message.id
+      stream.phase = 'finishing'
+      publishStream(message.speaker)
+      scheduleTyping(message.speaker)
+    }
+    const clearAllStreams = () => {
+      clearStream('user')
+      clearStream('ai')
+    }
+    clearStreamsRef.current = clearAllStreams
     const isCurrent = () => contextGenerationRef.current === generation && clientRef.current === client
     queueMicrotask(() => {
       if (!isCurrent()) return
       setState('idle')
-      setPartial({ user: '', ai: '' })
+      setPartial(emptyDrafts())
       setError(null)
       stopPlayback()
     })
     const unsubscribeEvent = client.subscribe((event) => {
       if (!isCurrent()) return
-      if (event.type === 'transcript') {
-        setPartial((current) => ({ ...current, [event.speaker]: event.text }))
+      if (event.type === 'transcript_delta') {
+        updateStream(event.speaker, event.text, true)
         const syncId = ++transcriptSync[event.speaker]
         void (async () => {
           for (const delay of [250, 500, 1_000, 1_500, 2_000]) {
@@ -231,11 +318,12 @@ export function useArenaAudio(
             if (!isCurrent() || transcriptSync[event.speaker] !== syncId) return
             const refreshed = await onReconnectRef.current()
             if (!isCurrent() || transcriptSync[event.speaker] !== syncId) return
-            const persisted = refreshed?.messages.some(
-              (message) => message.speaker === event.speaker && message.text === event.text,
+            const expectedText = streams[event.speaker].targetText
+            const persisted = refreshed?.messages.find(
+              (message) => message.speaker === event.speaker && message.text === expectedText,
             )
             if (persisted) {
-              setPartial((current) => ({ ...current, [event.speaker]: '' }))
+              commitStream(persisted)
               return
             }
           }
@@ -244,20 +332,20 @@ export function useArenaAudio(
           }
         })()
       } else if (event.type === 'transcript_partial') {
-        setPartial((current) => ({ ...current, [event.speaker]: event.text }))
+        if (event.text) updateStream(event.speaker, event.text, false)
       } else if (event.type === 'message_committed') {
         if (eventIds.has(event.eventId) || committedMessageIds.has(event.message.id)) return
         eventIds.add(event.eventId)
         committedMessageIds.add(event.message.id)
-        setPartial((current) => ({ ...current, [event.message.speaker]: '' }))
+        commitStream(event.message)
         onCommittedRef.current(event.message)
       } else if (event.type === 'audio_frame') {
         playFrame(event, isCurrent)
       } else if (event.type === 'error') {
-        setPartial({ user: '', ai: '' })
+        clearAllStreams()
         setError(event.message)
       } else if (event.type === 'closed') {
-        setPartial({ user: '', ai: '' })
+        clearAllStreams()
         stopPlayback()
       } else if (event.type === 'auth_error') {
         setError('Обновляем авторизацию голосового подключения…')
@@ -281,6 +369,11 @@ export function useArenaAudio(
       stopCapture()
       eventIds.clear()
       committedMessageIds.clear()
+      for (const speaker of ['user', 'ai'] as const) {
+        const timer = streams[speaker].timer
+        if (timer !== undefined) window.clearTimeout(timer)
+      }
+      if (clearStreamsRef.current === clearAllStreams) clearStreamsRef.current = () => undefined
       playbackGenerationRef.current += 1
       for (const source of playbackSources) {
         source.onended = null
@@ -328,7 +421,7 @@ export function useArenaAudio(
       setError('Звук недоступен в этом браузере. Текст ответа будет доступен в диалоге.')
     }
     busyRef.current = true
-    setPartial({ user: '', ai: '' })
+    clearStreamsRef.current()
     eventIdsRef.current.clear()
     try {
       await onReconnectRef.current()
@@ -371,7 +464,7 @@ export function useArenaAudio(
     } finally {
       stopCapture()
       stopPlayback()
-      setPartial({ user: '', ai: '' })
+      clearStreamsRef.current()
       setState('stopped')
       if (transportFailed) {
         setError('Аудиосвязь недоступна. Локальные ресурсы освобождены, тренировку можно завершить.')
