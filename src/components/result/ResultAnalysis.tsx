@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
 
-import hiringJudgeArtwork from '@/assets/judge/hiring.png'
-import sendingToNegotiationsJudgeArtwork from '@/assets/judge/sending-to-negotiations.png'
-import trusteeOfPropertyJudgeArtwork from '@/assets/judge/trustee-of-property.png'
+import hiringJudgeArtwork from '@/assets/judge/hiring.webp'
+import sendingToNegotiationsJudgeArtwork from '@/assets/judge/sending-to-negotiations.webp'
+import trusteeOfPropertyJudgeArtwork from '@/assets/judge/trustee-of-property.webp'
 import { AppButton } from '@/components/ui/AppButton'
 import { createMockResultAnalysis } from '@/mocks/resultAnalysis'
 import type { DuelPreparation } from '@/mocks/duelPreparation'
@@ -138,7 +138,7 @@ export function ResultAnalysis({ result, session, preparation, isDemo, isRestart
             <article className={`result-judge is-${judge.verdict}`} key={`${judge.name}-${index}`}>
               <header>
                 <span className="result-judge__avatar result-judge__avatar--photo" aria-hidden="true">
-                  <img src={judgeArtwork[index]} alt="" />
+                  <img src={judgeArtwork[index]} alt="" width={192} height={192} loading="lazy" decoding="async" />
                 </span>
                 <div><h3>{judge.name}</h3><p>{judge.question}</p></div>
               </header>

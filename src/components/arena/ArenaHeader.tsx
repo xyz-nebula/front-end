@@ -49,7 +49,7 @@ export function ArenaHeader({ title, userRole, opponentRole, startedAt, mode, au
           <div className="duel-header__actions">
             <span className="duel-header__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span> Серия: <strong>4 дня</strong></span>
             <div className="duel-header__profile">
-              <button type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}><img src={profileArtwork} alt="" /></button>
+              <button type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}><img src={profileArtwork} alt="" width={400} height={400} decoding="async" /></button>
               {profileOpen && <div className="duel-header__profile-menu"><span>Кирилл · демо-профиль</span><Link to="/home">К кейсам</Link></div>}
             </div>
           </div>
@@ -60,9 +60,9 @@ export function ArenaHeader({ title, userRole, opponentRole, startedAt, mode, au
         <button type="button" onClick={onFinish} disabled={finishDisabled} aria-label="Завершить"><span className="duel-heading__finish-full">Завершить переговоры</span><span className="duel-heading__finish-short">Завершить</span></button>
       </div>
       <section className="duel-shell duel-participants" aria-label="Участники и время поединка">
-        <div className="duel-participants__person duel-participants__person--user"><img src={profileArtwork} alt="" /><div><strong>{userRole}</strong><span>Вы</span></div></div>
+        <div className="duel-participants__person duel-participants__person--user"><img src={profileArtwork} alt="" width={400} height={400} decoding="async" /><div><strong>{userRole}</strong><span>Вы</span></div></div>
         <div className="duel-participants__center"><time aria-label="Время тренировки">{formatElapsed(startedAt, now)}</time><strong>{status}</strong><span>{mode === 'voice' ? audioState === 'connected' ? isDemoVoice ? 'Демо-реплики появятся автоматически' : 'Говорите — система завершит реплику по паузе' : 'Подключите голосовой разговор' : isSending ? 'Ожидайте ответ оппонента' : 'Напишите реплику ниже'}</span></div>
-        <div className="duel-participants__person duel-participants__person--ai"><img src={directorArtwork} alt="" /><div><strong>{opponentRole}</strong><span>AI-оппонент</span></div></div>
+        <div className="duel-participants__person duel-participants__person--ai"><img src={directorArtwork} alt="" width={400} height={400} decoding="async" /><div><strong>{opponentRole}</strong><span>AI-оппонент</span></div></div>
       </section>
     </>
   )

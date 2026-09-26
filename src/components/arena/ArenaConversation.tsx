@@ -35,7 +35,7 @@ export function ArenaConversation({ messages, opponent, isThinking, mode = 'text
       )}
       {messages.filter((message) => !streamingMessageIds.has(message.id)).map((message) => (
         <article className={`arena-message arena-message--${message.speaker}`} key={message.id}>
-          <img className="arena-message__avatar" src={message.speaker === 'user' ? profileArtwork : directorArtwork} alt="" />
+          <img className="arena-message__avatar" src={message.speaker === 'user' ? profileArtwork : directorArtwork} alt="" width={400} height={400} decoding="async" />
           <div>
             <span>{message.speaker === 'user' ? 'Вы' : opponent}</span>
             <p>{message.text}</p>
@@ -44,7 +44,7 @@ export function ArenaConversation({ messages, opponent, isThinking, mode = 'text
       ))}
       {(['user', 'ai'] as const).map((speaker) => partial[speaker]?.text && (
         <article className={`arena-message arena-message--${speaker} arena-message--partial`} key={`partial-${speaker}`} aria-live="off">
-          <img className="arena-message__avatar" src={speaker === 'user' ? profileArtwork : directorArtwork} alt="" />
+          <img className="arena-message__avatar" src={speaker === 'user' ? profileArtwork : directorArtwork} alt="" width={400} height={400} decoding="async" />
           <div>
             <span>{speaker === 'user' ? 'Вы · распознаём' : `${opponent} · отвечает`}</span>
             <p>{partial[speaker]?.text}<i className="arena-message__typing-cursor" aria-hidden="true" /></p>
@@ -53,7 +53,7 @@ export function ArenaConversation({ messages, opponent, isThinking, mode = 'text
       ))}
       {isThinking && (
         <article className="arena-message arena-message--ai arena-message--thinking" role="status">
-          <img className="arena-message__avatar" src={directorArtwork} alt="" />
+          <img className="arena-message__avatar" src={directorArtwork} alt="" width={400} height={400} decoding="async" />
           <div><span>{opponent}</span><p><i /><i /><i /><b>Формулирует ответ…</b></p></div>
         </article>
       )}

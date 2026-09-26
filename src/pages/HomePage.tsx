@@ -135,7 +135,7 @@ export function HomePage() {
             <span className="arena-home__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span><span>Серия: <strong>4 дня</strong></span></span>
             <div className="arena-home__profile" ref={profileRef}>
               <button className="arena-home__profile-toggle" type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}>
-                <img src={profileArtwork} alt="" />
+                <img src={profileArtwork} alt="" width={400} height={400} decoding="async" />
               </button>
               {profileOpen && <div className="arena-home__profile-menu">
                 <span className="arena-home__profile-name">Кирилл <small>Демо-профиль</small></span>
@@ -163,7 +163,7 @@ export function HomePage() {
             </div> : <>
               <div className="arena-home__continue-head"><h2 id="continue-title">{activeSession ? 'Продолжить тренировку' : 'Начать тренировку'}</h2><span>▣ &nbsp;{activeSession ? 'В процессе' : 'Рекомендуем'}</span></div>
               <div className="arena-home__continue-body">
-                <img src={activeSession && displayedCase ? caseArtwork[displayedCase.id] ?? heroArtwork : heroArtwork} alt="" />
+                <img src={activeSession && displayedCase ? caseArtwork[displayedCase.id] ?? heroArtwork : heroArtwork} alt="" decoding="async" />
                 <div className="arena-home__continue-info">
                   <h3>{displayedCase?.title ?? (casesLoading ? 'Загружаем кейс…' : 'Выберите кейс')}</h3>
                   <p>{displayedCase ? `${displayedCase.category} · ${displayedCase.duration}` : 'Подготовьтесь и проведите переговоры с AI'}</p>
@@ -178,7 +178,7 @@ export function HomePage() {
 
           <section className="arena-home__progress" aria-labelledby="progress-title">
             <h2 id="progress-title">Мой прогресс</h2>
-            <div className="arena-home__level"><div><strong>Уровень 4</strong><span>720 / 900 XP</span><div className="arena-home__bar"><i /></div></div><img src={profileArtwork} alt="" /></div>
+            <div className="arena-home__level"><div><strong>Уровень 4</strong><span>720 / 900 XP</span><div className="arena-home__bar"><i /></div></div><img src={profileArtwork} alt="" width={400} height={400} loading="lazy" decoding="async" /></div>
             <div className="arena-home__progress-stats"><div><span className="arena-home__bars" aria-hidden="true"><i /><i /><i /></span><p><strong>{historyLoading ? '—' : history.length}</strong><span>{historyLoading ? 'загрузка' : trainingCountLabel(history.length)}</span></p></div><div><span aria-hidden="true">🔥</span><p><strong>Серия: 4 дня</strong><span>Отличная динамика!</span></p></div></div>
           </section>
         </div>
@@ -199,7 +199,7 @@ export function HomePage() {
             {!historyLoading && !historyError && visibleHistory.map((item) => {
               const title = trainingTitle(item, cases)
               return <div className="arena-home__history-row" key={item.id}>
-                <img src={caseArtwork[item.caseId] ?? heroArtwork} alt="" />
+                <img src={caseArtwork[item.caseId] ?? heroArtwork} alt="" loading="lazy" decoding="async" />
                 <div className="arena-home__history-title"><strong>{title}</strong><span>{item.mode === 'voice' ? 'Голос' : 'Текст'}</span></div>
                 <span className={`arena-home__history-status ${item.status === 'active' ? 'is-active' : item.backendStatus === 'victory' ? 'is-success' : item.backendStatus === 'defeat' ? 'is-failure' : 'is-neutral'}`}>{trainingStatus(item)}</span>
                 <time dateTime={item.startedAt}>{new Date(item.startedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</time>

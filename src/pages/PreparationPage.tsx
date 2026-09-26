@@ -233,7 +233,7 @@ export function PreparationPage() {
   return <div className="preparation-page">
     <header className="preparation-header"><div className="preparation-shell preparation-header__inner">
       <Link className="preparation-header__brand" to="/"><ArenaCubeMark /><span>АРЕНА</span></Link>
-      <div className="preparation-header__profile"><span>🔥 <strong>4</strong></span><img src={profileArtwork} alt="" /></div>
+      <div className="preparation-header__profile"><span>🔥 <strong>4</strong></span><img src={profileArtwork} alt="" width={400} height={400} decoding="async" /></div>
     </div></header>
     <main className="preparation-shell preparation-main">
       <div className="preparation-context">

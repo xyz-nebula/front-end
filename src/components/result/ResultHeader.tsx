@@ -40,7 +40,7 @@ export function ResultHeader() {
           </span>
           <div className="result-header__profile" ref={profileRef}>
             <button type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}>
-              <img src={profileArtwork} alt="" />
+              <img src={profileArtwork} alt="" width={400} height={400} decoding="async" />
             </button>
             {profileOpen && (
               <div className="result-header__profile-menu">

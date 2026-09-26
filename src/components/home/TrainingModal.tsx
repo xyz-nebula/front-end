@@ -103,7 +103,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
             <div className="home-case-modal__roles" role="radiogroup" aria-label="Выберите свою роль">
               {item.roles.map((title, index) => <label className={`home-case-modal__role ${role === index ? 'is-selected' : role !== null ? 'is-opponent' : ''}`} key={title}>
                 <input type="radio" name="case-role" checked={role === index} onChange={() => setRole(index as 0 | 1)} />
-                <img src={/руководител|директор/i.test(title) ? directorArtwork : profileArtwork} alt="" />
+                <img src={/руководител|директор/i.test(title) ? directorArtwork : profileArtwork} alt="" width={400} height={400} loading="lazy" decoding="async" />
                 <span className="home-case-modal__role-copy">{role !== null && <span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span>}<strong>{title}</strong><small>{item.roleSummaries[index]}</small></span>
                 <span className="home-case-modal__radio-mark" aria-hidden="true">{role === index ? '✓' : ''}</span>
               </label>)}
