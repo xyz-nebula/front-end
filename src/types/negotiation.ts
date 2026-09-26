@@ -30,6 +30,50 @@ export interface NegotiationResult {
   strengths: string[]
   improvements: string[]
   recommendations: string[]
+  analysis?: NegotiationResultAnalysis
+}
+
+export type NegotiationVerdict = 'user' | 'opponent'
+export type NegotiationPlanStatus = 'followed' | 'adapted' | 'unused'
+
+export interface NegotiationAgreement {
+  title: string
+  points: string[]
+  tradeoff: string
+  nextStep: string
+}
+
+export interface NegotiationJudgeReview {
+  name: string
+  question: string
+  criterion: string
+  verdict: NegotiationVerdict
+  quote: string
+  observation: string
+  effect: string
+  comparison: string
+}
+
+export interface NegotiationCoachEpisode {
+  quote: string
+  action: string
+  change: string
+  consequence: string
+}
+
+export interface NegotiationPlanComparison {
+  plan: string
+  reality: string
+  status: NegotiationPlanStatus
+}
+
+export interface NegotiationResultAnalysis {
+  agreement: NegotiationAgreement
+  judges: NegotiationJudgeReview[]
+  coachSummary: string
+  worked: NegotiationCoachEpisode[]
+  hindered: NegotiationCoachEpisode[]
+  planComparison: NegotiationPlanComparison[]
 }
 
 export interface NegotiationSessionSummary {

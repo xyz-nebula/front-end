@@ -22,9 +22,10 @@ export async function expectNoDocumentVerticalOverflow(page: Page) {
     .toBe(true)
 }
 
-export async function captureScreenshot(page: Page, path: string) {
+export async function captureScreenshot(page: Page, path: string, fullPage = false) {
   await page.screenshot({
     path,
     animations: 'disabled',
+    fullPage,
   })
 }

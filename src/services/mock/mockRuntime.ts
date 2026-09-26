@@ -1,4 +1,5 @@
 import { getMockAiResponse } from '@/mocks/negotiation-scenarios'
+import { createMockResultAnalysis } from '@/mocks/resultAnalysis'
 import { MockStorage, type MockData, type MockSessionRecord } from '@/services/mock/mockStorage'
 import type {
   AudioTicket,
@@ -60,9 +61,11 @@ function appendMessage(
 function createResult(session: MockSessionRecord): NegotiationResult {
   const userTurns = session.messages.filter((message) => message.speaker === 'user').length
   const score = Math.min(94, 68 + userTurns * 6 + (session.mode === 'voice' ? 2 : 0))
+  const outcome = score >= 75 ? 'victory' : 'defeat'
+  const publicSession = toSession(session)
   return {
     sessionId: session.id,
-    outcome: score >= 75 ? 'victory' : 'defeat',
+    outcome,
     score,
     summary: score >= 75
       ? 'Вы удерживали фокус на интересах сторон и завершили разговор конкретными договорённостями.'
@@ -78,7 +81,9 @@ function createResult(session: MockSessionRecord): NegotiationResult {
     recommendations: [
       'Перед следующим раундом подготовьте три открытых вопроса',
       'Сформулируйте желаемый результат и приемлемую альтернативу',
+      'Закрепляйте уступки встречными обязательствами и сроками',
     ],
+    analysis: createMockResultAnalysis(publicSession, outcome),
   }
 }
 

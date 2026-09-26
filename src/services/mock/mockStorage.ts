@@ -83,6 +83,48 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isString)
 }
 
+function isAgreement(value: unknown): boolean {
+  return isRecord(value)
+    && isString(value.title)
+    && isStringArray(value.points)
+    && isString(value.tradeoff)
+    && isString(value.nextStep)
+}
+
+function isJudgeReview(value: unknown): boolean {
+  return isRecord(value)
+    && ['name', 'question', 'criterion', 'quote', 'observation', 'effect', 'comparison'].every(
+      (key) => isString(value[key]),
+    )
+    && (value.verdict === 'user' || value.verdict === 'opponent')
+}
+
+function isCoachEpisode(value: unknown): boolean {
+  return isRecord(value)
+    && ['quote', 'action', 'change', 'consequence'].every((key) => isString(value[key]))
+}
+
+function isPlanComparison(value: unknown): boolean {
+  return isRecord(value)
+    && isString(value.plan)
+    && isString(value.reality)
+    && (value.status === 'followed' || value.status === 'adapted' || value.status === 'unused')
+}
+
+function isResultAnalysis(value: unknown): boolean {
+  return isRecord(value)
+    && isAgreement(value.agreement)
+    && Array.isArray(value.judges)
+    && value.judges.every(isJudgeReview)
+    && isString(value.coachSummary)
+    && Array.isArray(value.worked)
+    && value.worked.every(isCoachEpisode)
+    && Array.isArray(value.hindered)
+    && value.hindered.every(isCoachEpisode)
+    && Array.isArray(value.planComparison)
+    && value.planComparison.every(isPlanComparison)
+}
+
 function isMessage(value: unknown): value is NegotiationMessage {
   return isRecord(value)
     && isString(value.id)
@@ -116,6 +158,7 @@ function isNegotiationResult(value: unknown): value is NegotiationResult {
     && isStringArray(value.strengths)
     && isStringArray(value.improvements)
     && isStringArray(value.recommendations)
+    && (value.analysis === undefined || isResultAnalysis(value.analysis))
 }
 
 function isUser(value: unknown): value is MockUserRecord {

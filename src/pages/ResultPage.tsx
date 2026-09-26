@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
-import { AppButton } from '@/components/ui/AppButton'
-import { Logo } from '@/components/ui/Logo'
+import { ResultAnalysis } from '@/components/result/ResultAnalysis'
+import { ResultHeader } from '@/components/result/ResultHeader'
+import { ResultStatus } from '@/components/result/ResultStatus'
 import {
   clearPendingSessionCreate,
   getOrCreatePendingSessionCreate,
   type PendingSessionCreate,
 } from '@/features/arena/pendingSessionCreate'
-import { trainingCases } from '@/mocks/cases'
+import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { useDomainServices } from '@/services/domainServices'
 import type { NegotiationResultState, NegotiationSession } from '@/types/negotiation'
+import '@/styles/result.css'
 
 const POLL_DELAYS = [400, 700, 1_000, 1_500, 2_000, 3_000]
 
@@ -94,34 +96,27 @@ export function ResultPage() {
     }
   }, [navigate, negotiationClient, session])
 
-  const trainingCase = trainingCases.find(
-    (item) => item.id === session?.caseId || item.title === session?.name,
-  )
   const ready = result?.status === 'ready' ? result.result : null
   const isRestarting = restartingSessionId === session?.id
+  const preparation = getDuelPreparation(session?.caseId ?? '')
 
   return (
     <div className="result-page">
-      <header className="result-header"><Logo /><Link to="/home">← К тренировкам</Link></header>
-      <main className="result-main">
-        <p className="eyebrow">Разбор переговоров · демо</p>
-        <h1>{ready ? 'Ваш результат' : 'Разбор тренировки'}</h1>
-        <p className="result-main__case">{trainingCase?.title ?? 'Переговоры'}{session && ` · ${session.mode === 'voice' ? 'Голос' : 'Текст'}`}</p>
-        {isRealVoice && <p className="result-demo-note" role="note">Это демонстрационный разбор интерфейса. Оценка и рекомендации не получены от backend или AI-сервиса.</p>}
-        {ready ? (
-          <>
-            <section className="result-hero" aria-label="Итог"><div><span>{ready.outcome === 'victory' ? 'Цель достигнута' : 'Есть над чем поработать'}</span><strong>{ready.score}<small>/100</small></strong></div><p>{ready.summary}</p></section>
-            <div className="result-grid">
-              <section><span className="result-grid__icon">↗</span><h2>Сильные стороны</h2><ul>{ready.strengths.map((item) => <li key={item}>{item}</li>)}</ul></section>
-              <section><span className="result-grid__icon">✦</span><h2>Что улучшить</h2><ul>{ready.improvements.map((item) => <li key={item}>{item}</li>)}</ul></section>
-            </div>
-            <section className="result-recommendations"><p className="eyebrow">Следующий шаг</p><h2>Рекомендации</h2><ol>{ready.recommendations.map((item) => <li key={item}>{item}</li>)}</ol></section>
-            <div className="result-actions"><AppButton type="button" onClick={() => void repeatCase()} disabled={isRestarting}>{isRestarting ? 'Создаём раунд…' : 'Повторить кейс'}</AppButton><AppButton to="/home" variant="secondary">Все тренировки</AppButton></div>
-          </>
-        ) : (
-          <section className="result-pending" role="status"><span className={result?.status === 'processing' || !result ? 'arena-state__spinner' : 'arena-state__mark'} aria-hidden="true">{result?.status === 'failed' ? '!' : ''}</span><h2>{result?.status === 'failed' ? 'Разбор не готов' : error ? 'Не удалось получить разбор' : 'Анализируем разговор…'}</h2><p>{result?.status === 'failed' ? result.message : error ?? 'Собираем выводы по вашим репликам. Это займёт несколько секунд.'}</p><div>{(error || result?.status === 'failed') && <AppButton type="button" onClick={() => { setError(null); setResult(null); setRetryVersion((version) => version + 1) }}>Проверить ещё раз</AppButton>}<AppButton to="/home" variant="secondary">К тренировкам</AppButton></div></section>
-        )}
-        {ready && error && <p className="result-error" role="alert">{error}</p>}
+      <ResultHeader />
+      <main className="result-shell result-main">
+        {ready && session ? <ResultAnalysis
+          result={ready}
+          session={session}
+          preparation={preparation}
+          isDemo={isRealVoice}
+          isRestarting={isRestarting}
+          error={error}
+          onRepeat={() => void repeatCase()}
+        /> : <ResultStatus
+          result={result}
+          error={error}
+          onRetry={() => { setError(null); setResult(null); setRetryVersion((version) => version + 1) }}
+        />}
       </main>
     </div>
   )
