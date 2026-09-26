@@ -71,6 +71,9 @@
 .result-judge__avatar { position: relative; display: block; width: 54px; height: 54px; flex: none; overflow: hidden; border-radius: 14px; background: linear-gradient(145deg, #d7eaff, #91bff2); }
 .result-judge__avatar::before { position: absolute; top: 9px; left: 50%; width: 17px; height: 17px; border-radius: 50%; background: rgba(255, 255, 255, .85); content: ''; transform: translateX(-50%); }
 .result-judge__avatar i { position: absolute; right: 10px; bottom: -9px; left: 10px; height: 31px; border-radius: 50% 50% 0 0; background: rgba(255, 255, 255, .85); }
+.result-judge__avatar--photo { background: #e6f1ff; }
+.result-judge__avatar--photo::before { display: none; }
+.result-judge__avatar--photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 22%; }
 .result-judge__avatar.tone-2 { background: linear-gradient(145deg, #eee4ff, #b3a1e8); }
 .result-judge__avatar.tone-3 { background: linear-gradient(145deg, #ffe5e5, #eaa1a6); }
 .result-judge header h3 { margin: 0; font-size: 14px; line-height: 1.2; font-weight: 780; }

@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom'
 
+import hiringJudgeArtwork from '@/assets/judge/hiring.png'
+import sendingToNegotiationsJudgeArtwork from '@/assets/judge/sending-to-negotiations.png'
+import trusteeOfPropertyJudgeArtwork from '@/assets/judge/trustee-of-property.png'
 import { AppButton } from '@/components/ui/AppButton'
 import { createMockResultAnalysis } from '@/mocks/resultAnalysis'
 import type { DuelPreparation } from '@/mocks/duelPreparation'
@@ -26,6 +29,12 @@ const statusLabels: Record<NegotiationPlanStatus, string> = {
   adapted: 'Адаптировал',
   unused: 'Не использовал',
 }
+
+const judgeArtwork = [
+  hiringJudgeArtwork,
+  sendingToNegotiationsJudgeArtwork,
+  trusteeOfPropertyJudgeArtwork,
+] as const
 
 function formatDuration(session: NegotiationSession): string | null {
   if (!session.finishedAt) return null
@@ -128,7 +137,9 @@ export function ResultAnalysis({ result, session, preparation, isDemo, isRestart
           {analysis.judges.slice(0, 3).map((judge, index) => (
             <article className={`result-judge is-${judge.verdict}`} key={`${judge.name}-${index}`}>
               <header>
-                <span className={`result-judge__avatar tone-${index + 1}`} aria-hidden="true"><i /></span>
+                <span className="result-judge__avatar result-judge__avatar--photo" aria-hidden="true">
+                  <img src={judgeArtwork[index]} alt="" />
+                </span>
                 <div><h3>{judge.name}</h3><p>{judge.question}</p></div>
               </header>
               <span className="result-judge__verdict"><Icon tone={judge.verdict === 'user' ? 'blue' : 'red'}>{judge.verdict === 'user' ? '✓' : '!'}</Icon>{judge.verdict === 'user' ? 'Выбираю вас' : 'Выбираю AI-оппонента'}</span>
