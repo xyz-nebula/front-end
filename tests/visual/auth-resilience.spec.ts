@@ -231,6 +231,28 @@ test('does not restore a pending login after logout', async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/)
 })
 
+test('session bootstrap loading renders on desktop and mobile', async ({ page }) => {
+  await seedSession(page)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  let releaseRefresh = () => undefined
+  const refreshReleased = new Promise<void>((resolve) => { releaseRefresh = resolve })
+  await page.route('**/api/v1/auth/token/refresh', async (route) => {
+    await refreshReleased
+    await json(route, 200, apiTokens).catch(() => undefined)
+  })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/home')
+  await expect(page.getByRole('heading', { name: 'Проверяем сессию' })).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/session-loading-desktop.png`)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/session-loading-mobile.png`)
+
+  releaseRefresh()
+})
+
 test('keeps tokens after a transient bootstrap failure and recovers on retry', async ({ page }) => {
   await seedSession(page)
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -242,6 +264,10 @@ test('keeps tokens after a transient bootstrap failure and recovers on retry', a
   expect(await readStoredTokens(page)).toContain('stored-refresh')
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/session-recovery-desktop.png`)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/session-recovery-mobile.png`)
 
   await page.unroute('**/api/v1/auth/token/refresh')
   await page.route('**/api/v1/auth/token/refresh', (route) => json(route, 200, {
