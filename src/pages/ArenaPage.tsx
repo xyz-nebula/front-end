@@ -15,6 +15,7 @@ import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { readSessionPreparation } from '@/features/preparation/preparation'
 import { useDomainServices } from '@/services/domainServices'
 import type { TrainingCase } from '@/types/case'
+import '@/styles/duel.css'
 
 function fallbackCase(title: string): TrainingCase {
   return {

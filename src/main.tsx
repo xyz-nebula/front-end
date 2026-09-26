@@ -8,7 +8,6 @@ import { AppThemeProvider } from '@/components/layout/AppThemeProvider'
 import { DomainServicesProvider } from '@/services/DomainServicesContext'
 import { ServiceAdaptersProvider } from '@/services/ServiceAdaptersContext'
 import '@/styles/global.css'
-import '@/styles/duel.css'
 
 const rootElement = document.getElementById('root')
 
