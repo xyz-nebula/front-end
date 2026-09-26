@@ -60,8 +60,6 @@ export function serializePreparation(draft: PreparationDraft): string {
       ['Корневой конфликт', draft.rootConflict],
       ['Стратегическая цель ситуации', draft.strategicGoal],
       ['Предложения, решающие конфликт', draft.proposals],
-    ]),
-    block('Стратегия', [
       ['Экономический слой', draft.layers.economic],
       ['Юридический слой', draft.layers.legal],
       ['Технический слой', draft.layers.technical],
@@ -70,6 +68,8 @@ export function serializePreparation(draft: PreparationDraft): string {
       ['Психологический слой', draft.layers.psychological],
       ['Эстетический слой', draft.layers.aesthetic],
       ['Этический слой', draft.layers.ethical],
+    ]),
+    block('Стратегия', [
       ['Сильные стороны', draft.swot.strengths],
       ['Слабые стороны', draft.swot.weaknesses],
       ['Возможности', draft.swot.opportunities],
