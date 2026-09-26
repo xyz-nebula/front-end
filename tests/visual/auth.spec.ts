@@ -64,14 +64,8 @@ test('auth entry screens render on desktop and mobile', async ({ page }) => {
 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/auth')
-  await expect(page.getByRole('heading', { level: 1, name: 'Выйди на Арену' })).toBeVisible()
-  await expectNoHorizontalOverflow(page)
-  await captureScreenshot(page, `${artifactsDir}/auth-choice-desktop.png`)
+  await expect(page).toHaveURL(/\/login$/)
 
-  await page.getByRole('link', { name: /Создать аккаунт/ }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Создай аккаунт' })).toBeVisible()
-
-  await page.goto('/login')
   await expect(page.getByRole('heading', { level: 1, name: 'С возвращением' })).toBeVisible()
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/login-desktop.png`)
@@ -271,7 +265,7 @@ test('returns to a protected route after password login and logs out locally', a
 
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
   // Local logout is optimistic; the redirect does not await remote revocation.
   await logoutHandled
   expect(logoutPayload).toEqual({ refresh_token: 'refresh-token' })

@@ -171,7 +171,7 @@ test('keeps the result of the last-started concurrent login', async ({ page }) =
   await firstLoginStarted
 
   await navigateInApp(page, '/auth')
-  await page.getByRole('link', { name: 'Войти' }).click()
+  await expect(page).toHaveURL(/\/login$/)
   await fillLogin(page)
   await page.getByLabel('Email').fill('newer@example.com')
   await page.getByRole('button', { name: 'Войти' }).click()
@@ -221,14 +221,14 @@ test('does not restore a pending login after logout', async ({ page }) => {
   await expect(page).toHaveURL(/\/home$/)
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
   expect(await readStoredTokens(page)).toBeNull()
 
   releaseLogin()
   await loginResponded
   await delay(100)
   expect(await readStoredTokens(page)).toBeNull()
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
 })
 
 test('keeps tokens after a transient bootstrap failure and recovers on retry', async ({ page }) => {
@@ -295,7 +295,7 @@ test('optimistic logout clears the UI and storage before a hanging request finis
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
 
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
   expect(await readStoredTokens(page)).toBeNull()
 })
 
@@ -321,7 +321,7 @@ test('retries remote logout after refreshing a rejected snapshot', async ({ page
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
 
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
   await expect.poll(() => logoutRequests).toBe(2)
   expect(await readStoredTokens(page)).toBeNull()
 })
@@ -633,7 +633,7 @@ test('synchronizes login, token rotation, and logout between tabs', async ({ pag
   await closeSecurityModal(page)
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
   await expect(otherPage).toHaveURL(/\/login$/)
 })
 

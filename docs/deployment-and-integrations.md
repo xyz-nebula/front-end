@@ -51,7 +51,7 @@ flowchart LR
 2. Подключить TLS на публичном домене. Для браузерного микрофона нужен secure
    context (`https://`), для аудио — `wss://`. Не направлять production-клиент
    на `ws://localhost:8000` из `.env.example`: это адрес компьютера посетителя.
-3. Для клиентских маршрутов (`/auth`, `/login`, `/register`, `/activate`,
+3. Для клиентских маршрутов (`/auth` (redirect), `/login`, `/register`, `/activate`,
    `/home`, `/arena/:sessionId`, `/result/:sessionId`) возвращать `index.html`
    при прямом открытии и обновлении страницы. `/api/*` и WebSocket путь не должны
    попадать в SPA fallback.

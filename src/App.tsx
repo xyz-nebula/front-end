@@ -1,10 +1,9 @@
 import { useEffect } from 'react'
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 
 import { ActivationRoute, GuestRoute, ProtectedRoute } from '@/components/auth/RouteGate'
 import { ActivatePage } from '@/pages/ActivatePage'
 import { ArenaPage } from '@/pages/ArenaPage'
-import { AuthChoicePage } from '@/pages/AuthChoicePage'
 import { LandingPage } from '@/pages/LandingPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { HomePage } from '@/pages/HomePage'
@@ -33,7 +32,7 @@ export function App() {
       <ScrollToLocation />
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/auth" element={<GuestRoute><AuthChoicePage /></GuestRoute>} />
+        <Route path="/auth" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
         <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
         <Route path="/activate" element={<ActivationRoute><ActivatePage /></ActivationRoute>} />

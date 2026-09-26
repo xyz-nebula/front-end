@@ -41,7 +41,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   if (status === 'booting' || status === 'signing-out') return <SessionLoading />
   if (status === 'restore-error') return <SessionRecovery />
   if (status === 'unauthenticated') {
-    if (logoutRequested) return <Navigate to="/auth" replace />
+    if (logoutRequested) return <Navigate to="/login" replace />
     return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />
   }
   return children
