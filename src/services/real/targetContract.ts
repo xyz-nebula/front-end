@@ -23,7 +23,8 @@ export interface CaseResponseDto {
   category: string
   difficulty: string
   time_limit: number
-  preparations: string
+  first_role_preparations: string
+  second_role_preparations: string
   goal: string
   synopsis: string
   first_role: string
@@ -170,9 +171,10 @@ export function parseChatWithMessages(value: unknown): ParsedChatWithMessages {
 
 function parseCase(value: unknown, path: string): ParsedCase {
   const dto = record(value, path)
-  // `preparations` is deliberately validated but not exposed: it contains the
-  // hidden ideal preparation used by the AI opponent.
-  stringValue(dto.preparations, `${path}.preparations`)
+  // Role preparations are deliberately validated but not exposed: they contain
+  // hidden scenario context intended for the corresponding negotiation role.
+  stringValue(dto.first_role_preparations, `${path}.first_role_preparations`)
+  stringValue(dto.second_role_preparations, `${path}.second_role_preparations`)
   return {
     id: uuid(dto.uuid, `${path}.uuid`),
     name: nonEmptyString(dto.name, `${path}.name`),

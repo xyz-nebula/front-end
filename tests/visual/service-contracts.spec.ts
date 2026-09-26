@@ -97,12 +97,15 @@ test('case parser normalizes public fields and does not expose ideal preparation
     uuid: '00000000-0000-4000-8000-000000000010',
     created_at: '2026-09-26T10:00:00Z',
     name: 'Срок поставки', description: 'Описание', category: 'Продажи', difficulty: 'hard',
-    time_limit: 10, preparations: 'Скрытая идеальная подготовка', goal: 'Цель', synopsis: 'Ситуация',
+    time_limit: 10, goal: 'Цель', synopsis: 'Ситуация',
     first_role: 'Поставщик', second_role: 'Заказчик',
+    first_role_preparations: 'Скрытая подготовка поставщика',
+    second_role_preparations: 'Скрытая подготовка заказчика',
   }]
   const parsed = parseCases(source)
   expect(parsed[0]).toMatchObject({ id: source[0].uuid, name: source[0].name, firstRole: 'Поставщик', secondRole: 'Заказчик' })
-  expect(parsed[0]).not.toHaveProperty('preparations')
+  expect(parsed[0]).not.toHaveProperty('firstRolePreparations')
+  expect(parsed[0]).not.toHaveProperty('secondRolePreparations')
 })
 
 test('service config requires explicit sources and rejects invalid values', () => {
