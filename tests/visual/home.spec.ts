@@ -27,6 +27,10 @@ test('home dashboard and case dialog fit desktop and mobile', async ({ page }) =
   await expect(page.getByText('Здесь появятся ваши тренировки.')).toBeVisible()
   await expect(page.locator('.arena-home__progress')).toContainText('0тренировок')
   await expect(page.locator('.home-case-card')).toHaveCount(6)
+  await expect(page.locator('.home-case-card img')).toHaveCount(0)
+  await expect(page.locator('.home-case-card').first().getByLabel(/Роли:/)).toBeVisible()
+  await expect(page.locator('.home-case-card').first()).toContainText('Сотрудник')
+  await expect(page.locator('.home-case-card').first()).toContainText('Руководитель')
   await expectNoHorizontalOverflow(page)
   await page.screenshot({ path: `${artifactsDir}/home-dashboard-desktop.png`, animations: 'disabled', fullPage: true })
 
