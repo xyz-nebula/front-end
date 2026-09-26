@@ -6,6 +6,7 @@ import { FormField } from '@/components/auth/FormField'
 import { AppButton } from '@/components/ui/AppButton'
 import { ArrowIcon } from '@/components/ui/ArrowIcon'
 import type { TotpEnrollResponse } from '@/types/auth'
+import '@/styles/security.css'
 
 type TotpView = 'overview' | 'enroll' | 'disable' | 'enabled' | 'disabled'
 
@@ -123,9 +124,9 @@ export function TotpModal({ onClose }: TotpModalProps) {
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div className="security-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="security-modal" role="dialog" aria-modal="true" aria-labelledby="security-modal-title">
-        <button className="training-modal__close" type="button" onClick={onClose} aria-label="Закрыть">×</button>
+        <button className="security-modal__close" type="button" onClick={onClose} aria-label="Закрыть">×</button>
 
         {view === 'overview' && (
           <>

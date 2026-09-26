@@ -372,6 +372,7 @@ test('refreshes once after a protected 401 and supports TOTP enable and disable'
   await page.getByLabel('Код из приложения').fill('654321')
   await page.getByRole('button', { name: 'Подтвердить и включить' }).click()
   await expect(page.getByRole('heading', { name: '2FA подключена' })).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/security-success-desktop.png`)
   expect(confirmAuthorization).toBe('Bearer retry-access')
 
   await page.locator('.security-success').getByRole('button', { name: 'Закрыть' }).click()
@@ -483,6 +484,10 @@ test('rejects malformed TOTP enrollment without exposing a success state', async
 test('security modal renders on desktop and mobile', async ({ page }) => {
   await seedSession(page)
   await mockSuccessfulBootstrap(page)
+  await page.route('**/api/v1/auth/totp/enroll', (route) => json(route, 200, {
+    secret: 'JBSWY3DPEHPK3PXP',
+    otpauth_url: 'otpauth://totp/Arena:user',
+  }))
   await page.emulateMedia({ reducedMotion: 'reduce' })
 
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -492,7 +497,19 @@ test('security modal renders on desktop and mobile', async ({ page }) => {
   await expect(page.getByRole('dialog')).toBeVisible()
   await captureScreenshot(page, `${artifactsDir}/security-modal-desktop.png`)
 
+  await page.getByRole('button', { name: /Подключить 2FA/ }).click()
+  await expect(page.getByText('JBSWY3DPEHPK3PXP')).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/security-enroll-desktop.png`)
+  await page.getByRole('button', { name: '← Назад' }).click()
+  await page.getByRole('button', { name: /Отключить 2FA/ }).click()
+  await expect(page.getByRole('heading', { name: 'Подтверди действие' })).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/security-disable-desktop.png`)
+  await page.getByRole('button', { name: '← Назад' }).click()
+
   await page.setViewportSize({ width: 390, height: 844 })
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/security-modal-mobile.png`)
+
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toBeHidden()
 })
