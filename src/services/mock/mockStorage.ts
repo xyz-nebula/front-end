@@ -10,7 +10,6 @@ const LEASE_REFRESH_MS = 2_000
 export interface MockUserRecord {
   id: string
   email: string
-  username: string
   firstName: string
   lastName: string
   password: string
@@ -163,7 +162,7 @@ function isNegotiationResult(value: unknown): value is NegotiationResult {
 
 function isUser(value: unknown): value is MockUserRecord {
   return isRecord(value)
-    && ['id', 'email', 'username', 'firstName', 'lastName', 'password', 'activationCode'].every(
+    && ['id', 'email', 'firstName', 'lastName', 'password', 'activationCode'].every(
       (key) => isString(value[key]),
     )
     && (value.status === 'pending_activation' || value.status === 'active' || value.status === 'suspended')

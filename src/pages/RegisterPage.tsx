@@ -10,7 +10,6 @@ import '@/styles/register.css'
 
 const initialFields: AuthRegisterRequest = {
   email: '',
-  username: '',
   first_name: '',
   last_name: '',
   password: '',
@@ -55,12 +54,10 @@ export function RegisterPage() {
   const validate = () => {
     const nextErrors: Record<string, string> = {}
     const email = fields.email.trim()
-    const username = fields.username.trim()
     const firstName = fields.first_name.trim()
     const lastName = fields.last_name.trim()
 
     if (!email || email.length > 254 || !/^\S+@\S+\.\S+$/.test(email)) nextErrors.email = 'Введите корректный email.'
-    if (!/^[a-zA-Z0-9_.-]{3,32}$/.test(username)) nextErrors.username = 'От 3 до 32 символов: латиница, цифры, ., _ или -.'
     if (!firstName) nextErrors.first_name = 'Введите имя.'
     else if (firstName.length > 64) nextErrors.first_name = 'Не более 64 символов.'
     if (!lastName) nextErrors.last_name = 'Введите фамилию.'
@@ -80,7 +77,6 @@ export function RegisterPage() {
     setFormError('')
     const payload: AuthRegisterRequest = {
       email: fields.email.trim(),
-      username: fields.username.trim(),
       first_name: fields.first_name.trim(),
       last_name: fields.last_name.trim(),
       password: fields.password,
@@ -125,7 +121,6 @@ export function RegisterPage() {
             <RegisterField label="Имя" name="first_name" autoComplete="given-name" value={fields.first_name} error={errors.first_name} maxLength={64} onChange={(event) => updateField('first_name', event.target.value)} />
             <RegisterField label="Фамилия" name="last_name" autoComplete="family-name" value={fields.last_name} error={errors.last_name} maxLength={64} onChange={(event) => updateField('last_name', event.target.value)} />
           </div>
-          <RegisterField label="Имя пользователя" name="username" autoComplete="username" value={fields.username} error={errors.username} minLength={3} maxLength={32} hint="Латиница, цифры, точка, дефис или подчёркивание" onChange={(event) => updateField('username', event.target.value)} />
           <RegisterField label="Электронная почта" aria-label="Email" name="email" type="email" autoComplete="email" placeholder="name@example.com" value={fields.email} error={errors.email} maxLength={254} onChange={(event) => updateField('email', event.target.value)} />
           <div className="login-field">
             <label htmlFor="register-password">Пароль</label>

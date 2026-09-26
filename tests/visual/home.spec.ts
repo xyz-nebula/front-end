@@ -4,7 +4,6 @@ async function enterHome(page: import('@playwright/test').Page) {
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Кирилл')
   await page.getByLabel('Фамилия').fill('Тестовый')
-  await page.getByLabel('Имя пользователя').fill('home.visual')
   await page.getByLabel('Email').fill('home.visual@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()

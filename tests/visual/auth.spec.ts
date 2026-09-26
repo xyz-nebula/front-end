@@ -60,7 +60,6 @@ async function submitRegistration(page: Page) {
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill('irina.pet')
   await page.getByLabel('Email').fill('irina@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
@@ -180,7 +179,6 @@ test('shows the email confirmation screen after registration', async ({ page }) 
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill('irina.pet')
   await page.getByLabel('Email').fill('irina@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
@@ -200,7 +198,6 @@ test('shows the email confirmation screen after registration', async ({ page }) 
   await expect(page.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/login')
   expect(registerPayload).toEqual({
     email: 'irina@example.com',
-    username: 'irina.pet',
     first_name: 'Ирина',
     last_name: 'Петрова',
     password: 'strong-password',
@@ -424,16 +421,15 @@ test('refreshes once after a protected 401 and supports TOTP enable and disable'
 
 test('maps backend validation errors to fields and shows network failures', async ({ page }) => {
   await page.route('**/api/v1/auth/register', (route) => json(route, 422, {
-    detail: [{ loc: ['body', 'username'], msg: 'Имя уже занято', type: 'value_error' }],
+    detail: [{ loc: ['body', 'email'], msg: 'Email уже занят', type: 'value_error' }],
   }))
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill('irina.pet')
   await page.getByLabel('Email').fill('irina@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
-  await expect(page.getByText('Имя уже занято')).toBeVisible()
+  await expect(page.getByText('Email уже занят')).toBeVisible()
 
   await page.unrouteAll({ behavior: 'wait' })
   await page.route('**/api/v1/auth/login', (route) => route.abort('failed'))

@@ -21,7 +21,6 @@ test('text arena creates, restores and finishes one atomic conversation without 
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill('text.user')
   await page.getByLabel('Email').fill('text@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()

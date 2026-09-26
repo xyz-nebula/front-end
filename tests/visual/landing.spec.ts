@@ -396,7 +396,6 @@ test('product home keeps its own styles after landing navigation', async ({ page
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill('landing.user')
   await page.getByLabel('Email').fill('landing@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
