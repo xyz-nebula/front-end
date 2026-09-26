@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import profileArtwork from '@/assets/home/profile-kirill.webp'
+import { CaseConditionDrawer } from '@/components/preparation/CaseConditionDrawer'
+import { HelpTooltip } from '@/components/preparation/HelpTooltip'
 import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import { AppButton } from '@/components/ui/AppButton'
 import { clearPendingSessionCreate, getOrCreatePendingSessionCreate, type PendingSessionCreate } from '@/features/arena/pendingSessionCreate'
@@ -51,30 +53,32 @@ interface PreparationFieldProps {
   placeholder: string
   value: string
   onChange: (value: string) => void
+  hideLabel?: boolean
 }
 
-function PreparationField({ label, help, placeholder, value, onChange }: PreparationFieldProps) {
+function PreparationField({ label, help, placeholder, value, onChange, hideLabel = false }: PreparationFieldProps) {
+  const textareaId = useId()
   return (
-    <label className="preparation-field">
-      <span className="preparation-field__title">{label}</span>
-      <span className="preparation-field__help">{help}</span>
-      <textarea aria-label={label} maxLength={2000} rows={4} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+    <div className={`preparation-field ${hideLabel ? 'preparation-field--single' : ''}`}>
+      {!hideLabel && <span className="preparation-field__heading"><label className="preparation-field__title" htmlFor={textareaId}>{label}</label><HelpTooltip label={label} text={help} /></span>}
+      <textarea id={textareaId} aria-label={label} maxLength={2000} rows={4} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
       <small>{value.length}/2000</small>
-    </label>
+    </div>
   )
 }
 
 interface PreparationSectionProps {
   id: PreparationStepId
   title: string
-  description: string
+  help: string
+  singleField?: boolean
   children: React.ReactNode
 }
 
-function PreparationSection({ id, title, description, children }: PreparationSectionProps) {
+function PreparationSection({ id, title, help, singleField = false, children }: PreparationSectionProps) {
   return <section className="preparation-card" id={`preparation-${id}`} aria-labelledby={`preparation-${id}-title`}>
-    <header><div><span>Шаг {PREPARATION_STEP_IDS.indexOf(id) + 1}</span><h2 id={`preparation-${id}-title`}>{title}</h2></div><p>{description}</p></header>
-    <div className="preparation-card__fields">{children}</div>
+    <header><div><span>Шаг {PREPARATION_STEP_IDS.indexOf(id) + 1}</span><span className="preparation-card__heading"><h2 id={`preparation-${id}-title`}>{title}</h2><HelpTooltip label={title} text={help} /></span></div></header>
+    {singleField ? <div className="preparation-card__fields preparation-card__fields--single">{children}</div> : <div className="preparation-card__fields">{children}</div>}
   </section>
 }
 
@@ -109,7 +113,9 @@ export function PreparationPage() {
   const [activeStep, setActiveStep] = useState<PreparationStepId>(activeSection.steps[0])
   const [isStarting, setIsStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
+  const [caseDrawerOpen, setCaseDrawerOpen] = useState(false)
   const pendingRef = useRef<PendingSessionCreate | null>(null)
+  const caseButtonRef = useRef<HTMLButtonElement>(null)
 
   const trainingCase = cases.find((item) => item.id === caseId)
   const completed = useMemo(() => completedPreparationSteps(draft), [draft])
@@ -172,6 +178,7 @@ export function PreparationPage() {
 
   const sectionIndex = sections.findIndex((section) => section.id === activeSectionId)
   const sectionCompleted = (section: SectionInfo) => section.steps.filter((step) => completed.includes(step)).length
+  const closeCaseDrawer = useCallback(() => setCaseDrawerOpen(false), [])
 
   const renderPreparationNavigation = (mobile = false) => <nav aria-label={mobile ? 'Разделы подготовки на мобильном устройстве' : 'Разделы подготовки'}>
     {sections.map((section) => {
@@ -231,6 +238,7 @@ export function PreparationPage() {
     <main className="preparation-shell preparation-main">
       <div className="preparation-context">
         <Link to="/home">← Назад</Link><div><strong>{trainingCase.title}</strong><span>Вы: {trainingCase.roles[roleIndex]}</span></div>
+        <button className="preparation-case-button" ref={caseButtonRef} type="button" onClick={() => setCaseDrawerOpen(true)}>Условие кейса</button>
         <span className={`preparation-save is-${saveState}`} role="status">{saveState === 'saving' ? 'Сохраняем…' : saveState === 'error' ? 'Не сохранено' : 'Сохранено ✓'}</span>
       </div>
       <section className="preparation-intro">
@@ -244,28 +252,28 @@ export function PreparationPage() {
         <aside className="preparation-sidebar">{renderPreparationNavigation()}</aside>
         <div className="preparation-content">
           {activeSectionId === 'analysis' && <>
-            <PreparationSection id="root-conflict" title="Корневой конфликт" description="Посмотрите на ситуацию с позиции беспристрастного наблюдателя."><PreparationField label="Корневой конфликт" help="Проблема, затрагивающая интересы всех сторон." placeholder="Опишите главное противоречие между сторонами…" value={draft.rootConflict} onChange={(value) => patchDraft('rootConflict', value)} /></PreparationSection>
-            <PreparationSection id="strategic-goal" title="Стратегическая цель ситуации" description="Сформулируйте более широкий желаемый результат для всех участников."><PreparationField label="Стратегическая цель" help="Результат, который разрешает корневой конфликт и учитывает интересы сторон." placeholder="Как должна измениться ситуация в результате…" value={draft.strategicGoal} onChange={(value) => patchDraft('strategicGoal', value)} /></PreparationSection>
-            <PreparationSection id="proposals" title="Предложения, решающие конфликт" description="Соберите несколько возможных решений, не ограничиваясь одним вариантом."><PreparationField label="Предложения" help="Варианты, способные снять корневое противоречие." placeholder="Перечислите возможные решения, каждое с новой строки…" value={draft.proposals} onChange={(value) => patchDraft('proposals', value)} /></PreparationSection>
-            <PreparationSection id="layers" title="Анализ по слоям" description="Разложите ситуацию на отдельные аспекты, влияющие на позиции сторон.">
+            <PreparationSection id="root-conflict" title="Корневой конфликт" help="Проблема, затрагивающая интересы всех сторон кейса. Её решение должно снимать остальные побочные конфликты." singleField><PreparationField hideLabel label="Корневой конфликт" help="Проблема, затрагивающая интересы всех сторон кейса." placeholder="Опишите главное противоречие между сторонами…" value={draft.rootConflict} onChange={(value) => patchDraft('rootConflict', value)} /></PreparationSection>
+            <PreparationSection id="strategic-goal" title="Стратегическая цель ситуации" help="Более широкий желаемый результат, который разрешает корневой конфликт и учитывает интересы всех сторон." singleField><PreparationField hideLabel label="Стратегическая цель ситуации" help="Желаемый результат для всех участников ситуации." placeholder="Как должна измениться ситуация в результате…" value={draft.strategicGoal} onChange={(value) => patchDraft('strategicGoal', value)} /></PreparationSection>
+            <PreparationSection id="proposals" title="Предложения, решающие конфликт" help="Варианты решений, которые снимают корневое противоречие и учитывают интересы участников." singleField><PreparationField hideLabel label="Предложения, решающие конфликт" help="Варианты решений корневого конфликта." placeholder="Перечислите возможные решения, каждое с новой строки…" value={draft.proposals} onChange={(value) => patchDraft('proposals', value)} /></PreparationSection>
+            <PreparationSection id="layers" title="Анализ по слоям" help="Способ разложить ситуацию на отдельные аспекты и понять, что влияет на позиции и поведение участников.">
             <div className="preparation-grid">{([
               ['economic', 'Экономический слой', 'Материальная выгода и ресурсы сторон.'], ['legal', 'Юридический слой', 'Законы, договоры, полномочия и правила.'], ['technical', 'Технический слой', 'Объективные факты: кто, что, где и когда.'], ['technological', 'Технологический слой', 'Как устроен процесс и что должно произойти дальше.'], ['emotional', 'Эмоциональный слой', 'Что участники чувствуют прямо сейчас.'], ['psychological', 'Психологический слой', 'Мотивы, ожидания, страхи и потребности.'], ['aesthetic', 'Эстетический слой', 'Насколько решение выглядит достойно или неловко.'], ['ethical', 'Этический слой', 'Представления о справедливости и порядочности.'],
             ] as const).map(([key, label, help]) => <PreparationField key={key} label={label} help={help} placeholder="Что важно учесть в этом слое…" value={draft.layers[key]} onChange={(value) => patchDraft('layers', { ...draft.layers, [key]: value })} />)}</div>
             </PreparationSection>
           </>}
           {activeSectionId === 'strategy' && <>
-            <PreparationSection id="swot" title="SWOT-анализ" description="Оцените внутренние стороны вашей позиции и внешние обстоятельства."><div className="preparation-grid">{([
+            <PreparationSection id="swot" title="SWOT-анализ" help="Оценка своей позиции через преимущества, уязвимости, доступные внешние возможности и возможные риски."><div className="preparation-grid">{([
             ['strengths', 'Сильные стороны', 'Что усиливает вашу переговорную позицию.'], ['weaknesses', 'Слабые стороны', 'Что делает позицию уязвимой.'], ['opportunities', 'Возможности', 'Внешние обстоятельства, которые можно использовать.'], ['threats', 'Угрозы', 'Риски, способные ухудшить позицию или сорвать договорённость.'],
             ] as const).map(([key, label, help]) => <PreparationField key={key} label={label} help={help} placeholder={`Опишите ${label.toLocaleLowerCase('ru-RU')}…`} value={draft.swot[key]} onChange={(value) => patchDraft('swot', { ...draft.swot, [key]: value })} />)}</div></PreparationSection>
-            <PreparationSection id="negotiation-goal" title="Цель на переговоры" description="Определите конкретный и проверяемый результат именно этого разговора."><PreparationField label="Цель на переговоры" help="Реалистичный результат, связанный с вашими интересами." placeholder="О чём вы хотите договориться…" value={draft.negotiationGoal} onChange={(value) => patchDraft('negotiationGoal', value)} /></PreparationSection>
-            <PreparationSection id="bargaining" title="Грани торга" description="Заранее определите пространство, в котором готовы договариваться."><div className="preparation-grid">{([
+            <PreparationSection id="negotiation-goal" title="Цель на переговоры" help="Конкретный и проверяемый результат именно этого разговора, связанный с вашими интересами." singleField><PreparationField hideLabel label="Цель на переговоры" help="Конкретный результат этого разговора." placeholder="О чём вы хотите договориться…" value={draft.negotiationGoal} onChange={(value) => patchDraft('negotiationGoal', value)} /></PreparationSection>
+            <PreparationSection id="bargaining" title="Грани торга" help="Заранее определённый диапазон условий, в котором вы готовы договариваться."><div className="preparation-grid">{([
             ['declared', 'Заявляемая позиция', 'Стартовые условия, оставляющие пространство для уступок.'], ['desired', 'Желаемая позиция', 'Конкретный результат, который полностью вас устраивает.'], ['redLine', 'Красная черта', 'Минимально приемлемый результат, хуже которого соглашаться невыгодно.'],
             ] as const).map(([key, label, help]) => <PreparationField key={key} label={label} help={help} placeholder={`Сформулируйте: ${label.toLocaleLowerCase('ru-RU')}…`} value={draft.bargaining[key]} onChange={(value) => patchDraft('bargaining', { ...draft.bargaining, [key]: value })} />)}</div></PreparationSection>
-            <PreparationSection id="batna" title="BATNA" description="Подготовьте лучший вариант действий, если договориться не получится."><PreparationField label="BATNA" help="Ответ на вопрос: «Что я буду делать, если мы не придём к соглашению?»" placeholder="Опишите реалистичную альтернативу соглашению…" value={draft.batna} onChange={(value) => patchDraft('batna', value)} /></PreparationSection>
+            <PreparationSection id="batna" title="BATNA" help="Лучший реалистичный вариант действий на случай, если договориться с текущим оппонентом не получится." singleField><PreparationField hideLabel label="BATNA" help="Лучший вариант действий без соглашения." placeholder="Опишите реалистичную альтернативу соглашению…" value={draft.batna} onChange={(value) => patchDraft('batna', value)} /></PreparationSection>
           </>}
           {activeSectionId === 'tactics' && <>
-            <PreparationSection id="scenario" title="Сценарий" description="Продумайте маршрут разговора, сохраняя возможность адаптироваться."><PreparationField label="Сценарий" help="Вопросы, темы, аргументы, варианты решений и фиксация договорённостей." placeholder="Опишите последовательность шагов переговоров…" value={draft.scenario} onChange={(value) => patchDraft('scenario', value)} /></PreparationSection>
-            <PreparationSection id="opening" title="Загрузка" description="Подготовьте короткую первую реплику, которая задаст направление разговора."><PreparationField label="Загрузка" help="Короткое начало без пересказа кейса, желательно с открытым вопросом." placeholder="Сформулируйте первую реплику до 30 секунд…" value={draft.opening} onChange={(value) => patchDraft('opening', value)} /></PreparationSection>
+            <PreparationSection id="scenario" title="Сценарий" help="Заранее продуманный маршрут переговоров от текущей ситуации к вашей цели, который оставляет возможность адаптироваться." singleField><PreparationField hideLabel label="Сценарий" help="Маршрут переговоров к вашей цели." placeholder="Опишите последовательность шагов переговоров…" value={draft.scenario} onChange={(value) => patchDraft('scenario', value)} /></PreparationSection>
+            <PreparationSection id="opening" title="Загрузка" help="Короткая первая реплика, которая задаёт контекст, запускает сценарий и вовлекает оппонента в диалог." singleField><PreparationField hideLabel label="Загрузка" help="Подготовленное начало переговоров." placeholder="Сформулируйте первую реплику до 30 секунд…" value={draft.opening} onChange={(value) => patchDraft('opening', value)} /></PreparationSection>
           </>}
           <div className="preparation-bottom">
             {sectionIndex > 0 && <button className="preparation-bottom__back" type="button" onClick={() => selectSection(sections[sectionIndex - 1].id)}><span>←</span> Назад</button>}
@@ -274,5 +282,6 @@ export function PreparationPage() {
         </div>
       </div>
     </main>
+    {caseDrawerOpen && <CaseConditionDrawer item={trainingCase} roleIndex={roleIndex} triggerRef={caseButtonRef} onClose={closeCaseDrawer} />}
   </div>
 }

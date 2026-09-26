@@ -22,6 +22,7 @@ test('mock registration, voice reconnect, committed history and result survive r
   await modal.getByText('Голос', { exact: true }).click()
   await modal.getByRole('button', { name: 'Начать подготовку' }).click()
   await expect(page).toHaveURL(/\/cases\/salary-review\/preparation/)
+  await page.locator('.preparation-sidebar').getByRole('button', { name: /Стратегия/ }).click()
   await page.getByRole('textbox', { name: 'BATNA', exact: true }).fill('Зафиксировать результаты и рассмотреть другие предложения.')
   await page.getByRole('button', { name: 'Начать поединок' }).first().click()
   await expect(page).toHaveURL(/\/arena\/[0-9a-f-]+$/)

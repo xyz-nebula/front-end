@@ -39,6 +39,7 @@ test('text arena creates, restores and finishes one atomic conversation without 
 
   await dialog.getByRole('button', { name: 'Начать подготовку' }).click()
   await expect(page).toHaveURL(/\/cases\/salary-review\/preparation/)
+  await page.locator('.preparation-sidebar').getByRole('button', { name: /Стратегия/ }).click()
   await page.getByRole('textbox', { name: 'Цель на переговоры', exact: true }).fill('Договориться о новых условиях и сроке пересмотра.')
   await page.getByRole('button', { name: 'Начать поединок' }).first().click()
   await expect(page).toHaveURL(/\/arena\/[0-9a-f-]+$/)
