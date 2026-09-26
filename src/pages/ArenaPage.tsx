@@ -12,6 +12,7 @@ import { useArenaSession } from '@/features/arena/useArenaSession'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
 import { trainingCases } from '@/mocks/cases'
 import { getDuelPreparation } from '@/mocks/duelPreparation'
+import { readSessionPreparation } from '@/features/preparation/preparation'
 import { useDomainServices } from '@/services/domainServices'
 import type { TrainingCase } from '@/types/case'
 
@@ -20,10 +21,13 @@ function fallbackCase(title: string): TrainingCase {
     id: title,
     title,
     description: 'Голосовой разговор с AI. Сценарий и роль оппонента пока не привязаны к карточке.',
+    synopsis: 'Переговорная сессия из истории.',
     category: 'Карьера',
     duration: 'Без ограничения',
     difficulty: 'Средне',
     opponent: 'AI-оппонент',
+    roles: ['Участник', 'AI-оппонент'],
+    roleSummaries: ['Участник переговоров.', 'AI-оппонент.'],
     accent: 'violet',
     icon: 'dialogue',
   }
@@ -41,6 +45,7 @@ export function ArenaPage() {
   const trainingCase = trainingCases.find(
     (item) => item.id === arena.session?.caseId || item.title === arena.session?.name,
   ) ?? (arena.session ? fallbackCase(arena.session.name ?? 'Переговоры с AI') : undefined)
+  const sessionPreparation = arena.session ? readSessionPreparation(arena.session.id) : null
 
   useEffect(() => {
     if (arena.viewState === 'finished') navigate(`/result/${sessionId}`, { replace: true })
@@ -94,8 +99,8 @@ export function ArenaPage() {
     <div className="arena-page">
       <ArenaHeader
         title={trainingCase.title}
-        userRole={preparation?.userRole ?? 'Вы'}
-        opponentRole={preparation?.opponentRole ?? trainingCase.opponent}
+        userRole={sessionPreparation?.userRole ?? preparation?.userRole ?? 'Вы'}
+        opponentRole={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? trainingCase.opponent}
         startedAt={arena.session.startedAt}
         mode={arena.session.mode}
         audioState={audio.state}
@@ -107,10 +112,10 @@ export function ArenaPage() {
       <main className="duel-shell arena-layout">
         <section className="arena-dialog-panel">
           <h2 className="arena-dialog-panel__title">Диалог</h2>
-          <ArenaConversation messages={arena.session.messages} opponent={preparation?.opponentRole ?? trainingCase.opponent} isThinking={isSending} mode={arena.session.mode} partial={audio.partial} />
+          <ArenaConversation messages={arena.session.messages} opponent={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? trainingCase.opponent} isThinking={isSending} mode={arena.session.mode} partial={audio.partial} />
           {arena.error && <div className="arena-inline-error" role="alert"><span>{arena.error}</span><button type="button" onClick={() => arena.turnState === 'error' ? void arena.sendTextTurn() : setShowFinishDialog(true)}>Повторить</button></div>}
         </section>
-        <DuelPreparation data={preparation} description={trainingCase.description} isRealVoice={isRealVoice} />
+        <DuelPreparation data={preparation} description={trainingCase.description} isRealVoice={isRealVoice} snapshot={sessionPreparation} />
         <div className="duel-controls">
           {isFinished ? (
             <div className="arena-finished" role="status"><div><strong>Переговоры завершены</strong><span>Открываем разбор…</span></div><Link to={`/result/${sessionId}`}>Посмотреть результат →</Link></div>

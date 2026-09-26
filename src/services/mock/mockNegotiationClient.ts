@@ -2,6 +2,7 @@ import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 import { MockRuntime } from '@/services/mock/mockRuntime'
 import type { NegotiationSessionSummary } from '@/types/negotiation'
 import { ServiceError } from '@/types/api'
+import { trainingCases } from '@/mocks/cases'
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds))
@@ -33,6 +34,12 @@ export class MockNegotiationClient implements NegotiationClient {
     const ownerKey = this.requireOwner()
     await this.delay()
     return this.runtime.createSession(ownerKey, input)
+  }
+
+  async listCases() {
+    this.requireOwner()
+    await this.delay()
+    return structuredClone(trainingCases)
   }
 
   async getSession(sessionId: string) {

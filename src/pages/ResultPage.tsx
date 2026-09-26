@@ -9,6 +9,7 @@ import {
   getOrCreatePendingSessionCreate,
   type PendingSessionCreate,
 } from '@/features/arena/pendingSessionCreate'
+import { readSessionPreparation, saveSessionPreparation, serializePreparation } from '@/features/preparation/preparation'
 import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { useDomainServices } from '@/services/domainServices'
 import type { NegotiationResultState, NegotiationSession } from '@/types/negotiation'
@@ -77,11 +78,16 @@ export function ResultPage() {
     setRestartingSessionId(session.id)
     setError(null)
     try {
+      const previousPreparation = readSessionPreparation(session.id)
       const created = await negotiationClient.createSession({
         caseId: command.caseId,
         mode: command.mode,
         clientCommandId: command.clientCommandId,
+        preparations: previousPreparation
+          ? serializePreparation(previousPreparation.draft)
+          : '# Подготовка\n\nПользователь не заполнял карточку подготовки.',
       })
+      if (previousPreparation) saveSessionPreparation(created.id, previousPreparation)
       clearPendingSessionCreate(storageKey)
       pendingRepeatRef.current = null
       if (generation !== generationRef.current) return

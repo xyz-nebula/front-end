@@ -9,14 +9,13 @@ import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import heroArtwork from '@/assets/home/hero-negotiation.webp'
 import profileArtwork from '@/assets/home/profile-kirill.webp'
 import { caseArtwork } from '@/mocks/caseArtwork'
-import { trainingCases } from '@/mocks/cases'
 import { useDomainServices } from '@/services/domainServices'
 import type { TrainingCase } from '@/types/case'
 import type { NegotiationSessionSummary } from '@/types/negotiation'
 import '@/styles/home.css'
 
-function trainingTitle(item: NegotiationSessionSummary) {
-  return trainingCases.find((trainingCase) => trainingCase.id === item.caseId || trainingCase.title === item.name)?.title
+function trainingTitle(item: NegotiationSessionSummary, cases: TrainingCase[]) {
+  return cases.find((trainingCase) => trainingCase.id === item.caseId || trainingCase.title === item.name)?.title
     ?? item.name ?? 'Переговоры с AI'
 }
 
@@ -48,10 +47,13 @@ export function HomePage() {
   const [history, setHistory] = useState<NegotiationSessionSummary[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [historyLoading, setHistoryLoading] = useState(true)
+  const [cases, setCases] = useState<TrainingCase[]>([])
+  const [casesLoading, setCasesLoading] = useState(true)
+  const [casesError, setCasesError] = useState<string | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
-  const recommendedCase = trainingCases[0]
+  const recommendedCase = cases[0]
   const activeSession = history.find((item) => item.status === 'active')
-  const activeCase = activeSession && trainingCases.find((item) => item.id === activeSession.caseId)
+  const activeCase = activeSession && cases.find((item) => item.id === activeSession.caseId)
   const displayedCase = activeCase ?? recommendedCase
   const visibleHistory = showAllHistory ? history : history.slice(0, 3)
 
@@ -72,6 +74,18 @@ export function HomePage() {
     }
   }, [negotiationClient])
 
+  const loadCases = useCallback(async () => {
+    setCasesLoading(true)
+    try {
+      setCases(await negotiationClient.listCases())
+      setCasesError(null)
+    } catch (caught) {
+      setCasesError(caught instanceof Error ? caught.message : 'Не удалось загрузить кейсы.')
+    } finally {
+      setCasesLoading(false)
+    }
+  }, [negotiationClient])
+
   useEffect(() => {
     let active = true
     void negotiationClient.listSessions().then((sessions) => {
@@ -80,6 +94,18 @@ export function HomePage() {
       if (active) setHistoryError(caught instanceof Error ? caught.message : 'Не удалось загрузить историю.')
     }).finally(() => {
       if (active) setHistoryLoading(false)
+    })
+    return () => { active = false }
+  }, [negotiationClient])
+
+  useEffect(() => {
+    let active = true
+    void negotiationClient.listCases().then((items) => {
+      if (active) setCases(items)
+    }).catch((caught: unknown) => {
+      if (active) setCasesError(caught instanceof Error ? caught.message : 'Не удалось загрузить кейсы.')
+    }).finally(() => {
+      if (active) setCasesLoading(false)
     })
     return () => { active = false }
   }, [negotiationClient])
@@ -137,14 +163,14 @@ export function HomePage() {
             </div> : <>
               <div className="arena-home__continue-head"><h2 id="continue-title">{activeSession ? 'Продолжить тренировку' : 'Начать тренировку'}</h2><span>▣ &nbsp;{activeSession ? 'В процессе' : 'Рекомендуем'}</span></div>
               <div className="arena-home__continue-body">
-                <img src={activeSession ? caseArtwork[displayedCase.id] : heroArtwork} alt="" />
+                <img src={activeSession && displayedCase ? caseArtwork[displayedCase.id] ?? heroArtwork : heroArtwork} alt="" />
                 <div className="arena-home__continue-info">
-                  <h3>{displayedCase.title}</h3>
-                  <p>{displayedCase.category} · {displayedCase.duration}</p>
+                  <h3>{displayedCase?.title ?? (casesLoading ? 'Загружаем кейс…' : 'Выберите кейс')}</h3>
+                  <p>{displayedCase ? `${displayedCase.category} · ${displayedCase.duration}` : 'Подготовьтесь и проведите переговоры с AI'}</p>
                   <div className="arena-home__preparation"><span>Подготовка: <strong>65%</strong></span><div role="meter" aria-label="Демо: прогресс подготовки" aria-valuenow={65} aria-valuemin={0} aria-valuemax={100}><i /></div></div>
                   {activeSession
                     ? <Link className="arena-home__primary-button" to={`/arena/${activeSession.id}`}>Продолжить <span aria-hidden="true">→</span></Link>
-                    : <button className="arena-home__primary-button" type="button" onClick={() => setSelectedCase(recommendedCase)}>Начать кейс <span aria-hidden="true">→</span></button>}
+                    : <button className="arena-home__primary-button" type="button" disabled={!recommendedCase} onClick={() => recommendedCase && setSelectedCase(recommendedCase)}>Начать кейс <span aria-hidden="true">→</span></button>}
                 </div>
               </div>
             </>}
@@ -159,7 +185,9 @@ export function HomePage() {
 
         <section className="arena-home__cases" id="cases" aria-labelledby="home-cases-title">
           <div className="arena-home__section-head"><h2 id="home-cases-title">Кейсы</h2></div>
-          <div className="arena-home__case-grid">{trainingCases.map((item) => <CaseCard key={item.id} item={item} onSelect={setSelectedCase} />)}</div>
+          {casesLoading && <p className="arena-home__history-state" role="status">Загружаем кейсы…</p>}
+          {casesError && <div className="arena-home__history-state" role="alert">{casesError} <button type="button" onClick={() => void loadCases()}>Повторить</button></div>}
+          {!casesLoading && !casesError && <div className="arena-home__case-grid">{cases.map((item) => <CaseCard key={item.id} item={item} onSelect={setSelectedCase} />)}</div>}
         </section>
 
         <section className="arena-home__history" aria-labelledby="home-history-title">
@@ -169,7 +197,7 @@ export function HomePage() {
             {historyError && <div className="arena-home__history-state" role="alert">{historyError} <button type="button" onClick={() => { setHistoryLoading(true); setHistoryError(null); void loadHistory() }}>Повторить</button></div>}
             {!historyLoading && !historyError && history.length === 0 && <p className="arena-home__history-state">Здесь появятся ваши тренировки. Выберите кейс и начните первый раунд.</p>}
             {!historyLoading && !historyError && visibleHistory.map((item) => {
-              const title = trainingTitle(item)
+              const title = trainingTitle(item, cases)
               return <div className="arena-home__history-row" key={item.id}>
                 <img src={caseArtwork[item.caseId] ?? heroArtwork} alt="" />
                 <div className="arena-home__history-title"><strong>{title}</strong><span>{item.mode === 'voice' ? 'Голос' : 'Текст'}</span></div>

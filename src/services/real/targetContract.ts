@@ -4,7 +4,7 @@ import type { MessageSpeaker, NegotiationMessage } from '@/types/negotiation'
 
 export type ChatStatusDto = 'victory' | 'defeat' | 'ongoing'
 
-export interface ChatCreateRequestDto { name: string }
+export interface ChatCreateRequestDto { name: string; case_uuid: string; preparations: string }
 export interface ChatActivateRequestDto { uuid: string }
 export interface ChatListItemDto { uuid: string; name: string }
 export interface ChatResponseDto extends ChatListItemDto { status: ChatStatusDto; created_at: string }
@@ -15,11 +15,36 @@ export interface MessageResponseDto {
   text: string
   created_at: string
 }
-export interface ChatWithMessagesResponseDto extends ChatResponseDto { messages: MessageResponseDto[] }
+export interface CaseResponseDto {
+  uuid: string
+  created_at: string
+  name: string
+  description: string
+  category: string
+  difficulty: string
+  time_limit: number
+  preparations: string
+  goal: string
+  synopsis: string
+  first_role: string
+  second_role: string
+}
+export interface ChatWithMessagesResponseDto extends ChatResponseDto { case?: CaseResponseDto; messages: MessageResponseDto[] }
 
 export interface ParsedChatListItem { id: string; name: string }
 export interface ParsedChat extends ParsedChatListItem { status: ChatStatusDto; createdAt: string }
-export interface ParsedChatWithMessages extends ParsedChat { messages: NegotiationMessage[] }
+export interface ParsedCase {
+  id: string
+  name: string
+  description: string
+  category: string
+  difficulty: string
+  timeLimit: number
+  synopsis: string
+  firstRole: string
+  secondRole: string
+}
+export interface ParsedChatWithMessages extends ParsedChat { case?: ParsedCase; messages: NegotiationMessage[] }
 
 export interface AudioFormatDto {
   codec: 'pcm_s16le'
@@ -63,6 +88,10 @@ function nonEmptyString(value: unknown, path: string): string {
 
 function nonEmptyChunk(value: unknown, path: string): string {
   return typeof value === 'string' && value.length > 0 ? value : invalidResponse(path)
+}
+
+function stringValue(value: unknown, path: string): string {
+  return typeof value === 'string' ? value : invalidResponse(path)
 }
 
 function uuid(value: unknown, path: string): string {
@@ -134,8 +163,32 @@ export function parseChatWithMessages(value: unknown): ParsedChatWithMessages {
   const uniqueMessages = [...new Map(messages.map((message) => [message.id, message])).values()]
   return {
     ...parseChatBase(dto, 'chat'),
+    ...(dto.case === undefined ? {} : { case: parseCase(dto.case, 'chat.case') }),
     messages: uniqueMessages.sort((left, right) => left.sequence - right.sequence),
   }
+}
+
+function parseCase(value: unknown, path: string): ParsedCase {
+  const dto = record(value, path)
+  // `preparations` is deliberately validated but not exposed: it contains the
+  // hidden ideal preparation used by the AI opponent.
+  stringValue(dto.preparations, `${path}.preparations`)
+  return {
+    id: uuid(dto.uuid, `${path}.uuid`),
+    name: nonEmptyString(dto.name, `${path}.name`),
+    description: stringValue(dto.description, `${path}.description`),
+    category: nonEmptyString(dto.category, `${path}.category`),
+    difficulty: nonEmptyString(dto.difficulty, `${path}.difficulty`),
+    timeLimit: positiveInteger(dto.time_limit, `${path}.time_limit`),
+    synopsis: stringValue(dto.synopsis, `${path}.synopsis`),
+    firstRole: nonEmptyString(dto.first_role, `${path}.first_role`),
+    secondRole: nonEmptyString(dto.second_role, `${path}.second_role`),
+  }
+}
+
+export function parseCases(value: unknown): ParsedCase[] {
+  if (!Array.isArray(value)) return invalidResponse('cases')
+  return value.map((item, index) => parseCase(item, `cases[${index}]`))
 }
 
 export function parseAudioEngineEvent(value: unknown): RemoteAudioEngineEvent {
@@ -178,7 +231,9 @@ export function parseBackendError(value: unknown, status: number): ServiceError 
   })
 }
 
-export function toCreateChatDto(name: string): ChatCreateRequestDto { return { name } }
+export function toCreateChatDto(name: string, caseId: string, preparations: string): ChatCreateRequestDto {
+  return { name, case_uuid: caseId, preparations }
+}
 export function toActivateChatDto(id: string): ChatActivateRequestDto { return { uuid: id } }
 export function toAudioInputDto(audio: string): AudioInputMessageDto { return { type: 'audio', audio } }
 export function toAudioControlDto(action: AudioControlDto['action']): AudioControlDto { return { type: 'control', action } }

@@ -31,6 +31,7 @@ const testGroups = [
     specs: [
       'landing.spec.ts',
       'home.spec.ts',
+      'preparation.spec.ts',
       'mock-domain.spec.ts',
       'domain-resilience.spec.ts',
       'arena-session-resilience.spec.ts',

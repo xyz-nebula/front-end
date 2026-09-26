@@ -37,7 +37,10 @@ test('text arena creates, restores and finishes one atomic conversation without 
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/training-modal-modes-desktop.png`)
 
-  await dialog.getByRole('button', { name: 'Начать тренировку' }).click()
+  await dialog.getByRole('button', { name: 'Начать подготовку' }).click()
+  await expect(page).toHaveURL(/\/cases\/salary-review\/preparation/)
+  await page.getByRole('textbox', { name: 'Цель на переговоры', exact: true }).fill('Договориться о новых условиях и сроке пересмотра.')
+  await page.getByRole('button', { name: 'Начать поединок' }).first().click()
   await expect(page).toHaveURL(/\/arena\/[0-9a-f-]+$/)
   await expect(page.getByRole('heading', { name: 'Начните разговор' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Моя подготовка' })).toBeVisible()
