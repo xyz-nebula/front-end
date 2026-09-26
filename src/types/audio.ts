@@ -39,6 +39,11 @@ export interface AudioTranscriptDraft {
   committedMessageId?: string
 }
 
+export interface AudioCaptureMessage {
+  buffer: ArrayBuffer
+  rms: number
+}
+
 export interface AudioTranscriptDrafts {
   user: AudioTranscriptDraft | null
   ai: AudioTranscriptDraft | null

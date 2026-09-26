@@ -23,6 +23,7 @@ function deferred<T>(): Deferred<T> {
 }
 
 class TestAudioClient implements AudioClient {
+  readonly requiresTicket = true
   state: AudioConnectionState = 'idle'
   connectCalls: Array<{ sessionId: string; ticket: string }> = []
   disconnectCalls = 0
@@ -60,6 +61,7 @@ function negotiationClient(createAudioTicket: (sessionId: string) => Promise<Aud
   return {
     createSession: unavailable,
     getSession: unavailable,
+    activateSession: async () => undefined,
     sendTextTurn: unavailable,
     createAudioTicket,
     finishSession: unavailable,

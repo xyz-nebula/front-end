@@ -81,10 +81,26 @@
 .arena-page .duel-preparation__expand { width: 100%; min-height: 42px; margin-top: 2px; border: 0; border-radius: 10px; color: var(--duel-blue); background: #eaf2ff; cursor: pointer; font-size: 14px; }
 .arena-page .duel-preparation__expand:hover { background: #dceaff; }
 .arena-page .duel-controls { grid-column: 1; grid-row: 2; min-width: 0; }
-.arena-page .voice-controls { padding: 0; border: 0; background: transparent; text-align: center; }
+.arena-page .voice-controls { --voice-level: 0; --voice-ring-inner-scale: 1; --voice-ring-middle-scale: 1; --voice-ring-outer-scale: 1; --voice-ring-inner-opacity: .54; --voice-ring-middle-opacity: .32; --voice-ring-outer-opacity: .18; --voice-glow-size: 13px; padding: 0; border: 0; background: transparent; text-align: center; }
 .arena-page .voice-controls__main { display: flex; align-items: center; justify-content: center; gap: 38px; }
-.arena-page .voice-controls__wave { color: var(--duel-blue); font-size: clamp(14px, 1.3vw, 23px); letter-spacing: 3px; white-space: nowrap; }
-.arena-page .voice-controls__mic { display: grid; width: 112px; height: 112px; flex: none; place-items: center; border: 10px solid #cfe1ff; border-radius: 50%; color: #fff; background: linear-gradient(145deg, #128cff, #0754df); box-shadow: 0 0 0 10px #edf4ff; cursor: pointer; }
+.arena-page .voice-controls__equalizer { display: flex; width: 190px; height: 44px; align-items: center; justify-content: flex-end; gap: 5px; color: var(--duel-blue); }
+.arena-page .voice-controls__equalizer--right { flex-direction: row-reverse; }
+.arena-page .voice-controls__equalizer i { width: 4px; height: 100%; border-radius: 999px; background: currentColor; box-shadow: 0 2px 8px #0869ec24; transform: scaleY(.24); transform-origin: center; }
+.arena-page .voice-controls__equalizer i:nth-child(1) { transform: scaleY(var(--voice-bar-1, .23)); }
+.arena-page .voice-controls__equalizer i:nth-child(2) { transform: scaleY(var(--voice-bar-2, .26)); }
+.arena-page .voice-controls__equalizer i:nth-child(3) { transform: scaleY(var(--voice-bar-3, .28)); }
+.arena-page .voice-controls__equalizer i:nth-child(4) { transform: scaleY(var(--voice-bar-4, .3)); }
+.arena-page .voice-controls__equalizer i:nth-child(5) { transform: scaleY(var(--voice-bar-5, .27)); }
+.arena-page .voice-controls__equalizer i:nth-child(6) { transform: scaleY(var(--voice-bar-6, .29)); }
+.arena-page .voice-controls__equalizer i:nth-child(7) { transform: scaleY(var(--voice-bar-7, .25)); }
+.arena-page .voice-controls__equalizer i:nth-child(8) { transform: scaleY(var(--voice-bar-8, .27)); }
+.arena-page .voice-controls__equalizer i:nth-child(9) { transform: scaleY(var(--voice-bar-9, .24)); }
+.arena-page .voice-controls__mic-stage { position: relative; display: grid; width: 112px; height: 112px; flex: none; place-items: center; }
+.arena-page .voice-controls__ring { position: absolute; top: 50%; left: 50%; border: 1px solid #8fbcff; border-radius: 50%; pointer-events: none; }
+.arena-page .voice-controls__ring--inner { width: 112%; height: 112%; background: #cfe1ff57; opacity: var(--voice-ring-inner-opacity); transform: translate(-50%, -50%) scale(var(--voice-ring-inner-scale)); }
+.arena-page .voice-controls__ring--middle { width: 132%; height: 132%; background: #dceaff47; opacity: var(--voice-ring-middle-opacity); transform: translate(-50%, -50%) scale(var(--voice-ring-middle-scale)); }
+.arena-page .voice-controls__ring--outer { width: 146%; height: 146%; border-color: #b9d5ff; background: #e8f1ff38; box-shadow: 0 0 var(--voice-glow-size) #4e9dff38; opacity: var(--voice-ring-outer-opacity); transform: translate(-50%, -50%) scale(var(--voice-ring-outer-scale)); }
+.arena-page .voice-controls__mic { position: relative; z-index: 1; display: grid; width: 112px; height: 112px; place-items: center; border: 10px solid #cfe1ff; border-radius: 50%; color: #fff; background: linear-gradient(145deg, #128cff, #0754df); box-shadow: 0 8px 24px #0869ec2e; cursor: pointer; }
 .arena-page .voice-controls__mic:hover:not(:disabled) { background: #064dca; transform: scale(1.03); }
 .arena-page .voice-controls__mic:disabled { cursor: wait; opacity: .55; }
 .arena-page .voice-controls__mic svg { width: 31px; height: 40px; }
@@ -161,8 +177,10 @@
   .arena-page .duel-preparation.is-expanded .duel-preparation__content { display: grid; }
   .arena-page .duel-controls { flex: none; padding: 4px 0 max(7px, env(safe-area-inset-bottom)); }
   .arena-page .voice-controls__main { gap: 13px; }
-  .arena-page .voice-controls__wave { max-width: 25%; overflow: hidden; font-size: 14px; letter-spacing: 0; }
-  .arena-page .voice-controls__mic { width: 78px; height: 78px; border-width: 7px; box-shadow: 0 0 0 7px #edf4ff; }
+  .arena-page .voice-controls__equalizer { width: min(25vw, 94px); height: 32px; gap: 3px; }
+  .arena-page .voice-controls__equalizer i { width: 3px; }
+  .arena-page .voice-controls__mic-stage, .arena-page .voice-controls__mic { width: 78px; height: 78px; }
+  .arena-page .voice-controls__mic { border-width: 7px; }
   .arena-page .voice-controls__mic svg { width: 23px; height: 31px; }
   .arena-page .voice-controls__status { max-width: 300px; gap: 3px; margin: 6px auto 0; line-height: 1.3; }
   .arena-page .voice-controls__status strong { font-size: 17px; }
@@ -172,6 +190,10 @@
   .arena-page .arena-composer > label { font-size: 11px; }
   .arena-page .arena-composer textarea { max-height: 58px; font-size: 13px; }
   .arena-page .arena-composer > small { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arena-page .voice-controls__ring, .arena-page .voice-controls__equalizer i { transition: none; }
 }
 
 @media (max-width: 380px) {

@@ -58,6 +58,7 @@ export async function runAudioFinishFailureScenario() {
   const negotiationClient: NegotiationClient = {
     createSession: unavailable,
     getSession: () => Promise.resolve(voiceSession()),
+    activateSession: async () => undefined,
     sendTextTurn: unavailable,
     createAudioTicket: unavailable,
     finishSession: (input) => {
@@ -82,9 +83,9 @@ export async function runAudioFinishFailureScenario() {
       await new Promise((resolve) => window.setTimeout(resolve, 5))
     })
   }
-  const button = (label: string) => [...host.querySelectorAll('button')]
-    .filter((candidate) => candidate.textContent?.trim() === label)
-    .at(-1)
+  const finishButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Завершить"]')
+  const confirmButton = () => [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')]
+    .find((candidate) => candidate.textContent?.trim() === 'Завершить')
 
   try {
     await act(async () => {
@@ -102,15 +103,15 @@ export async function runAudioFinishFailureScenario() {
         </DomainServicesContext.Provider>,
       )
     })
-    await flush()
-    await act(async () => { button('Завершить')?.click() })
-    await act(async () => { button('Завершить')?.click() })
+    for (let attempt = 0; attempt < 20 && finishButton()?.disabled !== false; attempt += 1) await flush()
+    await act(async () => { finishButton()?.click() })
+    await act(async () => { confirmButton()?.click() })
     await flush()
     const afterFailure = {
       dialogOpen: Boolean(host.querySelector('[role="dialog"]')),
       error: host.querySelector('[role="dialog"] [role="alert"]')?.textContent ?? null,
     }
-    await act(async () => { button('Завершить')?.click() })
+    await act(async () => { confirmButton()?.click() })
     await flush()
     return {
       afterFailure,

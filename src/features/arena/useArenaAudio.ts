@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useDomainServices } from '@/services/domainServices'
 import type { AudioClient } from '@/services/contracts/audioClient'
-import type { AudioConnectionState, AudioEngineEvent, AudioTranscriptDrafts } from '@/types/audio'
+import type { AudioCaptureMessage, AudioConnectionState, AudioEngineEvent, AudioTranscriptDrafts } from '@/types/audio'
 import type { MessageSpeaker, NegotiationMessage } from '@/types/negotiation'
+import { AdaptiveVoiceLevel } from '@/features/arena/voiceLevel'
 
 const TYPING_INTERVAL_MS = 30
 const FINISHING_INTERVAL_MS = 12
@@ -26,6 +27,7 @@ interface ArenaAudioState {
   partial: AudioTranscriptDrafts
   error: string | null
   isPlaying: boolean
+  getInputLevel: () => number
   connect: () => Promise<void>
   pause: () => void
   resume: () => void
@@ -43,6 +45,8 @@ export function useArenaAudio(
   const [partial, setPartial] = useState<AudioTranscriptDrafts>(emptyDrafts)
   const [error, setError] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const inputLevelRef = useRef(0)
+  const voiceLevelRef = useRef(new AdaptiveVoiceLevel())
   const clientRef = useRef<AudioClient | null>(null)
   const contextRef = useRef<AudioContext | null>(null)
   const captureStreamRef = useRef<MediaStream | null>(null)
@@ -65,6 +69,13 @@ export function useArenaAudio(
   useEffect(() => { onCommittedRef.current = onCommitted }, [onCommitted])
   useEffect(() => { onReconnectRef.current = onReconnect }, [onReconnect])
 
+  const resetInputLevel = useCallback(() => {
+    inputLevelRef.current = 0
+    voiceLevelRef.current.reset()
+  }, [])
+
+  const getInputLevel = useCallback(() => inputLevelRef.current, [])
+
   const stopCapture = useCallback(() => {
     const node = captureNodeRef.current
     if (node) {
@@ -82,7 +93,8 @@ export function useArenaAudio(
     captureSourceRef.current = null
     captureMuteRef.current = null
     captureStreamRef.current = null
-  }, [])
+    resetInputLevel()
+  }, [resetInputLevel])
 
   const startCapture = useCallback(async (client: AudioClient, isCurrent: () => boolean) => {
     if (!client.acceptsAudioInput) return
@@ -131,10 +143,14 @@ export function useArenaAudio(
     const mute = context.createGain()
     mute.gain.value = 0
     source.connect(node).connect(mute).connect(context.destination)
-    node.port.onmessage = (message: MessageEvent<ArrayBuffer>) => {
+    node.port.onmessage = (message: MessageEvent<AudioCaptureMessage>) => {
       if (!isCurrent()) return
       try {
-        const bytes = new Uint8Array(message.data)
+        if (!(message.data?.buffer instanceof ArrayBuffer) || !Number.isFinite(message.data.rms)) {
+          throw new Error('Получен некорректный аудиофрейм.')
+        }
+        inputLevelRef.current = voiceLevelRef.current.push(message.data.rms)
+        const bytes = new Uint8Array(message.data.buffer)
         let binary = ''
         for (const byte of bytes) binary += String.fromCharCode(byte)
         client.sendAudio(btoa(binary))
@@ -343,9 +359,11 @@ export function useArenaAudio(
         playFrame(event, isCurrent)
       } else if (event.type === 'error') {
         clearAllStreams()
+        resetInputLevel()
         setError(event.message)
       } else if (event.type === 'closed') {
         clearAllStreams()
+        resetInputLevel()
         stopPlayback()
       } else if (event.type === 'auth_error') {
         setError('Обновляем авторизацию голосового подключения…')
@@ -388,7 +406,7 @@ export function useArenaAudio(
       void contextRef.current?.close()
       contextRef.current = null
     }
-  }, [createAudioClient, enabled, negotiationClient, playFrame, sessionId, stopCapture, stopPlayback])
+  }, [createAudioClient, enabled, negotiationClient, playFrame, resetInputLevel, sessionId, stopCapture, stopPlayback])
 
   useEffect(() => {
     if (!enabled || !navigator.mediaDevices?.addEventListener) return
@@ -473,6 +491,7 @@ export function useArenaAudio(
   }, [stopCapture, stopPlayback])
 
   const pause = useCallback(() => {
+    resetInputLevel()
     captureNodeRef.current?.port.postMessage('pause')
     try {
       clientRef.current?.sendControl('pause')
@@ -486,7 +505,7 @@ export function useArenaAudio(
         setError('Не удалось приостановить звук. Текст ответа сохранён в диалоге.')
       }
     })
-  }, [])
+  }, [resetInputLevel])
 
   const resume = useCallback(() => {
     captureNodeRef.current?.port.postMessage('resume')
@@ -509,6 +528,7 @@ export function useArenaAudio(
     partial,
     error,
     isPlaying,
+    getInputLevel,
     connect,
     pause,
     resume,
