@@ -1,7 +1,7 @@
 {
-  "totalBytes": 6440658,
-  "imageBytes": 5632982,
-  "javascriptBytes": 603041,
-  "cssBytes": 203856,
-  "largestJavaScriptChunkBytes": 601455
+  "totalBytes": 2485598,
+  "imageBytes": 1791116,
+  "javascriptBytes": 509860,
+  "cssBytes": 183844,
+  "largestJavaScriptChunkBytes": 338927
 }

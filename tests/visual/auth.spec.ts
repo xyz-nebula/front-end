@@ -273,7 +273,10 @@ test('activation loading, success, and error states render on desktop and mobile
   await page.clock.pauseAt(new Date())
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`/activate?code=${activationCode}`)
+  // Let React commit the lazy route, then freeze the pending API timeout again.
+  await page.clock.resume()
   await expect(page.getByRole('heading', { name: 'Активируем аккаунт' })).toBeVisible()
+  await page.clock.pauseAt(new Date())
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/activation-loading-desktop.png`)
 
