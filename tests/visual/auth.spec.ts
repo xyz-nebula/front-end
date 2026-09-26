@@ -37,6 +37,13 @@ async function mockSuccessfulBootstrap(page: Page, nextAccessToken = 'fresh-acce
   }))
 }
 
+async function navigateInApp(page: Page, path: string) {
+  await page.evaluate((nextPath) => {
+    window.history.pushState({ usr: null, key: 'test-navigation', idx: 1 }, '', nextPath)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }, path)
+}
+
 async function loginThroughUi(page: Page, totpToken = '') {
   await page.goto('/login')
   await page.getByLabel('Email').fill('user@example.com')
@@ -96,6 +103,35 @@ test('registration renders responsively and reveals the password', async ({ page
   await page.setViewportSize({ width: 390, height: 844 })
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/register-mobile.png`)
+})
+
+test('not found page uses safe back navigation and a contextual home', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/missing-page')
+  await expect(page.getByRole('heading', { name: 'Такой страницы нет' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'На главную', exact: true })).toHaveAttribute('href', '/')
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/not-found-desktop.png`)
+
+  await page.getByRole('button', { name: /Вернуться назад/ }).click()
+  await expect(page).toHaveURL(/\/$/)
+
+  await page.goto('/login')
+  await navigateInApp(page, '/another-missing-page')
+  await expect(page.getByRole('heading', { name: 'Такой страницы нет' })).toBeVisible()
+  await page.getByRole('button', { name: /Вернуться назад/ }).click()
+  await expect(page).toHaveURL(/\/login$/)
+
+  await seedSession(page)
+  await mockSuccessfulBootstrap(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/missing-for-member')
+  await expect(page.getByRole('link', { name: 'На главную', exact: true })).toHaveAttribute('href', '/home')
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/not-found-mobile.png`)
+  await page.getByRole('link', { name: 'На главную', exact: true }).click()
+  await expect(page).toHaveURL(/\/home$/)
 })
 
 test('login controls reveal the password and 2FA field, and explain unavailable recovery', async ({ page }) => {
