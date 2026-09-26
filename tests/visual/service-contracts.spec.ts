@@ -103,9 +103,49 @@ test('case parser normalizes public fields and does not expose ideal preparation
     second_role_preparations: 'Скрытая подготовка заказчика',
   }]
   const parsed = parseCases(source)
-  expect(parsed[0]).toMatchObject({ id: source[0].uuid, name: source[0].name, firstRole: 'Поставщик', secondRole: 'Заказчик' })
+  expect(parsed[0]).toMatchObject({
+    id: source[0].uuid,
+    name: source[0].name,
+    timeLimit: 10,
+    firstRole: 'Поставщик',
+    secondRole: 'Заказчик',
+  })
   expect(parsed[0]).not.toHaveProperty('firstRolePreparations')
   expect(parsed[0]).not.toHaveProperty('secondRolePreparations')
+})
+
+test('real negotiation client converts case time limits from seconds to rounded-up minutes', async () => {
+  const originalFetch = globalThis.fetch
+  const cases = [600, 610].map((timeLimit, index) => ({
+    uuid: `00000000-0000-4000-8000-00000000001${index}`,
+    created_at: '2026-09-26T10:00:00Z',
+    name: `Кейс ${index + 1}`,
+    description: 'Описание',
+    category: 'Продажи',
+    difficulty: 'medium',
+    time_limit: timeLimit,
+    goal: 'Цель',
+    synopsis: 'Ситуация',
+    first_role: 'Поставщик',
+    second_role: 'Заказчик',
+    first_role_preparations: 'Скрытая подготовка поставщика',
+    second_role_preparations: 'Скрытая подготовка заказчика',
+  }))
+  globalThis.fetch = async () => new Response(JSON.stringify(cases), { status: 200 })
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+
+    const result = await client.listCases()
+
+    expect(cases.map((item) => item.time_limit)).toEqual([600, 610])
+    expect(result.map((item) => item.duration)).toEqual(['10 мин', '11 мин'])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
 })
 
 test('service config requires explicit sources and rejects invalid values', () => {

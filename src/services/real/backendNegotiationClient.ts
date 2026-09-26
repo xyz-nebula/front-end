@@ -64,6 +64,10 @@ function mapDifficulty(value: string): TrainingCase['difficulty'] {
   return 'Средне'
 }
 
+function formatTimeLimit(seconds: number): string {
+  return `${Math.ceil(seconds / 60)} мин`
+}
+
 function mapCase(item: ReturnType<typeof parseCases>[number], index: number): TrainingCase {
   const known = trainingCases.find((candidate) => normalizedTitle(candidate.title) === normalizedTitle(item.name))
   return {
@@ -72,7 +76,7 @@ function mapCase(item: ReturnType<typeof parseCases>[number], index: number): Tr
     description: item.description,
     synopsis: item.synopsis,
     category: item.category,
-    duration: `${item.timeLimit} мин`,
+    duration: formatTimeLimit(item.timeLimit),
     difficulty: mapDifficulty(item.difficulty),
     opponent: item.secondRole,
     roles: [item.firstRole, item.secondRole],
