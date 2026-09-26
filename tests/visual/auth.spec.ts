@@ -77,6 +77,27 @@ test('auth entry screens render on desktop and mobile', async ({ page }) => {
   await captureScreenshot(page, `${artifactsDir}/login-mobile.png`)
 })
 
+test('registration renders responsively and reveals the password', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/register')
+  await expect(page.getByRole('heading', { level: 1, name: 'Создание аккаунта' })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+
+  const password = page.getByLabel('Пароль')
+  await expect(password).toHaveAttribute('type', 'password')
+  await page.getByRole('button', { name: 'Показать символы' }).click()
+  await expect(password).toHaveAttribute('type', 'text')
+  await page.getByRole('button', { name: 'Скрыть символы' }).click()
+  await expect(password).toHaveAttribute('type', 'password')
+  await captureScreenshot(page, `${artifactsDir}/register-desktop.png`)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/register-mobile.png`)
+})
+
 test('login controls reveal the password and 2FA field, and explain unavailable recovery', async ({ page }) => {
   await page.goto('/login')
   const password = page.getByLabel('Пароль')

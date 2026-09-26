@@ -1,13 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type InputHTMLAttributes } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { getErrorMessage, getFieldErrors } from '@/auth/errors'
 import { useAuth } from '@/auth/useAuth'
-import { AuthShell } from '@/components/auth/AuthShell'
-import { FormField } from '@/components/auth/FormField'
-import { AppButton } from '@/components/ui/AppButton'
-import { ArrowIcon } from '@/components/ui/ArrowIcon'
+import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import type { AuthRegisterRequest } from '@/types/auth'
+import '@/styles/login.css'
+import '@/styles/register.css'
 
 const initialFields: AuthRegisterRequest = {
   email: '',
@@ -17,6 +16,27 @@ const initialFields: AuthRegisterRequest = {
   password: '',
 }
 
+interface RegisterFieldProps extends InputHTMLAttributes<HTMLInputElement> {
+  label: string
+  error?: string
+  hint?: string
+}
+
+function RegisterField({ label, error, hint, id, ...props }: RegisterFieldProps) {
+  const inputId = id ?? props.name
+  const describedBy = error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined
+
+  return (
+    <div className="login-field">
+      <label htmlFor={inputId}>{label}</label>
+      <input id={inputId} aria-invalid={Boolean(error)} aria-describedby={describedBy} {...props} />
+      {error
+        ? <span className="login-field__error" id={`${inputId}-error`}>{error}</span>
+        : hint && <span className="login-field__hint" id={`${inputId}-hint`}>{hint}</span>}
+    </div>
+  )
+}
+
 export function RegisterPage() {
   const { register } = useAuth()
   const navigate = useNavigate()
@@ -24,6 +44,7 @@ export function RegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
 
   const updateField = (name: keyof AuthRegisterRequest, value: string) => {
     setFields((current) => ({ ...current, [name]: value }))
@@ -84,20 +105,42 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthShell eyebrow="Регистрация" title="Создай аккаунт" description="Пять полей — и можно переходить к первой тренировке.">
-      <form className="auth-form" onSubmit={handleSubmit} noValidate>
-        {formError && <div className="form-alert" role="alert">{formError}</div>}
-        <div className="auth-form__row">
-          <FormField label="Имя" name="first_name" autoComplete="given-name" value={fields.first_name} error={errors.first_name} maxLength={64} onChange={(event) => updateField('first_name', event.target.value)} />
-          <FormField label="Фамилия" name="last_name" autoComplete="family-name" value={fields.last_name} error={errors.last_name} maxLength={64} onChange={(event) => updateField('last_name', event.target.value)} />
+    <main className="login-page register-page">
+      <header className="login-page__header">
+        <Link className="login-page__brand" to="/" aria-label="Арена переговоров — на главную">
+          <ArenaCubeMark className="login-page__brand-mark" />
+          <span>Арена переговоров</span>
+        </Link>
+      </header>
+
+      <section className="login-card register-card" aria-labelledby="register-title">
+        <div className="login-card__heading register-card__heading">
+          <h1 id="register-title">Создание аккаунта</h1>
+          <p>Заполните данные, чтобы начать тренировки</p>
         </div>
-        <FormField label="Имя пользователя" name="username" autoComplete="username" value={fields.username} error={errors.username} minLength={3} maxLength={32} hint="Латиница, цифры, точка, дефис или подчёркивание" onChange={(event) => updateField('username', event.target.value)} />
-        <FormField label="Email" name="email" type="email" autoComplete="email" value={fields.email} error={errors.email} maxLength={254} onChange={(event) => updateField('email', event.target.value)} />
-        <FormField label="Пароль" name="password" type="password" autoComplete="new-password" value={fields.password} error={errors.password} minLength={8} maxLength={128} hint="Не менее 8 символов" onChange={(event) => updateField('password', event.target.value)} />
-        <AppButton type="submit" className="auth-form__submit" icon={<ArrowIcon />} disabled={isSubmitting}>{isSubmitting ? 'Создаём…' : 'Создать аккаунт'}</AppButton>
-      </form>
-      <p className="auth-switch">Уже есть аккаунт? <Link to="/login">Войти</Link></p>
-      <Link className="auth-back-link" to="/auth">← Назад к выбору</Link>
-    </AuthShell>
+
+        <form className="login-form register-form" onSubmit={handleSubmit} noValidate>
+          {formError && <div className="login-form__alert" role="alert">{formError}</div>}
+          <div className="register-form__row">
+            <RegisterField label="Имя" name="first_name" autoComplete="given-name" value={fields.first_name} error={errors.first_name} maxLength={64} onChange={(event) => updateField('first_name', event.target.value)} />
+            <RegisterField label="Фамилия" name="last_name" autoComplete="family-name" value={fields.last_name} error={errors.last_name} maxLength={64} onChange={(event) => updateField('last_name', event.target.value)} />
+          </div>
+          <RegisterField label="Имя пользователя" name="username" autoComplete="username" value={fields.username} error={errors.username} minLength={3} maxLength={32} hint="Латиница, цифры, точка, дефис или подчёркивание" onChange={(event) => updateField('username', event.target.value)} />
+          <RegisterField label="Электронная почта" aria-label="Email" name="email" type="email" autoComplete="email" placeholder="name@example.com" value={fields.email} error={errors.email} maxLength={254} onChange={(event) => updateField('email', event.target.value)} />
+          <div className="login-field">
+            <label htmlFor="register-password">Пароль</label>
+            <div className="login-field__input-wrap">
+              <input id="register-password" name="password" type={isPasswordVisible ? 'text' : 'password'} autoComplete="new-password" placeholder="Не менее 8 символов" value={fields.password} aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? 'register-password-error' : 'register-password-hint'} minLength={8} maxLength={128} onChange={(event) => updateField('password', event.target.value)} />
+              <button className="login-field__visibility" type="button" aria-label={isPasswordVisible ? 'Скрыть символы' : 'Показать символы'} aria-pressed={isPasswordVisible} onClick={() => setIsPasswordVisible((current) => !current)}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />{isPasswordVisible && <path d="M3 3 21 21" />}</svg>
+              </button>
+            </div>
+            {errors.password ? <span className="login-field__error" id="register-password-error">{errors.password}</span> : <span className="login-field__hint" id="register-password-hint">Используйте от 8 до 128 символов</span>}
+          </div>
+          <button className="login-form__submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Создаём…' : 'Создать аккаунт'}</button>
+        </form>
+        <p className="login-card__register">Уже есть аккаунт? <Link to="/login">Войти</Link></p>
+      </section>
+    </main>
   )
 }
