@@ -2,6 +2,7 @@ import type { ServiceSource } from '@/services/config'
 
 const OWNER_SALT_STORAGE_KEY = 'arena.product-tour.owner-salt.v1'
 const PENDING_OWNER_SESSION_KEY = 'arena.product-tour.pending-owner.v1'
+const PROMPT_KEY_PREFIX = 'arena.product-tour.prompt-session.v1.'
 
 let memorySalt: string | null = null
 let memoryPendingOwnerKey: string | null = null
@@ -62,5 +63,13 @@ export function clearPendingTourOwnerKey(): void {
     window.sessionStorage.removeItem(PENDING_OWNER_SESSION_KEY)
   } catch {
     // There is no persistent pending identity to clear.
+  }
+}
+
+export function clearTourPromptDeferral(ownerKey: string): void {
+  try {
+    window.sessionStorage.removeItem(`${PROMPT_KEY_PREFIX}${encodeURIComponent(ownerKey)}`)
+  } catch {
+    // Session storage may be unavailable; the prompt provider also has a memory fallback.
   }
 }

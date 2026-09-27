@@ -22,12 +22,12 @@ import { AuthContext, type AuthContextValue } from '@/auth/useAuth'
 import { AuthRuntimeContext, type AuthRuntimeContextValue } from '@/auth/runtime'
 import {
   clearPendingTourOwnerKey,
+  clearTourPromptDeferral,
   consumePendingTourOwnerKey,
   createTourOwnerKey,
   storePendingTourOwnerKey,
 } from '@/auth/tourOwnerIdentity'
 import { AuthClientError, isAuthClientError } from '@/services/contracts/authClient'
-import { clearProductTourPromptDeferral } from '@/features/product-tour/productTourStorage'
 import { useServiceAdapters } from '@/services/serviceAdapters'
 import type { AuthStatus, AuthTokens, SessionPersistence } from '@/types/auth'
 
@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokensRef.current = null
     mockOwnerKeyRef.current = null
     setMockOwnerKey(null)
-    if (tourOwnerKeyRef.current) clearProductTourPromptDeferral(tourOwnerKeyRef.current)
+    if (tourOwnerKeyRef.current) clearTourPromptDeferral(tourOwnerKeyRef.current)
     tourOwnerKeyRef.current = null
     setTourOwnerKey(null)
     if (options.removeStored !== false && !removeStoredSession()) {
