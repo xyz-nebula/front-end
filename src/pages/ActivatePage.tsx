@@ -96,7 +96,6 @@ export function ActivatePage() {
   const [activationState, setActivationState] = useState<ActivationState>(() => (
     getInitialState(queryCode, registrationEmail)
   ))
-  const [showResendNotice, setShowResendNotice] = useState(false)
   const attemptedQueryCodeRef = useRef<string | null>(null)
   const requestIdRef = useRef(0)
 
@@ -148,10 +147,6 @@ export function ActivatePage() {
           </Link>
         )}
         <div className="activation-page__waiting-actions">
-          <p>Не получили письмо? <button type="button" onClick={() => setShowResendNotice(true)}>Отправить повторно</button></p>
-          {showResendNotice && (
-            <p className="activation-page__notice" role="status">Письмо отправлено при регистрации. Повторная отправка пока недоступна.</p>
-          )}
           <p>Уже подтвердили почту? <Link to="/login">Войти</Link></p>
         </div>
         <Link className="activation-page__back" to="/"><span aria-hidden="true">←</span> На главную</Link>

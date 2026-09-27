@@ -113,9 +113,7 @@
 .activation-page__demo-link { margin-top: 20px; color: var(--activation-blue); font-size: 14px; font-weight: 650; }
 .activation-page__waiting-actions { width: 100%; margin-top: 32px; color: var(--activation-muted); font-size: 16px; line-height: 1.5; }
 .activation-page__waiting-actions p { margin: 0; }
-.activation-page__waiting-actions p + p { margin-top: 20px; }
 .activation-page__waiting-actions a,
-.activation-page__waiting-actions button,
 .activation-page__error-login a {
   padding: 0;
   border: 0;
@@ -124,16 +122,6 @@
   cursor: pointer;
   font: inherit;
   font-weight: 650;
-}
-
-.activation-page__waiting-actions .activation-page__notice {
-  max-width: 500px;
-  margin: 16px auto 0;
-  padding: 11px 14px;
-  border-radius: 11px;
-  color: #4d607e;
-  background: #f1f6ff;
-  font-size: 14px;
 }
 
 .activation-page__back {
@@ -184,7 +172,7 @@
 .activation-page__error { width: 100%; margin-top: 31px; padding: 18px; border-radius: 14px; color: #a33f3f; background: #fff0f0; line-height: 1.5; text-align: left; }
 .activation-page__error-login { margin: 26px 0 0; color: var(--activation-muted); font-size: 16px; }
 .activation-page :is(a, button):focus-visible { outline: 3px solid rgba(8, 101, 232, .35); outline-offset: 3px; }
-.activation-page__waiting-actions :is(a, button):hover,
+.activation-page__waiting-actions a:hover,
 .activation-page__demo-link:hover,
 .activation-page__error-login a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .activation-page__back:hover { color: var(--activation-ink); }
@@ -219,8 +207,6 @@
   .activation-page__instructions p + p { margin-top: 14px; }
   .activation-page__demo-link { margin-top: 19px; }
   .activation-page__waiting-actions { margin-top: 38px; padding-top: 36px; border-top: 1px solid #e2e8f2; font-size: 16px; }
-  .activation-page__waiting-actions > p:first-child { display: flex; flex-direction: column; align-items: center; }
-  .activation-page__waiting-actions p + p { margin-top: 28px; }
   .activation-page__back { align-self: flex-start; margin-top: auto; padding-top: 75px; }
   .activation-page--waiting .activation-page__card { padding-top: 52px; }
   .activation-page--waiting .activation-page__back { padding-top: 30px; }

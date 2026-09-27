@@ -1,48 +1,41 @@
 # Карта приложения
 
 Источник истины — `src/App.tsx` и `src/components/auth/RouteGate.tsx`.
-Навигация клиентская, через React Router; production-хостинг должен отдавать
-приложение для прямых переходов на его маршруты.
+Навигация клиентская, поэтому production-хостинг должен возвращать `index.html`
+для прямого открытия маршрутов приложения.
 
 | Путь | Доступ | Экран и поведение |
 | --- | --- | --- |
-| `/` | Публичный | Landing; доступен независимо от состояния сессии. |
-| `/auth` | Публичный redirect | Совместимый адрес: перенаправляет на `/login` с заменой записи истории. |
-| `/login` | GuestRoute | Email, пароль и необязательный шестизначный TOTP. |
-| `/register` | GuestRoute | Регистрация; после успеха переход на `/activate` с состоянием подтверждения email. |
-| `/activate` | ActivationRoute | Ожидание письма, проверка кода из query, загрузка, успех или ошибка активации с повтором. |
-| `/home` | ProtectedRoute | Mock-каталог, прогресс, тренировки; logout и управление TOTP через выбранный auth source. |
-| `/arena/:sessionId` | ProtectedRoute | Text/voice переговоры выбранной сессии; сейчас доменный flow работает через mock negotiation/audio. |
-| `/result/:sessionId` | ProtectedRoute | Processing/error/готовый разбор, повтор кейса и возврат к каталогу; сейчас данные результата mock. |
-| `*` | Публичный | Страница 404. |
+| `/` | Публичный | Landing, доступный независимо от auth-сессии |
+| `/auth` | Публичный redirect | Перенаправление на `/login` |
+| `/login` | GuestRoute | Email, пароль и необязательный TOTP |
+| `/register` | GuestRoute | Регистрация и переход к подтверждению email |
+| `/activate` | ActivationRoute | Ожидание письма, активация по query code, success/error |
+| `/home` | ProtectedRoute | Каталог, история, прогресс, logout и управление TOTP |
+| `/cases/:caseId/preparation` | ProtectedRoute | Выбор стратегии и подготовка к выбранному кейсу |
+| `/arena/:sessionId` | ProtectedRoute | Text/voice mock flow либо real voice flow согласно профилю |
+| `/result/:sessionId` | ProtectedRoute | Загрузка результата, демонстрационный разбор и повтор кейса |
+| `*` | Публичный | Страница 404 |
 
-GuestRoute, ProtectedRoute и ActivationRoute показывают `SessionLoading` при
-`booting`/`signing-out`. При `restore-error` показывается `SessionRecovery` с
-действиями «Повторить» и «Выйти»; временный сбой не удаляет сохранённую сессию.
-Сами `/` и fallback не обёрнуты в эти gates.
+Все страницы подключены через `React.lazy`. Landing не должен загружать assets
+закрытых маршрутов до навигации.
+
+GuestRoute, ProtectedRoute и ActivationRoute показывают session loading при
+bootstrap и sign-out. При временной ошибке восстановления доступен recovery с
+повтором и выходом без преждевременного удаления сохранённых tokens.
 
 Авторизованный посетитель guest-only страниц перенаправляется на `/home`.
-Гость на protected-маршруте попадает на `/login` с `state.from`, содержащим
-pathname и query исходного адреса. LoginPage возвращает на этот внутренний путь
-(строка начинается с `/`, но не `//`), иначе использует `/home`.
-После явного выхода и при обычной потере сессии ProtectedRoute направляет на
-`/login`.
+Гость protected-маршрута попадает на `/login` с безопасным внутренним
+`state.from`, после входа исходный маршрут восстанавливается.
 
-Landing CTA ссылаются на `/home`: у гостя получается цепочка
-`/` → `/home` → `/login` → `/home` после входа. У пользователя с подтверждённой
-сессией CTA сразу открывает `/home`.
+Landing CTA ведут на `/home`: гость проходит через login, пользователь с
+сессией сразу открывает приложение. ActivationRoute не заменяет уже
+подтверждённую сессию кодом из письма и не отправляет невалидный UUID backend.
 
-`/arena/:sessionId` и `/result/:sessionId` не принимают токены и не обращаются к
-chat/message CRUD напрямую. Источник negotiation/audio выбирается composition
-root; поддерживаемые demo-комбинации описаны в [README](../README.md#режимы-сервисов).
+Источник negotiation/audio выбирается composition root, а не маршрутом. Три
+поддерживаемых профиля и ограничения real voice описаны в
+[architecture.md](architecture.md). На result route real adapter пока также
+возвращает локальный демонстрационный анализ.
 
-ActivationRoute намеренно отличается от GuestRoute: существующая подтверждённая
-сессия ведёт на `/home` без замены токенов кодом из письма. Если пользователь
-вошёл на экран без сессии, он остаётся на экране успешной активации после создания
-сессии, пока сам не продолжит. Код проверяется как UUID (включая UUIDv7);
-пустой/невалидный код не отправляется в backend. Повторный effect в StrictMode
-не должен дублировать активацию.
-
-Переходы и gates проверяются в `tests/visual/auth.spec.ts`, устойчивость сессии —
-в `tests/visual/auth-resilience.spec.ts`, landing CTA — в
-`tests/visual/landing.spec.ts`. Подробности сессии: [auth.md](auth.md).
+Подробности auth state machine находятся в [auth.md](auth.md), а набор проверок
+маршрутов — в [testing.md](testing.md).

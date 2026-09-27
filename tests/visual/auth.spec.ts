@@ -193,8 +193,8 @@ test('shows the email confirmation screen after registration', async ({ page }) 
   await expectNoHorizontalOverflow(page)
   await expect(page.getByRole('link', { name: 'На главную', exact: true })).toBeInViewport()
   await captureScreenshot(page, `${artifactsDir}/activation-waiting-mobile.png`)
-  await page.getByRole('button', { name: 'Отправить повторно' }).click()
-  await expect(page.getByRole('status')).toContainText('Повторная отправка пока недоступна')
+  await expect(page.getByRole('button', { name: 'Отправить повторно' })).toHaveCount(0)
+  await expect(page.getByText('Не получили письмо?')).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/login')
   expect(registerPayload).toEqual({
     email: 'irina@example.com',
