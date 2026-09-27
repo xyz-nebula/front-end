@@ -1,13 +1,12 @@
 import type { RefObject } from 'react'
 import { Link } from 'react-router-dom'
 
-import profileArtwork from '@/assets/home/profile-kirill.webp'
-import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
+import { ProductHeader } from '@/components/chrome/ProductHeader'
 import type { PreparationSaveState } from '@/features/preparation/usePreparationDraft'
 import type { TrainingCase } from '@/types/case'
 
 export function PreparationHeader() {
-  return <header className="preparation-header"><div className="preparation-shell preparation-header__inner"><Link className="preparation-header__brand" to="/"><ArenaCubeMark /><span>АРЕНА</span></Link><div className="preparation-header__profile"><span>🔥 <strong>4</strong></span><img src={profileArtwork} alt="" width={400} height={400} decoding="async" /></div></div></header>
+  return <ProductHeader variant="preparation" actions={<span>🔥 <strong>4</strong></span>} />
 }
 
 export function PreparationContext({ caseButtonRef, item, roleIndex, saveState, onCaseOpen }: { caseButtonRef: RefObject<HTMLButtonElement | null>; item: TrainingCase; roleIndex: 0 | 1; saveState: PreparationSaveState; onCaseOpen: () => void }) {

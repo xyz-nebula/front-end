@@ -1,3 +1,9 @@
+import {
+  clearTourPromptDeferral,
+  hasMemoryTourPromptDeferral,
+  rememberTourPromptDeferral,
+} from '@/auth/tourOwnerIdentity'
+
 export const PRODUCT_TOUR_VERSION = 'product-tour-v1' as const
 
 export type ProductTourStatus = 'active' | 'paused' | 'never' | 'completed'
@@ -38,7 +44,6 @@ export interface ProductTourStorageResult {
 const STATE_KEY_PREFIX = 'arena.product-tour.v1.'
 const PROMPT_KEY_PREFIX = 'arena.product-tour.prompt-session.v1.'
 const memoryStates = new Map<string, ProductTourState>()
-const memoryPromptDeferrals = new Set<string>()
 
 const statuses: readonly ProductTourStatus[] = ['active', 'paused', 'never', 'completed']
 const steps: readonly ProductTourStepId[] = [
@@ -144,7 +149,7 @@ export function removeProductTourState(ownerKey: string): boolean {
 
 export function isProductTourPromptDeferred(ownerKey: string): boolean {
   const key = promptKey(ownerKey)
-  if (memoryPromptDeferrals.has(key)) return true
+  if (hasMemoryTourPromptDeferral(ownerKey)) return true
   try {
     return window.sessionStorage.getItem(key) === 'deferred'
   } catch {
@@ -154,7 +159,7 @@ export function isProductTourPromptDeferred(ownerKey: string): boolean {
 
 export function deferProductTourPrompt(ownerKey: string): boolean {
   const key = promptKey(ownerKey)
-  memoryPromptDeferrals.add(key)
+  rememberTourPromptDeferral(ownerKey)
   try {
     window.sessionStorage.setItem(key, 'deferred')
     return true
@@ -165,7 +170,7 @@ export function deferProductTourPrompt(ownerKey: string): boolean {
 
 export function clearProductTourPromptDeferral(ownerKey: string): boolean {
   const key = promptKey(ownerKey)
-  memoryPromptDeferrals.delete(key)
+  clearTourPromptDeferral(ownerKey)
   try {
     window.sessionStorage.removeItem(key)
     return true

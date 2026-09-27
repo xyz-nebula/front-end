@@ -6,6 +6,8 @@ export interface ProductTourContextValue {
   ownerKey: string | null
   state: ProductTourState | null
   storageAvailable: boolean
+  menuLabel: 'Пройти тур' | 'Продолжить тур' | 'Пройти тур заново'
+  startOrResume: () => void
 }
 
 export const ProductTourContext = createContext<ProductTourContextValue | null>(null)

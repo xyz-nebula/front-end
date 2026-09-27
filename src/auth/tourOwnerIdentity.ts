@@ -6,6 +6,7 @@ const PROMPT_KEY_PREFIX = 'arena.product-tour.prompt-session.v1.'
 
 let memorySalt: string | null = null
 let memoryPendingOwnerKey: string | null = null
+const memoryPromptDeferrals = new Set<string>()
 
 function randomHex(byteLength = 32): string {
   const bytes = crypto.getRandomValues(new Uint8Array(byteLength))
@@ -67,9 +68,18 @@ export function clearPendingTourOwnerKey(): void {
 }
 
 export function clearTourPromptDeferral(ownerKey: string): void {
+  memoryPromptDeferrals.delete(ownerKey)
   try {
     window.sessionStorage.removeItem(`${PROMPT_KEY_PREFIX}${encodeURIComponent(ownerKey)}`)
   } catch {
     // Session storage may be unavailable; the prompt provider also has a memory fallback.
   }
+}
+
+export function rememberTourPromptDeferral(ownerKey: string): void {
+  memoryPromptDeferrals.add(ownerKey)
+}
+
+export function hasMemoryTourPromptDeferral(ownerKey: string): boolean {
+  return memoryPromptDeferrals.has(ownerKey)
 }

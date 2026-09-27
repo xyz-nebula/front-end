@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import profileArtwork from '@/assets/home/profile-kirill.webp'
 import directorArtwork from '@/assets/home/role-director.webp'
-import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
+import { ProductHeader } from '@/components/chrome/ProductHeader'
 import type { AudioConnectionState } from '@/types/audio'
 import type { NegotiationMode } from '@/types/negotiation'
 
@@ -27,7 +26,6 @@ interface ArenaHeaderProps {
 
 export function ArenaHeader({ title, userRole, opponentRole, startedAt, mode, audioState, isDemoVoice, isSending, finishDisabled, onFinish }: ArenaHeaderProps) {
   const [now, setNow] = useState(Date.now)
-  const [profileOpen, setProfileOpen] = useState(false)
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000)
@@ -43,18 +41,7 @@ export function ArenaHeader({ title, userRole, opponentRole, startedAt, mode, au
 
   return (
     <>
-      <header className="duel-header">
-        <div className="duel-shell duel-header__inner">
-          <Link className="duel-header__brand" to="/" aria-label="Арена — на главную"><ArenaCubeMark /><span>АРЕНА</span></Link>
-          <div className="duel-header__actions">
-            <span className="duel-header__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span> Серия: <strong>4 дня</strong></span>
-            <div className="duel-header__profile">
-              <button type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={() => setProfileOpen((value) => !value)}><img src={profileArtwork} alt="" width={400} height={400} decoding="async" /></button>
-              {profileOpen && <div className="duel-header__profile-menu"><span>Кирилл · демо-профиль</span><Link to="/home">К кейсам</Link></div>}
-            </div>
-          </div>
-        </div>
-      </header>
+      <ProductHeader variant="arena" actions={<span className="duel-header__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span> Серия: <strong>4 дня</strong></span>} />
       <div className="duel-shell duel-heading">
         <div><h1>{title}</h1><span>· Поединок</span></div>
         <button type="button" onClick={onFinish} disabled={finishDisabled} aria-label="Завершить"><span className="duel-heading__finish-full">Завершить переговоры</span><span className="duel-heading__finish-short">Завершить</span></button>

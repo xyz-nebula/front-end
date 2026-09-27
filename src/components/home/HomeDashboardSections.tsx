@@ -1,10 +1,8 @@
-import type { RefObject } from 'react'
 import { Link } from 'react-router-dom'
 
 import heroArtwork from '@/assets/home/hero-negotiation.webp'
 import profileArtwork from '@/assets/home/profile-kirill.webp'
 import { CaseCard } from '@/components/home/CaseCard'
-import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import { caseArtwork } from '@/mocks/caseArtwork'
 import type { TrainingCase } from '@/types/case'
 import type { NegotiationSessionSummary } from '@/types/negotiation'
@@ -28,35 +26,6 @@ function trainingCountLabel(count: number) {
   if (lastDigit === 1) return 'тренировка'
   if (lastDigit >= 2 && lastDigit <= 4) return 'тренировки'
   return 'тренировок'
-}
-
-interface HomeHeaderProps {
-  externalSessionVersion: number
-  isLoggingOut: boolean
-  profileOpen: boolean
-  profileRef: RefObject<HTMLDivElement | null>
-  onLogout: () => void
-  onProfileToggle: () => void
-  onSecurityOpen: (version: number) => void
-}
-
-export function HomeHeader({ externalSessionVersion, isLoggingOut, profileOpen, profileRef, onLogout, onProfileToggle, onSecurityOpen }: HomeHeaderProps) {
-  return <header className="arena-home__header">
-    <div className="arena-home__shell arena-home__header-inner">
-      <Link className="arena-home__brand" to="/" aria-label="Арена — на главную"><ArenaCubeMark /><span>АРЕНА</span></Link>
-      <div className="arena-home__header-actions">
-        <span className="arena-home__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span><span>Серия: <strong>4 дня</strong></span></span>
-        <div className="arena-home__profile" ref={profileRef}>
-          <button className="arena-home__profile-toggle" type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={onProfileToggle}><img src={profileArtwork} alt="" width={400} height={400} decoding="async" /></button>
-          {profileOpen && <div className="arena-home__profile-menu">
-            <span className="arena-home__profile-name">Кирилл <small>Демо-профиль</small></span>
-            <button type="button" onClick={() => onSecurityOpen(externalSessionVersion)}>Настроить 2FA</button>
-            <button type="button" disabled={isLoggingOut} onClick={onLogout}>{isLoggingOut ? 'Выходим…' : 'Выйти'}</button>
-          </div>}
-        </div>
-      </div>
-    </div>
-  </header>
 }
 
 interface HomeOverviewProps {

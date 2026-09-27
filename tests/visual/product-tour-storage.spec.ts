@@ -54,6 +54,7 @@ test('product tour storage falls back to memory when browser storage is unavaila
 
   const result = await page.evaluate(async () => {
     const storage = await import('/src/features/product-tour/productTourStorage.ts')
+    const identity = await import('/src/auth/tourOwnerIdentity.ts')
     const originalSetItem = Storage.prototype.setItem
     const originalGetItem = Storage.prototype.getItem
     Storage.prototype.setItem = () => { throw new DOMException('disabled', 'SecurityError') }
@@ -69,11 +70,14 @@ test('product tour storage falls back to memory when browser storage is unavaila
       const persisted = storage.writeProductTourState('memory-owner', state)
       const loaded = storage.readProductTourState('memory-owner')
       const promptPersisted = storage.deferProductTourPrompt('memory-owner')
+      const promptDeferred = storage.isProductTourPromptDeferred('memory-owner')
+      identity.clearTourPromptDeferral('memory-owner')
       return {
         persisted,
         loaded,
         promptPersisted,
-        promptDeferred: storage.isProductTourPromptDeferred('memory-owner'),
+        promptDeferred,
+        promptCleared: !storage.isProductTourPromptDeferred('memory-owner'),
       }
     } finally {
       Storage.prototype.setItem = originalSetItem
@@ -86,4 +90,5 @@ test('product tour storage falls back to memory when browser storage is unavaila
   expect(result.loaded.state).toMatchObject({ status: 'active', stepId: 'case' })
   expect(result.promptPersisted).toBe(false)
   expect(result.promptDeferred).toBe(true)
+  expect(result.promptCleared).toBe(true)
 })
