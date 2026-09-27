@@ -85,7 +85,7 @@ async function mountResult(sessionId: string, negotiationClient: NegotiationClie
 
   await act(async () => {
     root.render(
-      <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', runAuthorized }}>
+      <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', tourOwnerKey: 'harness-tour-owner', runAuthorized }}>
         <DomainServicesContext.Provider value={{
           negotiationClient,
           createAudioClient: () => { throw new Error('Audio is not used by this harness') as never },

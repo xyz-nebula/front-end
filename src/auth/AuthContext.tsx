@@ -20,7 +20,14 @@ import {
 import { executeAuthorizedOperation } from '@/auth/authorizedOperation'
 import { AuthContext, type AuthContextValue } from '@/auth/useAuth'
 import { AuthRuntimeContext, type AuthRuntimeContextValue } from '@/auth/runtime'
+import {
+  clearPendingTourOwnerKey,
+  consumePendingTourOwnerKey,
+  createTourOwnerKey,
+  storePendingTourOwnerKey,
+} from '@/auth/tourOwnerIdentity'
 import { AuthClientError, isAuthClientError } from '@/services/contracts/authClient'
+import { clearProductTourPromptDeferral } from '@/features/product-tour/productTourStorage'
 import { useServiceAdapters } from '@/services/serviceAdapters'
 import type { AuthStatus, AuthTokens, SessionPersistence } from '@/types/auth'
 
@@ -64,6 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mockOwnerKey, setMockOwnerKey] = useState<string | null>(
     initialSession.session?.mockOwnerKey ?? null,
   )
+  const [tourOwnerKey, setTourOwnerKey] = useState<string | null>(
+    initialSession.session?.tourOwnerKey ?? null,
+  )
+  const tourOwnerKeyRef = useRef<string | null>(initialSession.session?.tourOwnerKey ?? null)
   const persistenceRef = useRef<SessionPersistence>(
     initialSession.storageAvailable ? 'persistent' : 'memory',
   )
@@ -82,6 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokensRef.current = session.tokens
     mockOwnerKeyRef.current = session.mockOwnerKey
     setMockOwnerKey(session.mockOwnerKey)
+    tourOwnerKeyRef.current = session.tourOwnerKey ?? null
+    setTourOwnerKey(session.tourOwnerKey ?? null)
     const nextPersistence = wasPersisted ? 'persistent' : 'memory'
     persistenceRef.current = nextPersistence
     setPersistence(nextPersistence)
@@ -104,6 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokensRef.current = session.tokens
     mockOwnerKeyRef.current = session.mockOwnerKey
     setMockOwnerKey(session.mockOwnerKey)
+    tourOwnerKeyRef.current = session.tourOwnerKey ?? null
+    setTourOwnerKey(session.tourOwnerKey ?? null)
     persistenceRef.current = 'persistent'
     setPersistence('persistent')
     memoryNoticeShownRef.current = false
@@ -120,6 +135,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokensRef.current = null
     mockOwnerKeyRef.current = null
     setMockOwnerKey(null)
+    if (tourOwnerKeyRef.current) clearProductTourPromptDeferral(tourOwnerKeyRef.current)
+    tourOwnerKeyRef.current = null
+    setTourOwnerKey(null)
     if (options.removeStored !== false && !removeStoredSession()) {
       persistenceRef.current = 'memory'
       setPersistence('memory')
@@ -130,7 +148,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('unauthenticated')
   }, [])
 
-  const createSession = useCallback(async (requestTokens: () => Promise<AuthTokens>) => {
+  const createSession = useCallback(async (
+    requestTokens: () => Promise<AuthTokens>,
+    resolveTourOwnerKey: () => Promise<string | undefined>,
+  ) => {
     const generation = sessionCreationGenerationRef.current + 1
     sessionCreationGenerationRef.current = generation
     const tokens = await requestTokens()
@@ -139,7 +160,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new StaleSessionCreationError()
     }
 
-    saveSession(createStoredSession(tokens, config.authSource))
+    const ownerKey = await resolveTourOwnerKey()
+    if (sessionCreationGenerationRef.current !== generation) {
+      throw new StaleSessionCreationError()
+    }
+    saveSession(createStoredSession(tokens, config.authSource, ownerKey))
   }, [config.authSource, saveSession])
 
   const refreshSession = useCallback((): Promise<AuthTokens> => {
@@ -159,7 +184,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const ownerKey = mockOwnerKeyRef.current
         if (!ownerKey) throw new AuthClientError(401, 'Сессия уже завершена.')
-        saveSession({ tokens, source: config.authSource, mockOwnerKey: ownerKey }, false)
+        saveSession({
+          tokens,
+          source: config.authSource,
+          mockOwnerKey: ownerKey,
+          ...(tourOwnerKeyRef.current ? { tourOwnerKey: tourOwnerKeyRef.current } : {}),
+        }, false)
         return tokens
       })
       .catch((error: unknown): AuthTokens => {
@@ -313,13 +343,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     showMemorySessionNotice,
     dismissMemorySessionNotice: () => setShowMemorySessionNotice(false),
     retrySession: restoreSession,
-    register: (payload) => authClient.register(payload),
-    activate: (code) => createSession(() => authClient.activate(code)),
-    login: (payload) => createSession(() => authClient.login(payload)),
+    register: async (payload) => {
+      const response = await authClient.register(payload)
+      storePendingTourOwnerKey(await createTourOwnerKey(config.authSource, payload.email))
+      return response
+    },
+    activate: (code) => createSession(
+      () => authClient.activate(code),
+      async () => consumePendingTourOwnerKey(),
+    ),
+    login: (payload) => createSession(
+      () => authClient.login(payload),
+      () => createTourOwnerKey(config.authSource, payload.email),
+    ),
     logout: () => {
       const tokens = tokensRef.current
       setStatus('signing-out')
       clearSession({ requestedByLogout: true })
+      clearPendingTourOwnerKey()
       if (tokens) void revokeRemoteSession(tokens)
       return Promise.resolve()
     },
@@ -334,6 +375,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authClient,
     clearSession,
     createSession,
+    config.authSource,
     externalSessionVersion,
     logoutRequested,
     persistence,
@@ -346,8 +388,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const runtimeValue = useMemo<AuthRuntimeContextValue>(() => ({
     mockOwnerKey,
+    tourOwnerKey,
     runAuthorized,
-  }), [mockOwnerKey, runAuthorized])
+  }), [mockOwnerKey, runAuthorized, tourOwnerKey])
 
   return (
     <AuthRuntimeContext.Provider value={runtimeValue}>

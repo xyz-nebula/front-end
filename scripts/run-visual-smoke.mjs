@@ -22,6 +22,7 @@ const testGroups = [
       'auth.spec.ts',
       'auth-resilience.spec.ts',
       'authorized-operation.spec.ts',
+      'product-tour-storage.spec.ts',
       'service-contracts.spec.ts',
     ],
   },

@@ -93,7 +93,7 @@ export async function runAudioFinishFailureScenario() {
   try {
     await act(async () => {
       root.render(
-        <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', runAuthorized }}>
+        <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', tourOwnerKey: 'harness-tour-owner', runAuthorized }}>
           <DomainServicesContext.Provider value={{ negotiationClient, createAudioClient: () => audioClient }}>
             <MemoryRouter initialEntries={['/arena/voice-finish']}>
               <Routes>
