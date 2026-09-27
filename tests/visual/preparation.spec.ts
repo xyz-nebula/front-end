@@ -101,3 +101,69 @@ test('preparation serializer uses level-three field headings only', async ({ pag
   expect(result.filled).toContain('### Красная черта')
   expect(result.filled).not.toMatch(/^## [^#]/m)
 })
+
+test('preparation drafts and snapshots are isolated by auth-session owner', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(async () => {
+    const storage = await import('/src/features/preparation/preparation.ts')
+    const draft = storage.createEmptyPreparation()
+    draft.rootConflict = 'Секрет владельца A'
+    const snapshot = {
+      caseId: 'shared-case',
+      caseTitle: 'Общий кейс',
+      userRole: 'Роль A',
+      opponentRole: 'Роль B',
+      draft,
+    }
+    const legacyKey = 'arena.preparation-draft.v1.shared-case.0'
+    localStorage.setItem(legacyKey, JSON.stringify(draft))
+
+    storage.savePreparationDraft('owner-a', 'shared-case', 0, draft)
+    storage.saveSessionPreparation('owner-a', 'shared-session', snapshot)
+    const persistent = {
+      ownerA: storage.readPreparationDraft('owner-a', 'shared-case', 0).rootConflict,
+      ownerB: storage.readPreparationDraft('owner-b', 'shared-case', 0).rootConflict,
+      snapshotA: storage.readSessionPreparation('owner-a', 'shared-session')?.userRole ?? null,
+      snapshotB: storage.readSessionPreparation('owner-b', 'shared-session'),
+      legacyStillPresent: localStorage.getItem(legacyKey) !== null,
+    }
+
+    const storagePrototype = Object.getPrototypeOf(localStorage) as Storage
+    const originalGetItem = storagePrototype.getItem
+    const originalSetItem = storagePrototype.setItem
+    storagePrototype.getItem = () => { throw new DOMException('blocked') }
+    storagePrototype.setItem = () => { throw new DOMException('blocked') }
+    try {
+      const memoryDraft = storage.createEmptyPreparation()
+      memoryDraft.rootConflict = 'Memory secret A'
+      storage.savePreparationDraft('memory-owner-a', 'shared-case', 0, memoryDraft)
+      storage.saveSessionPreparation('memory-owner-a', 'shared-session', { ...snapshot, draft: memoryDraft })
+      return {
+        persistent,
+        memory: {
+          ownerA: storage.readPreparationDraft('memory-owner-a', 'shared-case', 0).rootConflict,
+          ownerB: storage.readPreparationDraft('memory-owner-b', 'shared-case', 0).rootConflict,
+          snapshotA: storage.readSessionPreparation('memory-owner-a', 'shared-session')?.draft.rootConflict ?? null,
+          snapshotB: storage.readSessionPreparation('memory-owner-b', 'shared-session'),
+        },
+      }
+    } finally {
+      storagePrototype.getItem = originalGetItem
+      storagePrototype.setItem = originalSetItem
+    }
+  })
+
+  expect(result.persistent).toEqual({
+    ownerA: 'Секрет владельца A',
+    ownerB: '',
+    snapshotA: 'Роль A',
+    snapshotB: null,
+    legacyStillPresent: true,
+  })
+  expect(result.memory).toEqual({
+    ownerA: 'Memory secret A',
+    ownerB: '',
+    snapshotA: 'Memory secret A',
+    snapshotB: null,
+  })
+})

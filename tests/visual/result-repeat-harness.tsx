@@ -2,9 +2,11 @@ import { act, useLayoutEffect } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
+import { AuthRuntimeContext } from '@/auth/runtime'
 import { ResultPage } from '@/pages/ResultPage'
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 import { DomainServicesContext } from '@/services/domainServices'
+import type { RunAuthorized } from '@/services/serviceAdapters'
 import type { NegotiationResultState, NegotiationSession } from '@/types/negotiation'
 
 interface Deferred<T> {
@@ -73,6 +75,7 @@ async function mountResult(sessionId: string, negotiationClient: NegotiationClie
   document.body.append(host)
   const root = createRoot(host)
   let currentPath = ''
+  const runAuthorized: RunAuthorized = (operation) => operation('harness-access-token')
 
   function LocationProbe() {
     const location = useLocation()
@@ -82,18 +85,20 @@ async function mountResult(sessionId: string, negotiationClient: NegotiationClie
 
   await act(async () => {
     root.render(
-      <DomainServicesContext.Provider value={{
-        negotiationClient,
-        createAudioClient: () => { throw new Error('Audio is not used by this harness') as never },
-      }}>
-        <MemoryRouter initialEntries={[`/result/${sessionId}`]}>
-          <LocationProbe />
-          <Routes>
-            <Route path="/result/:sessionId" element={<ResultPage />} />
-            <Route path="/arena/:sessionId" element={<div>Арена</div>} />
-          </Routes>
-        </MemoryRouter>
-      </DomainServicesContext.Provider>,
+      <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', runAuthorized }}>
+        <DomainServicesContext.Provider value={{
+          negotiationClient,
+          createAudioClient: () => { throw new Error('Audio is not used by this harness') as never },
+        }}>
+          <MemoryRouter initialEntries={[`/result/${sessionId}`]}>
+            <LocationProbe />
+            <Routes>
+              <Route path="/result/:sessionId" element={<ResultPage />} />
+              <Route path="/arena/:sessionId" element={<div>Арена</div>} />
+            </Routes>
+          </MemoryRouter>
+        </DomainServicesContext.Provider>
+      </AuthRuntimeContext.Provider>,
     )
   })
   await waitForButton(host)

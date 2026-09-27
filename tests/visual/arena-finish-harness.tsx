@@ -2,7 +2,9 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
+import { AuthRuntimeContext } from '@/auth/runtime'
 import { ArenaPage } from '@/pages/ArenaPage'
+import type { RunAuthorized } from '@/services/serviceAdapters'
 import type { AudioClient } from '@/services/contracts/audioClient'
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 import { DomainServicesContext } from '@/services/domainServices'
@@ -71,6 +73,7 @@ export async function runAudioFinishFailureScenario() {
     getResult: unavailable,
     listSessions: unavailable,
   }
+  const runAuthorized: RunAuthorized = (operation) => operation('harness-access-token')
   const unhandled: string[] = []
   const onUnhandled = (event: PromiseRejectionEvent) => {
     unhandled.push(String(event.reason))
@@ -90,17 +93,16 @@ export async function runAudioFinishFailureScenario() {
   try {
     await act(async () => {
       root.render(
-        <DomainServicesContext.Provider value={{
-          negotiationClient,
-          createAudioClient: () => audioClient,
-        }}>
-          <MemoryRouter initialEntries={['/arena/voice-finish']}>
-            <Routes>
-              <Route path="/arena/:sessionId" element={<ArenaPage />} />
-              <Route path="/result/:sessionId" element={<div data-testid="result-route">Результат</div>} />
-            </Routes>
-          </MemoryRouter>
-        </DomainServicesContext.Provider>,
+        <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', runAuthorized }}>
+          <DomainServicesContext.Provider value={{ negotiationClient, createAudioClient: () => audioClient }}>
+            <MemoryRouter initialEntries={['/arena/voice-finish']}>
+              <Routes>
+                <Route path="/arena/:sessionId" element={<ArenaPage />} />
+                <Route path="/result/:sessionId" element={<div data-testid="result-route">Результат</div>} />
+              </Routes>
+            </MemoryRouter>
+          </DomainServicesContext.Provider>
+        </AuthRuntimeContext.Provider>,
       )
     })
     for (let attempt = 0; attempt < 20 && finishButton()?.disabled !== false; attempt += 1) await flush()

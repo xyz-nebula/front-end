@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
+import { useAuthRuntime } from '@/auth/runtime'
 import { ArenaConversation } from '@/components/arena/ArenaConversation'
 import { ArenaHeader } from '@/components/arena/ArenaHeader'
 import { DuelPreparation } from '@/components/arena/DuelPreparation'
@@ -36,6 +37,8 @@ function fallbackCase(title: string): TrainingCase {
 
 export function ArenaPage() {
   const { sessionId = '' } = useParams()
+  const { mockOwnerKey } = useAuthRuntime()
+  if (!mockOwnerKey) throw new Error('ArenaPage requires an authenticated owner.')
   const navigate = useNavigate()
   const { isRealVoice } = useDomainServices()
   const arena = useArenaSession(sessionId)
@@ -46,7 +49,7 @@ export function ArenaPage() {
   const trainingCase = trainingCases.find(
     (item) => item.id === arena.session?.caseId || item.title === arena.session?.name,
   ) ?? (arena.session ? fallbackCase(arena.session.name ?? 'Переговоры с AI') : undefined)
-  const sessionPreparation = arena.session ? readSessionPreparation(arena.session.id) : null
+  const sessionPreparation = arena.session ? readSessionPreparation(mockOwnerKey, arena.session.id) : null
 
   useEffect(() => {
     if (arena.viewState === 'finished') navigate(`/result/${sessionId}`, { replace: true })

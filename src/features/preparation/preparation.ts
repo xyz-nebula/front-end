@@ -104,16 +104,45 @@ export function parsePreparationDraft(value: unknown): PreparationDraft | null {
   return value as unknown as PreparationDraft
 }
 
-const DRAFT_PREFIX = 'arena.preparation-draft.v1'
-const SNAPSHOT_PREFIX = 'arena.session-preparation.v1'
+const DRAFT_PREFIX = 'arena.preparation-draft.v2'
+const SNAPSHOT_PREFIX = 'arena.session-preparation.v2'
+const memoryStorage = new Map<string, string>()
 
-export function draftStorageKey(caseId: string, roleIndex: 0 | 1): string {
-  return `${DRAFT_PREFIX}.${encodeURIComponent(caseId)}.${roleIndex}`
+function scopedStorageKey(prefix: string, ownerKey: string, entityId: string): string {
+  if (!ownerKey) throw new Error('Preparation storage requires an authenticated owner.')
+  return `${prefix}.${encodeURIComponent(ownerKey)}.${encodeURIComponent(entityId)}`
 }
 
-export function readPreparationDraft(caseId: string, roleIndex: 0 | 1): PreparationDraft {
+function readStoredValue(key: string): string | null {
+  const memoryValue = memoryStorage.get(key)
+  if (memoryValue !== undefined) return memoryValue
   try {
-    const serialized = window.localStorage.getItem(draftStorageKey(caseId, roleIndex))
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeStoredValue(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value)
+    memoryStorage.delete(key)
+  } catch {
+    memoryStorage.set(key, value)
+  }
+}
+
+export function draftStorageKey(ownerKey: string, caseId: string, roleIndex: 0 | 1): string {
+  return `${scopedStorageKey(DRAFT_PREFIX, ownerKey, caseId)}.${roleIndex}`
+}
+
+export function sessionPreparationStorageKey(ownerKey: string, sessionId: string): string {
+  return scopedStorageKey(SNAPSHOT_PREFIX, ownerKey, sessionId)
+}
+
+export function readPreparationDraft(ownerKey: string, caseId: string, roleIndex: 0 | 1): PreparationDraft {
+  try {
+    const serialized = readStoredValue(draftStorageKey(ownerKey, caseId, roleIndex))
     if (!serialized) return createEmptyPreparation()
     return parsePreparationDraft(JSON.parse(serialized) as unknown) ?? createEmptyPreparation()
   } catch {
@@ -121,18 +150,17 @@ export function readPreparationDraft(caseId: string, roleIndex: 0 | 1): Preparat
   }
 }
 
-export function savePreparationDraft(caseId: string, roleIndex: 0 | 1, draft: PreparationDraft): void {
-  window.localStorage.setItem(draftStorageKey(caseId, roleIndex), JSON.stringify(draft))
+export function savePreparationDraft(ownerKey: string, caseId: string, roleIndex: 0 | 1, draft: PreparationDraft): void {
+  writeStoredValue(draftStorageKey(ownerKey, caseId, roleIndex), JSON.stringify(draft))
 }
 
-export function saveSessionPreparation(sessionId: string, snapshot: SessionPreparationSnapshot): void {
-  try { window.localStorage.setItem(`${SNAPSHOT_PREFIX}.${sessionId}`, JSON.stringify(snapshot)) }
-  catch { /* The server session already exists; a local snapshot is best-effort. */ }
+export function saveSessionPreparation(ownerKey: string, sessionId: string, snapshot: SessionPreparationSnapshot): void {
+  writeStoredValue(sessionPreparationStorageKey(ownerKey, sessionId), JSON.stringify(snapshot))
 }
 
-export function readSessionPreparation(sessionId: string): SessionPreparationSnapshot | null {
+export function readSessionPreparation(ownerKey: string, sessionId: string): SessionPreparationSnapshot | null {
   try {
-    const serialized = window.localStorage.getItem(`${SNAPSHOT_PREFIX}.${sessionId}`)
+    const serialized = readStoredValue(sessionPreparationStorageKey(ownerKey, sessionId))
     if (!serialized) return null
     const value: unknown = JSON.parse(serialized)
     if (typeof value !== 'object' || value === null) return null

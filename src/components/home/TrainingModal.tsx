@@ -19,21 +19,72 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const { isRealVoice } = useDomainServices()
   const [mode, setMode] = useState<NegotiationMode>(isRealVoice ? 'voice' : 'text')
   const [role, setRole] = useState<0 | 1 | null>(null)
+  const backdropRef = useRef<HTMLDivElement>(null)
+  const modalRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const onCloseRef = useRef(onClose)
   const dragStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null)
   const [dragOffset, setDragOffset] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
+
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
+
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const backgroundElements = [...(backdropRef.current?.parentElement?.children ?? [])]
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== backdropRef.current)
+      .map((element) => ({ element, wasInert: element.inert }))
+    backgroundElements.forEach(({ element }) => { element.inert = true })
+
+    const focusableElements = () => [...(modalRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ) ?? [])].filter((element) => !element.hidden && element.getClientRects().length > 0)
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusable = focusableElements()
+      if (focusable.length === 0) {
+        event.preventDefault()
+        closeButtonRef.current?.focus()
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement
+      if (!modalRef.current?.contains(active)) {
+        event.preventDefault()
+        first.focus()
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    const handleFocusIn = (event: FocusEvent) => {
+      if (event.target instanceof Node && !modalRef.current?.contains(event.target)) {
+        closeButtonRef.current?.focus()
+      }
+    }
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     closeButtonRef.current?.focus()
-    window.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('focusin', handleFocusIn)
     return () => {
       document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('focusin', handleFocusIn)
+      backgroundElements.forEach(({ element, wasInert }) => { element.inert = wasInert })
+      if (trigger?.isConnected) trigger.focus()
     }
-  }, [onClose])
+  }, [])
 
   const startPreparation = () => {
     if (role === null) return
@@ -75,8 +126,9 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   }
 
   return (
-    <div className="home-case-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div className="home-case-backdrop" ref={backdropRef} role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section
+        ref={modalRef}
         className={`home-case-modal ${isDragging ? 'is-dragging' : ''}`}
         style={{ '--modal-drag-offset': `${dragOffset}px` } as CSSProperties}
         role="dialog"

@@ -3,7 +3,44 @@ import { createRoot } from 'react-dom/client'
 
 import { VoiceControls } from '@/components/arena/VoiceControls'
 
-const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+class ManualAnimationClock {
+  private readonly originalRequestAnimationFrame = window.requestAnimationFrame
+  private readonly originalCancelAnimationFrame = window.cancelAnimationFrame
+  private readonly originalPerformanceNow = Object.getOwnPropertyDescriptor(performance, 'now')
+  private readonly callbacks = new Map<number, FrameRequestCallback>()
+  private nextId = 1
+  private now = performance.now()
+
+  install(): void {
+    window.requestAnimationFrame = (callback) => {
+      const id = this.nextId
+      this.nextId += 1
+      this.callbacks.set(id, callback)
+      return id
+    }
+    window.cancelAnimationFrame = (id) => { this.callbacks.delete(id) }
+    Object.defineProperty(performance, 'now', { configurable: true, value: () => this.now })
+  }
+
+  advance(frames: number, frameDuration = 16): void {
+    for (let frame = 0; frame < frames; frame += 1) {
+      this.now += frameDuration
+      const pending = [...this.callbacks.values()]
+      this.callbacks.clear()
+      pending.forEach((callback) => callback(this.now))
+    }
+  }
+
+  restore(): void {
+    window.requestAnimationFrame = this.originalRequestAnimationFrame
+    window.cancelAnimationFrame = this.originalCancelAnimationFrame
+    if (this.originalPerformanceNow) {
+      Object.defineProperty(performance, 'now', this.originalPerformanceNow)
+    } else {
+      delete (performance as Performance & { now?: () => number }).now
+    }
+  }
+}
 
 export async function runVoiceControlsVisualizationScenario() {
   ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -11,6 +48,8 @@ export async function runVoiceControlsVisualizationScenario() {
   host.className = 'arena-page'
   document.body.append(host)
   const root = createRoot(host)
+  const clock = new ManualAnimationClock()
+  clock.install()
   let level = 0
 
   const render = async (input: { isPlaying?: boolean; isDemo?: boolean; isUserSpeaking?: boolean; state?: 'connected' | 'paused' }) => {
@@ -38,19 +77,19 @@ export async function runVoiceControlsVisualizationScenario() {
 
   try {
     await render({})
-    await wait(40)
+    clock.advance(3)
     const idleLevel = readLevel()
     level = 1
-    await wait(350)
+    clock.advance(22)
     const loudLevel = readLevel()
     await render({ isPlaying: true })
-    await wait(300)
+    clock.advance(19)
     const aiLevel = readLevel()
     await render({ isDemo: true, isUserSpeaking: true })
-    await wait(150)
+    clock.advance(10)
     const demoLevel = readLevel()
     await render({ isDemo: true, isUserSpeaking: false })
-    await wait(300)
+    clock.advance(19)
     const quietDemoLevel = readLevel()
     return {
       idleLevel,
@@ -63,6 +102,7 @@ export async function runVoiceControlsVisualizationScenario() {
     }
   } finally {
     await act(async () => root.unmount())
+    clock.restore()
     host.remove()
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
   }
@@ -74,6 +114,8 @@ export async function runReducedMotionVisualizationScenario() {
   host.className = 'arena-page'
   document.body.append(host)
   const root = createRoot(host)
+  const clock = new ManualAnimationClock()
+  clock.install()
   try {
     await act(async () => {
       root.render(
@@ -92,12 +134,13 @@ export async function runReducedMotionVisualizationScenario() {
         />,
       )
     })
-    await wait(120)
+    clock.advance(8)
     return Number.parseFloat(
       (host.querySelector('.voice-controls') as HTMLElement).style.getPropertyValue('--voice-level'),
     )
   } finally {
     await act(async () => root.unmount())
+    clock.restore()
     host.remove()
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
   }
