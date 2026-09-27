@@ -4,7 +4,7 @@ import type { MessageSpeaker, NegotiationMessage } from '@/types/negotiation'
 
 export type ChatStatusDto = 'victory' | 'defeat' | 'ongoing'
 
-export interface ChatCreateRequestDto { name: string; case_uuid: string; preparations: string }
+export interface ChatCreateRequestDto { name: string; case_uuid: string; preparations: string; selected_role: 0 | 1 }
 export interface ChatActivateRequestDto { uuid: string }
 export interface ChatListItemDto { uuid: string; name: string }
 export interface ChatResponseDto extends ChatListItemDto { status: ChatStatusDto; created_at: string }
@@ -233,8 +233,8 @@ export function parseBackendError(value: unknown, status: number): ServiceError 
   })
 }
 
-export function toCreateChatDto(name: string, caseId: string, preparations: string): ChatCreateRequestDto {
-  return { name, case_uuid: caseId, preparations }
+export function toCreateChatDto(name: string, caseId: string, preparations: string, selectedRole: 0 | 1): ChatCreateRequestDto {
+  return { name, case_uuid: caseId, preparations, selected_role: selectedRole }
 }
 export function toActivateChatDto(id: string): ChatActivateRequestDto { return { uuid: id } }
 export function toAudioInputDto(audio: string): AudioInputMessageDto { return { type: 'audio', audio } }

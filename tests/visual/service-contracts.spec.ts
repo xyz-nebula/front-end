@@ -84,8 +84,8 @@ test('invalid DTO and event payloads fail with a typed invalid-response error', 
 })
 
 test('request serializers keep the target snake_case boundary', () => {
-  expect(toCreateChatDto('Срок поставки', chatFixture.uuid, '### Цель\nДоговориться')).toEqual({
-    name: 'Срок поставки', case_uuid: chatFixture.uuid, preparations: '### Цель\nДоговориться',
+  expect(toCreateChatDto('Срок поставки', chatFixture.uuid, '### Цель\nДоговориться', 1)).toEqual({
+    name: 'Срок поставки', case_uuid: chatFixture.uuid, preparations: '### Цель\nДоговориться', selected_role: 1,
   })
   expect(toActivateChatDto(chatFixture.uuid)).toEqual({ uuid: chatFixture.uuid })
   expect(toAudioInputDto(audioInputFixture.audio)).toEqual(audioInputFixture)
@@ -209,7 +209,7 @@ test('real negotiation client creates, activates, reads and lists remote chats',
       { baseUrl: '/api', timeoutMs: 1_000 },
     )
     const created = await client.createSession({
-      caseId: '00000000-0000-4000-8000-000000000001', caseName: 'Повышение зарплаты', mode: 'voice', clientCommandId: 'create-1', preparations: '# Стратегия\n\n### Цель\nДоговориться',
+      caseId: '00000000-0000-4000-8000-000000000001', caseName: 'Повышение зарплаты', mode: 'voice', clientCommandId: 'create-1', preparations: '# Стратегия\n\n### Цель\nДоговориться', selectedRole: 1,
     })
     await client.activateSession(created.id)
     const loaded = await client.getSession(created.id)
@@ -219,7 +219,7 @@ test('real negotiation client creates, activates, reads and lists remote chats',
     expect(loaded.messages).toHaveLength(2)
     expect(listed).toHaveLength(2)
     expect(requests[0]).toMatchObject({
-      url: '/api/v1/chats/', method: 'POST', body: JSON.stringify({ name: 'Повышение зарплаты', case_uuid: '00000000-0000-4000-8000-000000000001', preparations: '# Стратегия\n\n### Цель\nДоговориться' }),
+      url: '/api/v1/chats/', method: 'POST', body: JSON.stringify({ name: 'Повышение зарплаты', case_uuid: '00000000-0000-4000-8000-000000000001', preparations: '# Стратегия\n\n### Цель\nДоговориться', selected_role: 1 }),
     })
     expect(requests.some((request) => request.url === '/api/v1/chats/active' && request.method === 'PUT')).toBe(true)
   } finally {
@@ -232,7 +232,7 @@ test('real negotiation client requires authorization while demo-only operations 
   const audio = new AudioEngineClient()
 
   const calls = [
-    negotiation.createSession({ caseId: 'case-1', mode: 'text', clientCommandId: 'command-1', preparations: '' }),
+    negotiation.createSession({ caseId: 'case-1', mode: 'text', clientCommandId: 'command-1', preparations: '', selectedRole: 0 }),
     negotiation.getSession('session-1'),
     negotiation.sendTextTurn({ sessionId: 'session-1', text: 'Текст', clientTurnId: 'turn-1' }),
     negotiation.createAudioTicket('session-1'),
@@ -290,7 +290,7 @@ test('real client uses HTTP only for implemented chat operations', async ({ page
     const negotiation = new BackendNegotiationClient(async (operation) => operation('test-access-token'))
     const audio = new AudioEngineClient()
     const calls = [
-      negotiation.createSession({ caseId: 'case-1', mode: 'text', clientCommandId: 'create-1', preparations: '' }),
+      negotiation.createSession({ caseId: 'case-1', mode: 'text', clientCommandId: 'create-1', preparations: '', selectedRole: 0 }),
       negotiation.getSession('session-1'),
       negotiation.sendTextTurn({ sessionId: 'session-1', text: 'Текст', clientTurnId: 'turn-1' }),
       negotiation.createAudioTicket('session-1'),

@@ -15,6 +15,7 @@ export interface NegotiationClient {
     mode: NegotiationMode
     clientCommandId: string
     preparations: string
+    selectedRole: 0 | 1
   }): Promise<NegotiationSession>
 
   listCases(): Promise<TrainingCase[]>

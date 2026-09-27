@@ -182,7 +182,7 @@ export class BackendNegotiationClient implements NegotiationClient {
     return this.authorized(async (accessToken) => {
       const created = parseChat(await this.request(accessToken, '/v1/chats/', {
         method: 'POST',
-        body: toCreateChatDto(input.caseName ?? input.caseId, input.caseId, input.preparations),
+        body: toCreateChatDto(input.caseName ?? input.caseId, input.caseId, input.preparations, input.selectedRole),
       }))
       return mapSession({ ...created, messages: [] })
     })
