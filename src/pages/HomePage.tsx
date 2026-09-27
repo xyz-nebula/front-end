@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useAuth } from '@/auth/useAuth'
 import { ProductHeader } from '@/components/chrome/ProductHeader'
 import { CaseCatalog, HomeOverview, TrainingHistory } from '@/components/home/HomeDashboardSections'
 import { TrainingModal } from '@/components/home/TrainingModal'
+import { ProductTourInvitation } from '@/components/product-tour/ProductTourInvitation'
 import { useHomeDashboardData } from '@/features/home/useHomeDashboardData'
+import { useProductTour } from '@/features/product-tour/useProductTour'
 import { useDomainServices } from '@/services/domainServices'
 import type { TrainingCase } from '@/types/case'
 import '@/styles/home.css'
@@ -13,12 +15,18 @@ export function HomePage() {
   const { dismissMemorySessionNotice, showMemorySessionNotice } = useAuth()
   const { negotiationClient } = useDomainServices()
   const dashboard = useHomeDashboardData(negotiationClient)
+  const productTour = useProductTour()
+  const { considerInvitation } = productTour
   const [selectedCase, setSelectedCase] = useState<TrainingCase | null>(null)
   const [showAllHistory, setShowAllHistory] = useState(false)
   const recommendedCase = dashboard.cases[0]
   const activeSession = dashboard.history.find((item) => item.status === 'active')
   const activeCase = activeSession && dashboard.cases.find((item) => item.id === activeSession.caseId)
   const displayedCase = activeCase ?? recommendedCase
+
+  useEffect(() => {
+    considerInvitation(!dashboard.casesLoading && !dashboard.casesError && dashboard.cases.length > 0)
+  }, [considerInvitation, dashboard.cases.length, dashboard.casesError, dashboard.casesLoading])
 
   return <div className="arena-home">
     <ProductHeader variant="home" actions={<span className="arena-home__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span><span>Серия: <strong>4 дня</strong></span></span>} />
@@ -31,5 +39,10 @@ export function HomePage() {
       <TrainingHistory cases={dashboard.cases} error={dashboard.historyError} history={dashboard.history} loading={dashboard.historyLoading} showAll={showAllHistory} onRetry={() => void dashboard.loadHistory()} onToggleAll={() => setShowAllHistory((value) => !value)} />
     </main>
     {selectedCase && <TrainingModal item={selectedCase} onClose={() => setSelectedCase(null)} />}
+    {productTour.invitationOpen && <ProductTourInvitation
+      onStart={productTour.beginFromInvitation}
+      onLater={productTour.deferInvitation}
+      onNever={productTour.disableInvitation}
+    />}
   </div>
 }

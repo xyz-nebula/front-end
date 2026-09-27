@@ -27,6 +27,7 @@ export interface ProductTourState {
   status: ProductTourStatus
   stepId: ProductTourStepId
   caseId?: string
+  caseIndex?: number
   roleIndex?: 0 | 1
   sessionId?: string
   dialogueBaseline?: {
@@ -74,6 +75,7 @@ export function parseProductTourState(value: unknown): ProductTourState | null {
   if (!steps.includes(value.stepId as ProductTourStepId)) return null
   if (!hasOptionalString(value, 'caseId') || !hasOptionalString(value, 'sessionId')) return null
   if (value.roleIndex !== undefined && value.roleIndex !== 0 && value.roleIndex !== 1) return null
+  if (value.caseIndex !== undefined && (!Number.isInteger(value.caseIndex) || (value.caseIndex as number) < 0)) return null
   if (typeof value.updatedAt !== 'string' || Number.isNaN(Date.parse(value.updatedAt))) return null
 
   let dialogueBaseline: ProductTourState['dialogueBaseline']
@@ -92,6 +94,7 @@ export function parseProductTourState(value: unknown): ProductTourState | null {
     stepId: value.stepId as ProductTourStepId,
     updatedAt: value.updatedAt,
     ...(typeof value.caseId === 'string' ? { caseId: value.caseId } : {}),
+    ...(typeof value.caseIndex === 'number' ? { caseIndex: value.caseIndex } : {}),
     ...(value.roleIndex === 0 || value.roleIndex === 1 ? { roleIndex: value.roleIndex } : {}),
     ...(typeof value.sessionId === 'string' ? { sessionId: value.sessionId } : {}),
     ...(dialogueBaseline ? { dialogueBaseline } : {}),

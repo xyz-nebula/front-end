@@ -17,6 +17,8 @@ async function enterHome(page: import('@playwright/test').Page) {
   await expect(progressCard.getByText('—', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Кейсы' })).toBeVisible()
   await expect(continueCard.getByRole('status', { name: 'Загружаем тренировку' })).toHaveCount(0)
+  const tourInvitation = page.getByRole('dialog', { name: 'Познакомимся с Ареной?' })
+  if (await tourInvitation.isVisible()) await tourInvitation.getByRole('button', { name: 'Позже' }).click()
 }
 
 test('home dashboard and case dialog fit desktop and mobile', async ({ page }) => {
