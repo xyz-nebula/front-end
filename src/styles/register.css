@@ -1,0 +1,23 @@
+.register-page { padding-block: 96px 54px; }
+
+.register-card {
+  width: min(100%, 720px);
+  padding-block: 38px 36px;
+}
+
+.register-card__heading { margin-bottom: 30px; }
+.register-form { gap: 18px; }
+.register-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.register-form .login-form__submit { margin-top: 4px; }
+
+@media (max-width: 600px) {
+  .register-page { padding-block: 0 40px; }
+  .register-card { margin-top: 54px; padding: 0; }
+  .register-card__heading { margin-bottom: 28px; }
+  .register-form { gap: 20px; }
+  .register-form__row { grid-template-columns: 1fr; gap: 20px; }
+}
+
+@media (max-width: 370px) {
+  .register-card { margin-top: 42px; }
+}

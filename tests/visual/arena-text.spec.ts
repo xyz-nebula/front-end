@@ -2,6 +2,7 @@ import {
   artifactsDir,
   captureScreenshot,
   expect,
+  expectNoDocumentVerticalOverflow,
   expectNoHorizontalOverflow,
   test,
 } from './helpers'
@@ -20,7 +21,6 @@ test('text arena creates, restores and finishes one atomic conversation without 
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill('text.user')
   await page.getByLabel('Email').fill('text@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
@@ -30,15 +30,21 @@ test('text arena creates, restores and finishes one atomic conversation without 
   await page.getByRole('button', { name: 'Начать кейс' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Повышение зарплаты' })
+  await dialog.getByRole('radio', { name: /Сотрудник/ }).check()
   await expect(dialog.getByText('Текст', { exact: true })).toBeVisible()
   await expect(dialog.getByText('Голос', { exact: true })).toBeVisible()
   await expect(dialog.getByRole('radio', { name: /Голос/ })).toBeEnabled()
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/training-modal-modes-desktop.png`)
 
-  await dialog.getByRole('button', { name: 'Начать тренировку' }).click()
+  await dialog.getByRole('button', { name: 'Начать подготовку' }).click()
+  await expect(page).toHaveURL(/\/cases\/salary-review\/preparation/)
+  await page.locator('.preparation-sidebar').getByRole('button', { name: /Стратегия/ }).click()
+  await page.getByRole('textbox', { name: 'Цель на переговоры', exact: true }).fill('Договориться о новых условиях и сроке пересмотра.')
+  await page.getByRole('button', { name: 'Начать поединок' }).first().click()
   await expect(page).toHaveURL(/\/arena\/[0-9a-f-]+$/)
   await expect(page.getByRole('heading', { name: 'Начните разговор' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Моя подготовка' })).toBeVisible()
 
   const composer = page.getByLabel('Ваша реплика')
   await composer.fill('Хочу обсудить пересмотр зарплаты: за полгода я взял на себя два новых направления.')
@@ -81,19 +87,26 @@ test('text arena creates, restores and finishes one atomic conversation without 
   await captureScreenshot(page, `${artifactsDir}/arena-text-desktop.png`)
 
   await page.setViewportSize({ width: 390, height: 844 })
+  await page.evaluate(() => window.scrollTo(0, 0))
   await expect(page.getByRole('heading', { name: 'Повышение зарплаты' })).toBeVisible()
+  await expect(page.getByLabel('Ваша реплика')).toBeVisible()
   await expectNoHorizontalOverflow(page)
+  await expectNoDocumentVerticalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/arena-text-mobile.png`)
+  await page.setViewportSize({ width: 360, height: 800 })
+  await expectNoHorizontalOverflow(page)
+  await expectNoDocumentVerticalOverflow(page)
+  await page.setViewportSize({ width: 390, height: 844 })
 
   await page.getByRole('button', { name: 'Завершить' }).click()
   await expect(page.getByRole('heading', { name: 'Закончить переговоры?' })).toBeVisible()
   await captureScreenshot(page, `${artifactsDir}/arena-finish-confirmation-mobile.png`)
   await page.getByRole('dialog').getByRole('button', { name: 'Завершить' }).click()
   await expect(page).toHaveURL(new RegExp(`/result/${sessionId}$`))
-  await expect(page.getByRole('heading', { name: 'Ваш результат' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Разбор поединка' })).toBeVisible()
   await expect(composer).toHaveCount(0)
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Ваш результат' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Разбор поединка' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/result/${sessionId}$`))
   expect(chatCrudRequests).toEqual([])
 })

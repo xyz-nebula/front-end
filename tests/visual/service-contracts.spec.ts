@@ -7,6 +7,7 @@ import { BackendNegotiationClient } from '../../src/services/real/backendNegotia
 import {
   parseAudioEngineEvent,
   parseBackendError,
+  parseCases,
   parseChatList,
   parseChatWithMessages,
   toActivateChatDto,
@@ -46,17 +47,23 @@ test('target audio event fixtures validate and preserve event semantics', () => 
   const events = audioEventFixtures.map(parseAudioEngineEvent)
 
   expect(events.map((event) => event.type)).toEqual([
-    'transcript',
+    'transcript_delta',
     'audio_frame',
     'error',
     'auth_error',
   ])
   expect(events[0]).toEqual({
-    type: 'transcript',
+    type: 'transcript_delta',
     speaker: 'user',
     text: 'Предлагаю согласовать',
   })
   expect(events[3]).toMatchObject({ code: 'expired_token' })
+
+  expect(parseAudioEngineEvent({ type: 'transcript', role: 'assistant', text: ' ' })).toEqual({
+    type: 'transcript_delta',
+    speaker: 'ai',
+    text: ' ',
+  })
 })
 
 test('invalid DTO and event payloads fail with a typed invalid-response error', () => {
@@ -77,10 +84,68 @@ test('invalid DTO and event payloads fail with a typed invalid-response error', 
 })
 
 test('request serializers keep the target snake_case boundary', () => {
-  expect(toCreateChatDto('Срок поставки')).toEqual({ name: 'Срок поставки' })
+  expect(toCreateChatDto('Срок поставки', chatFixture.uuid, '### Цель\nДоговориться')).toEqual({
+    name: 'Срок поставки', case_uuid: chatFixture.uuid, preparations: '### Цель\nДоговориться',
+  })
   expect(toActivateChatDto(chatFixture.uuid)).toEqual({ uuid: chatFixture.uuid })
   expect(toAudioInputDto(audioInputFixture.audio)).toEqual(audioInputFixture)
   expect(toAudioControlDto('pause')).toEqual({ type: 'control', action: 'pause' })
+})
+
+test('case parser normalizes public fields and does not expose ideal preparation', () => {
+  const source = [{
+    uuid: '00000000-0000-4000-8000-000000000010',
+    created_at: '2026-09-26T10:00:00Z',
+    name: 'Срок поставки', description: 'Описание', category: 'Продажи', difficulty: 'hard',
+    time_limit: 10, goal: 'Цель', synopsis: 'Ситуация',
+    first_role: 'Поставщик', second_role: 'Заказчик',
+    first_role_preparations: 'Скрытая подготовка поставщика',
+    second_role_preparations: 'Скрытая подготовка заказчика',
+  }]
+  const parsed = parseCases(source)
+  expect(parsed[0]).toMatchObject({
+    id: source[0].uuid,
+    name: source[0].name,
+    timeLimit: 10,
+    firstRole: 'Поставщик',
+    secondRole: 'Заказчик',
+  })
+  expect(parsed[0]).not.toHaveProperty('firstRolePreparations')
+  expect(parsed[0]).not.toHaveProperty('secondRolePreparations')
+})
+
+test('real negotiation client converts case time limits from seconds to rounded-up minutes', async () => {
+  const originalFetch = globalThis.fetch
+  const cases = [600, 610].map((timeLimit, index) => ({
+    uuid: `00000000-0000-4000-8000-00000000001${index}`,
+    created_at: '2026-09-26T10:00:00Z',
+    name: `Кейс ${index + 1}`,
+    description: 'Описание',
+    category: 'Продажи',
+    difficulty: 'medium',
+    time_limit: timeLimit,
+    goal: 'Цель',
+    synopsis: 'Ситуация',
+    first_role: 'Поставщик',
+    second_role: 'Заказчик',
+    first_role_preparations: 'Скрытая подготовка поставщика',
+    second_role_preparations: 'Скрытая подготовка заказчика',
+  }))
+  globalThis.fetch = async () => new Response(JSON.stringify(cases), { status: 200 })
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+
+    const result = await client.listCases()
+
+    expect(cases.map((item) => item.time_limit)).toEqual([600, 610])
+    expect(result.map((item) => item.duration)).toEqual(['10 мин', '11 мин'])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
 })
 
 test('service config requires explicit sources and rejects invalid values', () => {
@@ -144,7 +209,7 @@ test('real negotiation client creates, activates, reads and lists remote chats',
       { baseUrl: '/api', timeoutMs: 1_000 },
     )
     const created = await client.createSession({
-      caseId: 'salary-review', caseName: 'Повышение зарплаты', mode: 'voice', clientCommandId: 'create-1',
+      caseId: '00000000-0000-4000-8000-000000000001', caseName: 'Повышение зарплаты', mode: 'voice', clientCommandId: 'create-1', preparations: '# Стратегия\n\n### Цель\nДоговориться',
     })
     await client.activateSession(created.id)
     const loaded = await client.getSession(created.id)
@@ -154,7 +219,7 @@ test('real negotiation client creates, activates, reads and lists remote chats',
     expect(loaded.messages).toHaveLength(2)
     expect(listed).toHaveLength(2)
     expect(requests[0]).toMatchObject({
-      url: '/api/v1/chats/', method: 'POST', body: JSON.stringify({ name: 'Повышение зарплаты' }),
+      url: '/api/v1/chats/', method: 'POST', body: JSON.stringify({ name: 'Повышение зарплаты', case_uuid: '00000000-0000-4000-8000-000000000001', preparations: '# Стратегия\n\n### Цель\nДоговориться' }),
     })
     expect(requests.some((request) => request.url === '/api/v1/chats/active' && request.method === 'PUT')).toBe(true)
   } finally {
@@ -162,17 +227,18 @@ test('real negotiation client creates, activates, reads and lists remote chats',
   }
 })
 
-test('real negotiation and audio stubs return feature-unavailable without network work', async () => {
+test('real negotiation client requires authorization while demo-only operations remain local', async () => {
   const negotiation = new BackendNegotiationClient()
   const audio = new AudioEngineClient()
 
   const calls = [
-    negotiation.createSession({ caseId: 'case-1', mode: 'text', clientCommandId: 'command-1' }),
+    negotiation.createSession({ caseId: 'case-1', mode: 'text', clientCommandId: 'command-1', preparations: '' }),
     negotiation.getSession('session-1'),
     negotiation.sendTextTurn({ sessionId: 'session-1', text: 'Текст', clientTurnId: 'turn-1' }),
     negotiation.createAudioTicket('session-1'),
     negotiation.finishSession({ sessionId: 'session-1', clientCommandId: 'command-2' }),
     negotiation.getResult('session-1'),
+    negotiation.listCases(),
     negotiation.listSessions(),
     audio.connect({ sessionId: 'session-1', ticket: {
       ticket: 'short-lived',
@@ -182,8 +248,11 @@ test('real negotiation and audio stubs return feature-unavailable without networ
   ]
   const results = await Promise.allSettled(calls)
 
-  expect(results).toHaveLength(8)
-  for (const result of results) {
+  expect(results).toHaveLength(9)
+  expect(results[4].status).toBe('fulfilled')
+  expect(results[5].status).toBe('fulfilled')
+  for (const [index, result] of results.entries()) {
+    if (index === 4 || index === 5) continue
     expect(result.status).toBe('rejected')
     if (result.status === 'rejected') {
       expect(isServiceError(result.reason)).toBe(true)
@@ -203,10 +272,10 @@ test('real negotiation and audio stubs return feature-unavailable without networ
   await expect(audio.disconnect()).resolves.toBeUndefined()
 })
 
-test('real stubs make no HTTP or WebSocket requests in the browser', async ({ page }) => {
+test('real client uses HTTP only for implemented chat operations', async ({ page }) => {
   const domainRequests: string[] = []
   page.on('request', (request) => {
-    if (/\/api\/v1\/(negotiations|chat)\b/.test(request.url())) domainRequests.push(request.url())
+    if (/\/api\/v1\/chats\b/.test(request.url())) domainRequests.push(request.url())
   })
   page.on('websocket', (socket) => {
     if (socket.url().includes('/v1/audio-stream')) domainRequests.push(socket.url())
@@ -221,12 +290,13 @@ test('real stubs make no HTTP or WebSocket requests in the browser', async ({ pa
     const negotiation = new BackendNegotiationClient(async (operation) => operation('test-access-token'))
     const audio = new AudioEngineClient()
     const calls = [
-      negotiation.createSession({ caseId: 'case-1', mode: 'text', clientCommandId: 'create-1' }),
+      negotiation.createSession({ caseId: 'case-1', mode: 'text', clientCommandId: 'create-1', preparations: '' }),
       negotiation.getSession('session-1'),
       negotiation.sendTextTurn({ sessionId: 'session-1', text: 'Текст', clientTurnId: 'turn-1' }),
       negotiation.createAudioTicket('session-1'),
       negotiation.finishSession({ sessionId: 'session-1', clientCommandId: 'finish-1' }),
       negotiation.getResult('session-1'),
+      negotiation.listCases(),
       negotiation.listSessions(),
       audio.connect({ sessionId: 'session-1', ticket: {
         ticket: 'short-lived', expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -238,8 +308,8 @@ test('real stubs make no HTTP or WebSocket requests in the browser', async ({ pa
       ? (entry.reason as { reason?: string }).reason : 'resolved')
   })
 
-  expect(result).toEqual(Array(8).fill('feature-unavailable'))
-  expect(domainRequests).toEqual([])
+  expect(result).toEqual(['http', 'http', 'feature-unavailable', 'feature-unavailable', 'resolved', 'resolved', 'http', 'http', 'feature-unavailable'])
+  expect(domainRequests).toHaveLength(4)
 })
 
 test('pages and arena hooks depend only on service ports', async () => {

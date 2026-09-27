@@ -6,12 +6,14 @@ class PcmCaptureProcessor extends AudioWorkletProcessor {
     this.active = true
     this.accumulator = 0
     this.samples = []
+    this.sumSquares = 0
     this.port.onmessage = (event) => {
       if (event.data === 'pause') this.active = false
       if (event.data === 'resume') this.active = true
       if (event.data === 'reset') {
         this.accumulator = 0
         this.samples = []
+        this.sumSquares = 0
       }
     }
   }
@@ -27,10 +29,13 @@ class PcmCaptureProcessor extends AudioWorkletProcessor {
       this.accumulator -= sampleRate
       const value = Math.max(-1, Math.min(1, channel[index]))
       this.samples.push(value < 0 ? Math.round(value * 32768) : Math.round(value * 32767))
+      this.sumSquares += value * value
       if (this.samples.length === 480) {
         const pcm = new Int16Array(this.samples)
+        const rms = Math.sqrt(this.sumSquares / this.samples.length)
         this.samples = []
-        this.port.postMessage(pcm.buffer, [pcm.buffer])
+        this.sumSquares = 0
+        this.port.postMessage({ buffer: pcm.buffer, rms }, [pcm.buffer])
       }
     }
     return true

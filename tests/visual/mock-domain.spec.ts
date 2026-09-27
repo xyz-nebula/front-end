@@ -13,7 +13,6 @@ test('mock registration exposes a demo activation link on desktop and mobile', a
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill(`irina.${Date.now()}`)
   await page.getByLabel('Email').fill(`irina.${Date.now()}@example.com`)
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
@@ -42,7 +41,6 @@ test('mock auth supports registration, activation, login, refresh and logout', a
     const auth = new MockAuthClient(storage, 1)
     const registered = await auth.register({
       email: 'demo@example.com',
-      username: 'demo.user',
       first_name: 'Демо',
       last_name: 'Пользователь',
       password: 'strong-password',

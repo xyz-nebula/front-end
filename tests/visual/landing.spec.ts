@@ -392,11 +392,10 @@ test('mobile navigation opens and closes accessibly', async ({ page }) => {
   await expect(menuButton).toHaveAttribute('aria-expanded', 'false')
 })
 
-test('product home remains separate from the landing redesign', async ({ page }) => {
+test('product home keeps its own styles after landing navigation', async ({ page }) => {
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill('landing.user')
   await page.getByLabel('Email').fill('landing@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
@@ -407,7 +406,7 @@ test('product home remains separate from the landing redesign', async ({ page })
   await page.getByRole('link', { name: 'Начать поединок' }).click()
 
   await expect(page).toHaveURL(/\/home$/)
-  await expect(page.getByRole('heading', { level: 1, name: /Какой разговор/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /Добро пожаловать/ })).toBeVisible()
   await expect(page.locator('.arena-landing')).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/home-mobile-regression.png`)

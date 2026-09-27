@@ -32,9 +32,26 @@ export type AudioConnectionState =
 
 export type AudioControlAction = 'pause' | 'resume' | 'stop' | 'close'
 
+export interface AudioTranscriptDraft {
+  text: string
+  targetText: string
+  phase: 'receiving' | 'finishing'
+  committedMessageId?: string
+}
+
+export interface AudioCaptureMessage {
+  buffer: ArrayBuffer
+  rms: number
+}
+
+export interface AudioTranscriptDrafts {
+  user: AudioTranscriptDraft | null
+  ai: AudioTranscriptDraft | null
+}
+
 export type AudioEngineEvent =
   | {
-      type: 'transcript'
+      type: 'transcript_delta'
       speaker: MessageSpeaker
       text: string
     }

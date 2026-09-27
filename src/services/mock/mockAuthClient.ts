@@ -38,17 +38,12 @@ export class MockAuthClient implements AuthClient {
     await this.delay()
     return this.storage.mutate((data) => {
       const email = normalizeEmail(payload.email)
-      const username = payload.username.trim().toLocaleLowerCase('ru-RU')
       if (data.users.some((user) => user.email === email)) {
         throw fieldError('email', 'Пользователь с таким email уже существует.', 409)
-      }
-      if (data.users.some((user) => user.username.toLocaleLowerCase('ru-RU') === username)) {
-        throw fieldError('username', 'Имя пользователя уже занято.', 409)
       }
       const user: MockUserRecord = {
         id: crypto.randomUUID(),
         email,
-        username: payload.username.trim(),
         firstName: payload.first_name.trim(),
         lastName: payload.last_name.trim(),
         password: payload.password,

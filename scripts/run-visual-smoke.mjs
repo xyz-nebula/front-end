@@ -30,6 +30,9 @@ const testGroups = [
     authSource: 'mock',
     specs: [
       'landing.spec.ts',
+      'home.spec.ts',
+      'preparation.spec.ts',
+      'page-data-hooks.spec.ts',
       'mock-domain.spec.ts',
       'domain-resilience.spec.ts',
       'arena-session-resilience.spec.ts',

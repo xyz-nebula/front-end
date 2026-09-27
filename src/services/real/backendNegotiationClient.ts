@@ -2,6 +2,7 @@ import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 import type { RunAuthorized } from '@/services/serviceAdapters'
 import {
   parseBackendError,
+  parseCases,
   parseChat,
   parseChatList,
   parseChatWithMessages,
@@ -17,6 +18,8 @@ import type {
   NegotiationSessionSummary,
   NegotiationStatus,
 } from '@/types/negotiation'
+import type { CaseAccent, CaseIcon, TrainingCase } from '@/types/case'
+import { trainingCases } from '@/mocks/cases'
 
 interface BackendNegotiationClientOptions {
   baseUrl: string
@@ -40,13 +43,46 @@ function mapStatus(status: ParsedChat['status']): NegotiationStatus {
 function mapSession(chat: ParsedChatWithMessages): NegotiationSession {
   return {
     id: chat.id,
-    caseId: chat.name,
-    name: chat.name,
+    caseId: chat.case?.id ?? chat.name,
+    name: chat.case?.name ?? chat.name,
     mode: 'voice',
     status: mapStatus(chat.status),
     backendStatus: chat.status,
     startedAt: chat.createdAt,
     messages: chat.messages,
+  }
+}
+
+const accents: CaseAccent[] = ['violet', 'lime', 'orange', 'blue', 'pink', 'mint']
+const icons: CaseIcon[] = ['wallet', 'people', 'clock', 'receipt', 'tag', 'dialogue']
+
+function normalizedTitle(value: string): string { return value.trim().toLocaleLowerCase('ru-RU') }
+
+function mapDifficulty(value: string): TrainingCase['difficulty'] {
+  if (value === 'easy') return 'Легко'
+  if (value === 'hard' || value === 'insane') return 'Сложно'
+  return 'Средне'
+}
+
+function formatTimeLimit(seconds: number): string {
+  return `${Math.ceil(seconds / 60)} мин`
+}
+
+function mapCase(item: ReturnType<typeof parseCases>[number], index: number): TrainingCase {
+  const known = trainingCases.find((candidate) => normalizedTitle(candidate.title) === normalizedTitle(item.name))
+  return {
+    id: item.id,
+    title: item.name,
+    description: item.description,
+    synopsis: item.synopsis,
+    category: item.category,
+    duration: formatTimeLimit(item.timeLimit),
+    difficulty: mapDifficulty(item.difficulty),
+    opponent: item.secondRole,
+    roles: [item.firstRole, item.secondRole],
+    roleSummaries: known?.roleSummaries ?? ['Ваша роль в этом переговорном кейсе.', 'Роль AI-оппонента в этом кейсе.'],
+    accent: known?.accent ?? accents[index % accents.length],
+    icon: known?.icon ?? icons[index % icons.length],
   }
 }
 
@@ -146,10 +182,16 @@ export class BackendNegotiationClient implements NegotiationClient {
     return this.authorized(async (accessToken) => {
       const created = parseChat(await this.request(accessToken, '/v1/chats/', {
         method: 'POST',
-        body: toCreateChatDto(input.caseName ?? input.caseId),
+        body: toCreateChatDto(input.caseName ?? input.caseId, input.caseId, input.preparations),
       }))
       return mapSession({ ...created, messages: [] })
     })
+  }
+
+  listCases(): Promise<TrainingCase[]> {
+    return this.authorized(async (accessToken) => parseCases(
+      await this.request(accessToken, '/v1/chats/cases'),
+    ).map(mapCase))
   }
 
   getSession(sessionId: string): Promise<NegotiationSession> {

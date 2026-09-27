@@ -37,11 +37,21 @@ async function mockSuccessfulBootstrap(page: Page, nextAccessToken = 'fresh-acce
   }))
 }
 
+async function navigateInApp(page: Page, path: string) {
+  await page.evaluate((nextPath) => {
+    window.history.pushState({ usr: null, key: 'test-navigation', idx: 1 }, '', nextPath)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }, path)
+}
+
 async function loginThroughUi(page: Page, totpToken = '') {
   await page.goto('/login')
   await page.getByLabel('Email').fill('user@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
-  if (totpToken) await page.getByLabel('Код 2FA — если подключён').fill(totpToken)
+  if (totpToken) {
+    await page.getByRole('button', { name: 'У меня подключён 2FA' }).click()
+    await page.getByLabel('Код 2FA — если подключён').fill(totpToken)
+  }
   await page.getByRole('button', { name: 'Войти' }).click()
   await expect(page).toHaveURL(/\/home$/)
 }
@@ -50,7 +60,6 @@ async function submitRegistration(page: Page) {
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill('irina.pet')
   await page.getByLabel('Email').fill('irina@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
@@ -61,12 +70,11 @@ test('auth entry screens render on desktop and mobile', async ({ page }) => {
 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/auth')
-  await expect(page.getByRole('heading', { level: 1, name: 'Выйди на Арену' })).toBeVisible()
-  await expectNoHorizontalOverflow(page)
-  await captureScreenshot(page, `${artifactsDir}/auth-choice-desktop.png`)
+  await expect(page).toHaveURL(/\/login$/)
 
-  await page.getByRole('link', { name: /Создать аккаунт/ }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Создай аккаунт' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'С возвращением' })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/login-desktop.png`)
 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/login')
@@ -75,7 +83,90 @@ test('auth entry screens render on desktop and mobile', async ({ page }) => {
   await captureScreenshot(page, `${artifactsDir}/login-mobile.png`)
 })
 
+test('registration renders responsively and reveals the password', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/register')
+  await expect(page.getByRole('heading', { level: 1, name: 'Создание аккаунта' })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+
+  const password = page.getByLabel('Пароль')
+  await expect(password).toHaveAttribute('type', 'password')
+  await page.getByRole('button', { name: 'Показать символы' }).click()
+  await expect(password).toHaveAttribute('type', 'text')
+  await page.getByRole('button', { name: 'Скрыть символы' }).click()
+  await expect(password).toHaveAttribute('type', 'password')
+  await captureScreenshot(page, `${artifactsDir}/register-desktop.png`)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/register-mobile.png`)
+})
+
+test('not found page uses safe back navigation and a contextual home', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/missing-page')
+  await expect(page.getByRole('heading', { name: 'Такой страницы нет' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'На главную', exact: true })).toHaveAttribute('href', '/')
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/not-found-desktop.png`)
+
+  await page.getByRole('button', { name: /Вернуться назад/ }).click()
+  await expect(page).toHaveURL(/\/$/)
+
+  await page.goto('/login')
+  await navigateInApp(page, '/another-missing-page')
+  await expect(page.getByRole('heading', { name: 'Такой страницы нет' })).toBeVisible()
+  await page.getByRole('button', { name: /Вернуться назад/ }).click()
+  await expect(page).toHaveURL(/\/login$/)
+
+  await seedSession(page)
+  await mockSuccessfulBootstrap(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/missing-for-member')
+  await expect(page.getByRole('link', { name: 'На главную', exact: true })).toHaveAttribute('href', '/home')
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/not-found-mobile.png`)
+  await page.getByRole('link', { name: 'На главную', exact: true }).click()
+  await expect(page).toHaveURL(/\/home$/)
+})
+
+test('login controls reveal the password and 2FA field, and explain unavailable recovery', async ({ page }) => {
+  await page.goto('/login')
+  const password = page.getByLabel('Пароль')
+  await expect(password).toHaveAttribute('type', 'password')
+  await page.getByRole('button', { name: 'Показать символы' }).click()
+  await expect(password).toHaveAttribute('type', 'text')
+  await page.getByRole('button', { name: 'Скрыть символы' }).click()
+  await expect(password).toHaveAttribute('type', 'password')
+
+  const totpToggle = page.getByRole('button', { name: 'У меня подключён 2FA' })
+  await expect(totpToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByLabel('Код 2FA — если подключён')).toHaveCount(0)
+  await totpToggle.click()
+  await expect(page.getByLabel('Код 2FA — если подключён')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Скрыть код 2FA' })).toHaveAttribute('aria-expanded', 'true')
+  await captureScreenshot(page, `${artifactsDir}/login-totp-desktop.png`)
+  await page.getByRole('button', { name: 'Скрыть код 2FA' }).click()
+  await expect(page.getByLabel('Код 2FA — если подключён')).toHaveCount(0)
+
+  const forgot = page.getByRole('button', { name: 'Забыли пароль?' })
+  await forgot.click()
+  const dialog = page.getByRole('dialog', { name: 'Восстановление пароля' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText(/пока недоступно/)).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/login-recovery-dialog-desktop.png`)
+  await page.keyboard.press('Escape')
+  await expect(dialog).not.toBeVisible()
+  await expect(forgot).toBeFocused()
+})
+
 test('shows the email confirmation screen after registration', async ({ page }) => {
+  test.setTimeout(30_000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 1440, height: 900 })
   let registerPayload: unknown
 
   await page.route('**/api/v1/auth/register', async (route) => {
@@ -88,7 +179,6 @@ test('shows the email confirmation screen after registration', async ({ page }) 
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill('irina.pet')
   await page.getByLabel('Email').fill('irina@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
@@ -97,9 +187,17 @@ test('shows the email confirmation screen after registration', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'Проверьте почту' })).toBeVisible()
   await expect(page.getByText(/irina@example.com/)).toBeVisible()
   await expect(page.getByLabel('Код активации')).toHaveCount(0)
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/activation-waiting-desktop.png`)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await expect(page.getByRole('link', { name: 'На главную', exact: true })).toBeInViewport()
+  await captureScreenshot(page, `${artifactsDir}/activation-waiting-mobile.png`)
+  await page.getByRole('button', { name: 'Отправить повторно' }).click()
+  await expect(page.getByRole('status')).toContainText('Повторная отправка пока недоступна')
+  await expect(page.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/login')
   expect(registerPayload).toEqual({
     email: 'irina@example.com',
-    username: 'irina.pet',
     first_name: 'Ирина',
     last_name: 'Петрова',
     password: 'strong-password',
@@ -175,7 +273,10 @@ test('activation loading, success, and error states render on desktop and mobile
   await page.clock.pauseAt(new Date())
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`/activate?code=${activationCode}`)
+  // Let React commit the lazy route, then freeze the pending API timeout again.
+  await page.clock.resume()
   await expect(page.getByRole('heading', { name: 'Активируем аккаунт' })).toBeVisible()
+  await page.clock.pauseAt(new Date())
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/activation-loading-desktop.png`)
 
@@ -219,8 +320,9 @@ test('returns to a protected route after password login and logs out locally', a
   await expect(page).toHaveURL(/\/home$/)
   expect(loginPayload).toEqual({ email: 'user@example.com', password: 'strong-password' })
 
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
   // Local logout is optimistic; the redirect does not await remote revocation.
   await logoutHandled
   expect(logoutPayload).toEqual({ refresh_token: 'refresh-token' })
@@ -252,7 +354,7 @@ test('restores a session with refresh and clears an invalid session', async ({ p
   })
 
   await page.goto('/home')
-  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
   expect(refreshPayload).toEqual({ refresh_token: 'stored-refresh' })
   expect(await page.evaluate((key) => window.localStorage.getItem(key), storageKey)).toContain('renewed-refresh')
 
@@ -296,7 +398,8 @@ test('refreshes once after a protected 401 and supports TOTP enable and disable'
   })
 
   await page.goto('/home')
-  await page.getByRole('button', { name: '2FA' }).click()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Настроить 2FA' }).click()
   await page.getByRole('button', { name: /Подключить 2FA/ }).click()
   await expect(page.getByText('JBSWY3DPEHPK3PXP')).toBeVisible()
   expect(refreshRequests).toBe(2)
@@ -305,10 +408,12 @@ test('refreshes once after a protected 401 and supports TOTP enable and disable'
   await page.getByLabel('Код из приложения').fill('654321')
   await page.getByRole('button', { name: 'Подтвердить и включить' }).click()
   await expect(page.getByRole('heading', { name: '2FA подключена' })).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/security-success-desktop.png`)
   expect(confirmAuthorization).toBe('Bearer retry-access')
 
   await page.locator('.security-success').getByRole('button', { name: 'Закрыть' }).click()
-  await page.getByRole('button', { name: '2FA' }).click()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Настроить 2FA' }).click()
   await page.getByRole('button', { name: /Отключить 2FA/ }).click()
   await page.getByLabel('Текущий пароль').fill('strong-password')
   await page.getByLabel('Я понимаю, что вход станет менее защищённым').check()
@@ -319,16 +424,15 @@ test('refreshes once after a protected 401 and supports TOTP enable and disable'
 
 test('maps backend validation errors to fields and shows network failures', async ({ page }) => {
   await page.route('**/api/v1/auth/register', (route) => json(route, 422, {
-    detail: [{ loc: ['body', 'username'], msg: 'Имя уже занято', type: 'value_error' }],
+    detail: [{ loc: ['body', 'email'], msg: 'Email уже занят', type: 'value_error' }],
   }))
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Ирина')
   await page.getByLabel('Фамилия').fill('Петрова')
-  await page.getByLabel('Имя пользователя').fill('irina.pet')
   await page.getByLabel('Email').fill('irina@example.com')
   await page.getByLabel('Пароль').fill('strong-password')
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
-  await expect(page.getByText('Имя уже занято')).toBeVisible()
+  await expect(page.getByText('Email уже занят')).toBeVisible()
 
   await page.unrouteAll({ behavior: 'wait' })
   await page.route('**/api/v1/auth/login', (route) => route.abort('failed'))
@@ -404,7 +508,8 @@ test('rejects malformed TOTP enrollment without exposing a success state', async
   }))
 
   await page.goto('/home')
-  await page.getByRole('button', { name: '2FA' }).click()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Настроить 2FA' }).click()
   await page.getByRole('button', { name: /Подключить 2FA/ }).click()
 
   await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Сервер вернул несовместимый ответ')
@@ -414,15 +519,32 @@ test('rejects malformed TOTP enrollment without exposing a success state', async
 test('security modal renders on desktop and mobile', async ({ page }) => {
   await seedSession(page)
   await mockSuccessfulBootstrap(page)
+  await page.route('**/api/v1/auth/totp/enroll', (route) => json(route, 200, {
+    secret: 'JBSWY3DPEHPK3PXP',
+    otpauth_url: 'otpauth://totp/Arena:user',
+  }))
   await page.emulateMedia({ reducedMotion: 'reduce' })
 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/home')
-  await page.getByRole('button', { name: '2FA' }).click()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Настроить 2FA' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await captureScreenshot(page, `${artifactsDir}/security-modal-desktop.png`)
+
+  await page.getByRole('button', { name: /Подключить 2FA/ }).click()
+  await expect(page.getByText('JBSWY3DPEHPK3PXP')).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/security-enroll-desktop.png`)
+  await page.getByRole('button', { name: '← Назад' }).click()
+  await page.getByRole('button', { name: /Отключить 2FA/ }).click()
+  await expect(page.getByRole('heading', { name: 'Подтверди действие' })).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/security-disable-desktop.png`)
+  await page.getByRole('button', { name: '← Назад' }).click()
 
   await page.setViewportSize({ width: 390, height: 844 })
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/security-modal-mobile.png`)
+
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toBeHidden()
 })

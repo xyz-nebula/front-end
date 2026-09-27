@@ -2,7 +2,9 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
+import { AuthRuntimeContext } from '@/auth/runtime'
 import { ArenaPage } from '@/pages/ArenaPage'
+import type { RunAuthorized } from '@/services/serviceAdapters'
 import type { AudioClient } from '@/services/contracts/audioClient'
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 import { DomainServicesContext } from '@/services/domainServices'
@@ -58,6 +60,7 @@ export async function runAudioFinishFailureScenario() {
   const negotiationClient: NegotiationClient = {
     createSession: unavailable,
     getSession: () => Promise.resolve(voiceSession()),
+    activateSession: async () => undefined,
     sendTextTurn: unavailable,
     createAudioTicket: unavailable,
     finishSession: (input) => {
@@ -70,6 +73,7 @@ export async function runAudioFinishFailureScenario() {
     getResult: unavailable,
     listSessions: unavailable,
   }
+  const runAuthorized: RunAuthorized = (operation) => operation('harness-access-token')
   const unhandled: string[] = []
   const onUnhandled = (event: PromiseRejectionEvent) => {
     unhandled.push(String(event.reason))
@@ -82,35 +86,34 @@ export async function runAudioFinishFailureScenario() {
       await new Promise((resolve) => window.setTimeout(resolve, 5))
     })
   }
-  const button = (label: string) => [...host.querySelectorAll('button')]
-    .filter((candidate) => candidate.textContent?.trim() === label)
-    .at(-1)
+  const finishButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Завершить"]')
+  const confirmButton = () => [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')]
+    .find((candidate) => candidate.textContent?.trim() === 'Завершить')
 
   try {
     await act(async () => {
       root.render(
-        <DomainServicesContext.Provider value={{
-          negotiationClient,
-          createAudioClient: () => audioClient,
-        }}>
-          <MemoryRouter initialEntries={['/arena/voice-finish']}>
-            <Routes>
-              <Route path="/arena/:sessionId" element={<ArenaPage />} />
-              <Route path="/result/:sessionId" element={<div data-testid="result-route">Результат</div>} />
-            </Routes>
-          </MemoryRouter>
-        </DomainServicesContext.Provider>,
+        <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', runAuthorized }}>
+          <DomainServicesContext.Provider value={{ negotiationClient, createAudioClient: () => audioClient }}>
+            <MemoryRouter initialEntries={['/arena/voice-finish']}>
+              <Routes>
+                <Route path="/arena/:sessionId" element={<ArenaPage />} />
+                <Route path="/result/:sessionId" element={<div data-testid="result-route">Результат</div>} />
+              </Routes>
+            </MemoryRouter>
+          </DomainServicesContext.Provider>
+        </AuthRuntimeContext.Provider>,
       )
     })
-    await flush()
-    await act(async () => { button('Завершить')?.click() })
-    await act(async () => { button('Завершить')?.click() })
+    for (let attempt = 0; attempt < 20 && finishButton()?.disabled !== false; attempt += 1) await flush()
+    await act(async () => { finishButton()?.click() })
+    await act(async () => { confirmButton()?.click() })
     await flush()
     const afterFailure = {
       dialogOpen: Boolean(host.querySelector('[role="dialog"]')),
       error: host.querySelector('[role="dialog"] [role="alert"]')?.textContent ?? null,
     }
-    await act(async () => { button('Завершить')?.click() })
+    await act(async () => { confirmButton()?.click() })
     await flush()
     return {
       afterFailure,

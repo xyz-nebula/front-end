@@ -1,15 +1,21 @@
 export type CaseCategory = 'Все' | 'Карьера' | 'Управление' | 'Конфликты' | 'Продажи'
 
+export type CaseAccent = 'violet' | 'lime' | 'orange' | 'blue' | 'pink' | 'mint'
+export type CaseIcon = 'wallet' | 'people' | 'clock' | 'receipt' | 'tag' | 'dialogue'
+
 export interface TrainingCase {
   id: string
   title: string
   description: string
-  category: Exclude<CaseCategory, 'Все'>
+  synopsis: string
+  category: string
   duration: string
   difficulty: 'Легко' | 'Средне' | 'Сложно'
   opponent: string
-  accent: 'violet' | 'lime' | 'orange' | 'blue' | 'pink' | 'mint'
-  icon: 'wallet' | 'people' | 'clock' | 'receipt' | 'tag' | 'dialogue'
+  roles: [string, string]
+  roleSummaries: [string, string]
+  accent: CaseAccent
+  icon: CaseIcon
 }
 
 export interface TrainingHistoryItem {

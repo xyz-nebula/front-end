@@ -98,8 +98,9 @@ Landing — утверждённое визуальное направление
 
 Соблюдай [CSS-first styling policy](docs/styling.md): новые компоненты оформляй
 семантическими scoped CSS-классами, сохраняй `arena-*` и изоляцию landing от
-auth/home. Tailwind остаётся существующим baseline/preflight, MUI —
-ThemeProvider/CssBaseline; не смешивай эти подходы незаметно.
+auth/home. Foundation проекта — собственный reset в `src/styles/global.css`;
+Tailwind, MUI и Emotion не входят в текущий styling stack. Не добавляй новую
+styling-систему без отдельного архитектурного решения.
 
 Не принимай значимые продуктовые или дизайн-решения молча. Если задача требует:
 

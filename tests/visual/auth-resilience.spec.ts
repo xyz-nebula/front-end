@@ -63,7 +63,8 @@ async function replaceSessionExternally(page: Page, accessToken: string, refresh
 }
 
 async function openEnrollment(page: Page) {
-  await page.getByRole('button', { name: '2FA' }).click()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Настроить 2FA' }).click()
   await page.getByRole('button', { name: /Подключить 2FA/ }).click()
 }
 
@@ -170,7 +171,7 @@ test('keeps the result of the last-started concurrent login', async ({ page }) =
   await firstLoginStarted
 
   await navigateInApp(page, '/auth')
-  await page.getByRole('link', { name: 'Войти' }).click()
+  await expect(page).toHaveURL(/\/login$/)
   await fillLogin(page)
   await page.getByLabel('Email').fill('newer@example.com')
   await page.getByRole('button', { name: 'Войти' }).click()
@@ -218,15 +219,38 @@ test('does not restore a pending login after logout', async ({ page }) => {
     value: { accessToken: 'temporary-access', refreshToken: 'temporary-refresh' },
   })
   await expect(page).toHaveURL(/\/home$/)
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
   expect(await readStoredTokens(page)).toBeNull()
 
   releaseLogin()
   await loginResponded
   await delay(100)
   expect(await readStoredTokens(page)).toBeNull()
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
+})
+
+test('session bootstrap loading renders on desktop and mobile', async ({ page }) => {
+  await seedSession(page)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  let releaseRefresh = () => undefined
+  const refreshReleased = new Promise<void>((resolve) => { releaseRefresh = resolve })
+  await page.route('**/api/v1/auth/token/refresh', async (route) => {
+    await refreshReleased
+    await json(route, 200, apiTokens).catch(() => undefined)
+  })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/home')
+  await expect(page.getByRole('heading', { name: 'Проверяем сессию' })).toBeVisible()
+  await captureScreenshot(page, `${artifactsDir}/session-loading-desktop.png`)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/session-loading-mobile.png`)
+
+  releaseRefresh()
 })
 
 test('keeps tokens after a transient bootstrap failure and recovers on retry', async ({ page }) => {
@@ -241,6 +265,10 @@ test('keeps tokens after a transient bootstrap failure and recovers on retry', a
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/session-recovery-desktop.png`)
 
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/session-recovery-mobile.png`)
+
   await page.unroute('**/api/v1/auth/token/refresh')
   await page.route('**/api/v1/auth/token/refresh', (route) => json(route, 200, {
     access_token: 'recovered-access',
@@ -249,7 +277,7 @@ test('keeps tokens after a transient bootstrap failure and recovers on retry', a
   await page.getByRole('button', { name: 'Повторить' }).click()
 
   await expect(page).toHaveURL(/\/home$/)
-  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
   expect(await readStoredTokens(page)).toContain('recovered-refresh')
 })
 
@@ -290,9 +318,10 @@ test('optimistic logout clears the UI and storage before a hanging request finis
   })
   await login(page)
 
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
 
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
   expect(await readStoredTokens(page)).toBeNull()
 })
 
@@ -315,9 +344,10 @@ test('retries remote logout after refreshing a rejected snapshot', async ({ page
   }))
   await login(page)
 
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
 
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
   await expect.poll(() => logoutRequests).toBe(2)
   expect(await readStoredTokens(page)).toBeNull()
 })
@@ -407,7 +437,8 @@ test('discards a late protected success from the previous session', async ({ pag
   releaseEnrollment()
   await delay(100)
 
-  await page.getByRole('button', { name: '2FA' }).click()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Настроить 2FA' }).click()
   await expect(page.getByRole('heading', { name: 'Двухфакторная защита' })).toBeVisible()
   await expect(page.getByText('ACCOUNT_A_LATE_SECRET')).toHaveCount(0)
 })
@@ -462,7 +493,7 @@ test('migrates legacy auth storage and preserves its mock owner key across refre
   })
 
   await page.goto('/home')
-  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
   const migrated = await page.evaluate((key) => JSON.parse(
     window.localStorage.getItem(key) ?? 'null',
   ) as unknown, storageKey) as {
@@ -476,7 +507,7 @@ test('migrates legacy auth storage and preserves its mock owner key across refre
   expect(migrated.tokens.refreshToken).toBe('rotated-refresh-1')
 
   await page.reload()
-  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
   const refreshed = await page.evaluate((key) => JSON.parse(
     window.localStorage.getItem(key) ?? 'null',
   ) as unknown, storageKey) as {
@@ -626,8 +657,9 @@ test('synchronizes login, token rotation, and logout between tabs', async ({ pag
   expect(otherAuthorization).toBe('Bearer rotated-access')
 
   await closeSecurityModal(page)
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
-  await expect(page).toHaveURL(/\/auth$/)
+  await expect(page).toHaveURL(/\/login$/)
   await expect(otherPage).toHaveURL(/\/login$/)
 })
 
@@ -704,8 +736,8 @@ test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, 
     otherPage.goto('/home'),
   ])
 
-  await expect(page.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
-  await expect(otherPage.getByRole('heading', { name: /Какой разговор/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
+  await expect(otherPage.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
   await expect.poll(() => readStoredTokens(page)).toContain('rotated-refresh')
   await expect.poll(() => readStoredTokens(otherPage)).toContain('rotated-refresh')
   const diagnostics = { lockOrder, refreshTokenKinds, bothTabsHadInitialStorage }
