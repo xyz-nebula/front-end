@@ -88,7 +88,10 @@ async function mountResult(sessionId: string, negotiationClient: NegotiationClie
   }
   const tourValue = {
     ownerKey: 'harness-tour-owner', state: null, storageAvailable: true,
-    menuLabel: 'Пройти тур' as const, startOrResume: () => undefined,
+    menuLabel: 'Пройти тур' as const, invitationOpen: false,
+    startOrResume: () => undefined, beginFromInvitation: () => undefined,
+    deferInvitation: () => undefined, disableInvitation: () => undefined,
+    considerInvitation: () => undefined, send: () => undefined,
   }
 
   function LocationProbe() {

@@ -1,6 +1,7 @@
 import {
   artifactsDir,
   captureScreenshot,
+  dismissProductTourInvitation,
   expect,
   expectNoHorizontalOverflow,
   test,
@@ -53,6 +54,7 @@ const teamsViewports = [
 ]
 
 test('landing renders the redesigned hero, problem section and section framework', async ({ page }) => {
+  test.setTimeout(30_000)
   await page.emulateMedia({ reducedMotion: 'reduce' })
 
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -401,6 +403,7 @@ test('product home keeps its own styles after landing navigation', async ({ page
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
   await page.getByRole('link', { name: 'Открыть demo-ссылку активации' }).click()
   await page.getByRole('link', { name: 'Перейти в приложение' }).click()
+  await dismissProductTourInvitation(page)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await page.getByRole('link', { name: 'Начать поединок' }).click()

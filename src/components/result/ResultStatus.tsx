@@ -12,7 +12,7 @@ export function ResultStatus({ result, error, onRetry }: ResultStatusProps) {
   const loading = !failed && !error
 
   return (
-    <section className={`result-status ${loading ? 'is-loading' : 'is-error'}`} role="status">
+    <section className={`result-status ${loading ? 'is-loading' : 'is-error'}`} role="status" data-tour-id="result-status">
       <span className="result-status__mark" aria-hidden="true">
         {loading ? <i /> : '!'}
       </span>

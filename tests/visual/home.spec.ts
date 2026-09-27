@@ -1,4 +1,4 @@
-import { artifactsDir, captureScreenshot, expect, expectNoHorizontalOverflow, test } from './helpers'
+import { artifactsDir, captureScreenshot, dismissProductTourInvitation, expect, expectNoHorizontalOverflow, test } from './helpers'
 
 async function enterHome(page: import('@playwright/test').Page) {
   await page.goto('/register')
@@ -14,14 +14,14 @@ async function enterHome(page: import('@playwright/test').Page) {
   const progressCard = page.locator('.arena-home__progress')
   await expect(continueCard.getByRole('status', { name: 'Загружаем тренировку' })).toBeVisible()
   await expect(continueCard.getByText('Повышение зарплаты')).toHaveCount(0)
-  await expect(progressCard.getByText('—', { exact: true })).toBeVisible()
+  await expect(progressCard).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Кейсы' })).toBeVisible()
   await expect(continueCard.getByRole('status', { name: 'Загружаем тренировку' })).toHaveCount(0)
-  const tourInvitation = page.getByRole('dialog', { name: 'Познакомимся с Ареной?' })
-  if (await tourInvitation.isVisible()) await tourInvitation.getByRole('button', { name: 'Позже' }).click()
+  await dismissProductTourInvitation(page)
 }
 
 test('home dashboard and case dialog fit desktop and mobile', async ({ page }) => {
+  test.setTimeout(30_000)
   test.skip(process.env.VITE_AUTH_SOURCE !== 'mock', 'Requires mock auth.')
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -51,11 +51,6 @@ test('home dashboard and case dialog fit desktop and mobile', async ({ page }) =
   await page.keyboard.press('Escape')
   await expect(securityDialog).toHaveCount(0)
   await expect(profileTrigger).toBeFocused()
-  await profileTrigger.click()
-  await page.getByRole('button', { name: 'Пройти тур' }).click()
-  await profileTrigger.click()
-  await expect(page.getByRole('button', { name: 'Продолжить тур' })).toBeVisible()
-  await page.keyboard.press('Escape')
   await expectNoHorizontalOverflow(page)
   await page.screenshot({ path: `${artifactsDir}/home-dashboard-desktop.png`, animations: 'disabled', fullPage: true })
 

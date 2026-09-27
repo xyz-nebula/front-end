@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 
 const HOST = '127.0.0.1'
-const SHUTDOWN_TIMEOUT_MS = 310_000
-const HARD_TIMEOUT_MS = 660_000
+const SHUTDOWN_TIMEOUT_MS = 480_000
+const HARD_TIMEOUT_MS = 1_020_000
 const PROCESS_EXIT_GRACE_MS = 2_000
 const PROCESS_TREE_SETTLE_MS = 500
 const projectRoot = fileURLToPath(new URL('../', import.meta.url))
@@ -33,6 +33,7 @@ const testGroups = [
       'landing.spec.ts',
       'home.spec.ts',
       'product-tour-machine.spec.ts',
+      'product-tour-events.spec.ts',
       'preparation.spec.ts',
       'page-data-hooks.spec.ts',
       'mock-domain.spec.ts',

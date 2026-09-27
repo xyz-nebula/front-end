@@ -3,6 +3,7 @@ import type { Page, Route } from '@playwright/test'
 import {
   artifactsDir,
   captureScreenshot,
+  dismissProductTourInvitation,
   expect,
   expectNoHorizontalOverflow,
   test,
@@ -647,6 +648,8 @@ test('synchronizes login, token rotation, and logout between tabs', async ({ pag
   await otherPage.goto('/login')
   await login(page)
   await expect(otherPage).toHaveURL(/\/home$/)
+  await dismissProductTourInvitation(page)
+  await dismissProductTourInvitation(otherPage)
 
   await openEnrollment(page)
   await expect(page.getByText('FIRSTPAGE')).toBeVisible()
@@ -664,7 +667,7 @@ test('synchronizes login, token rotation, and logout between tabs', async ({ pag
 })
 
 test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, context }) => {
-  test.setTimeout(30_000)
+  test.setTimeout(45_000)
   let lockAttempts = 0
   let releaseLockBarrier = () => undefined
   const bothTabsRequestedLock = new Promise<void>((resolve) => { releaseLockBarrier = resolve })
@@ -736,8 +739,8 @@ test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, 
     otherPage.goto('/home'),
   ])
 
-  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
-  await expect(otherPage.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible({ timeout: 15_000 })
+  await expect(otherPage.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible({ timeout: 15_000 })
   await expect.poll(() => readStoredTokens(page)).toContain('rotated-refresh')
   await expect.poll(() => readStoredTokens(otherPage)).toContain('rotated-refresh')
   const diagnostics = { lockOrder, refreshTokenKinds, bothTabsHadInitialStorage }

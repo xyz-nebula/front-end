@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type RefObject } from 'react'
 
 import profileArtwork from '@/assets/home/profile-kirill.webp'
 import directorArtwork from '@/assets/home/role-director.webp'
@@ -22,9 +22,10 @@ interface ArenaHeaderProps {
   isSending: boolean
   finishDisabled: boolean
   onFinish: () => void
+  finishButtonRef?: RefObject<HTMLButtonElement | null>
 }
 
-export function ArenaHeader({ title, userRole, opponentRole, startedAt, mode, audioState, isDemoVoice, isSending, finishDisabled, onFinish }: ArenaHeaderProps) {
+export function ArenaHeader({ title, userRole, opponentRole, startedAt, mode, audioState, isDemoVoice, isSending, finishDisabled, onFinish, finishButtonRef }: ArenaHeaderProps) {
   const [now, setNow] = useState(Date.now)
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export function ArenaHeader({ title, userRole, opponentRole, startedAt, mode, au
       <ProductHeader variant="arena" actions={<span className="duel-header__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span> Серия: <strong>4 дня</strong></span>} />
       <div className="duel-shell duel-heading">
         <div><h1>{title}</h1><span>· Поединок</span></div>
-        <button type="button" onClick={onFinish} disabled={finishDisabled} aria-label="Завершить"><span className="duel-heading__finish-full">Завершить переговоры</span><span className="duel-heading__finish-short">Завершить</span></button>
+        <button ref={finishButtonRef} type="button" onClick={onFinish} disabled={finishDisabled} aria-label="Завершить" data-tour-id="finish"><span className="duel-heading__finish-full">Завершить переговоры</span><span className="duel-heading__finish-short">Завершить</span></button>
       </div>
       <section className="duel-shell duel-participants" aria-label="Участники и время поединка">
         <div className="duel-participants__person duel-participants__person--user"><img src={profileArtwork} alt="" width={400} height={400} decoding="async" /><div><strong>{userRole}</strong><span>Вы</span></div></div>

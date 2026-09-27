@@ -29,3 +29,10 @@ export async function captureScreenshot(page: Page, path: string, fullPage = fal
     fullPage,
   })
 }
+
+export async function dismissProductTourInvitation(page: Page) {
+  const invitation = page.getByRole('dialog', { name: 'Познакомимся с Ареной?' })
+  await page.locator('[data-tour-id="case-card"]').waitFor({ state: 'visible' })
+  await expect(invitation).toBeVisible()
+  await invitation.getByRole('button', { name: 'Позже' }).click()
+}

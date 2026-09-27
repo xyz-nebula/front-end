@@ -128,7 +128,7 @@ export function transitionProductTour(
         ? update(state, now, { stepId: 'result' })
         : state
     case 'result-ready':
-      return state.sessionId ? update(state, now, { stepId: 'result' }) : state
+      return state.sessionId && state.stepId !== 'result' ? update(state, now, { stepId: 'result' }) : state
     case 'complete':
       return state.stepId === 'result' ? update(state, now, { status: 'completed' }) : state
     default:

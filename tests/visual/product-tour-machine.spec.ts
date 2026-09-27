@@ -1,4 +1,4 @@
-import { expect, test } from './helpers'
+import { artifactsDir, captureScreenshot, expect, expectNoHorizontalOverflow, test } from './helpers'
 
 test('product tour machine only accepts valid persisted transitions', async ({ page }) => {
   await page.goto('/')
@@ -33,6 +33,7 @@ test('product tour machine only accepts valid persisted transitions', async ({ p
 
 test('product tour invitation supports later and manual start', async ({ page }) => {
   test.skip(process.env.VITE_AUTH_SOURCE !== 'mock', 'Requires mock auth.')
+  await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/register')
   await page.getByLabel('Имя', { exact: true }).fill('Тур')
   await page.getByLabel('Фамилия').fill('Тест')
@@ -46,6 +47,11 @@ test('product tour invitation supports later and manual start', async ({ page })
   await expect(invitation).toBeVisible()
   await expect(invitation.getByRole('button', { name: 'Начать тур' })).toBeFocused()
   await expect(page.locator('#root')).toHaveJSProperty('inert', true)
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/product-tour-invitation-desktop.png`)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/product-tour-invitation-mobile.png`)
   await page.keyboard.press('Escape')
   await expect(invitation).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Меню профиля' })).toBeFocused()

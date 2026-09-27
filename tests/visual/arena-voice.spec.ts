@@ -1,4 +1,4 @@
-import { artifactsDir, captureScreenshot, expect, expectNoDocumentVerticalOverflow, expectNoHorizontalOverflow, test } from './helpers'
+import { artifactsDir, captureScreenshot, dismissProductTourInvitation, expect, expectNoDocumentVerticalOverflow, expectNoHorizontalOverflow, test } from './helpers'
 
 test('mock registration, voice reconnect, committed history and result survive reload', async ({ page }) => {
   test.skip(process.env.VITE_AUTH_SOURCE !== 'mock' || process.env.VITE_NEGOTIATION_SOURCE !== 'mock' || process.env.VITE_AUDIO_SOURCE !== 'mock', 'Requires full mock mode.')
@@ -15,6 +15,7 @@ test('mock registration, voice reconnect, committed history and result survive r
   await expect(page.getByRole('heading', { name: 'Аккаунт активирован' })).toBeVisible()
   await page.getByRole('link', { name: 'Перейти в приложение' }).click()
   await expect(page).toHaveURL(/\/home$/)
+  await dismissProductTourInvitation(page)
 
   await page.getByRole('button', { name: 'Начать кейс' }).click()
   const modal = page.getByRole('dialog', { name: 'Повышение зарплаты' })

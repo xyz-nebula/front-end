@@ -1,4 +1,4 @@
-import { artifactsDir, captureScreenshot, expect, expectNoHorizontalOverflow, test } from './helpers'
+import { artifactsDir, captureScreenshot, dismissProductTourInvitation, expect, expectNoHorizontalOverflow, test } from './helpers'
 
 async function registerAndOpenPreparation(page: import('@playwright/test').Page) {
   await page.goto('/register')
@@ -9,6 +9,7 @@ async function registerAndOpenPreparation(page: import('@playwright/test').Page)
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
   await page.getByRole('link', { name: 'Открыть demo-ссылку активации' }).click()
   await page.getByRole('link', { name: 'Перейти в приложение' }).click()
+  await dismissProductTourInvitation(page)
   await page.getByRole('button', { name: 'Выбрать кейс «Повышение зарплаты»' }).click()
   const dialog = page.getByRole('dialog', { name: 'Повышение зарплаты' })
   await dialog.getByRole('radio', { name: /Сотрудник/ }).check()
@@ -17,6 +18,7 @@ async function registerAndOpenPreparation(page: import('@playwright/test').Page)
 }
 
 test('preparation draft, progress and responsive layout', async ({ page }) => {
+  test.setTimeout(30_000)
   test.skip(process.env.VITE_AUTH_SOURCE !== 'mock', 'Requires mock auth.')
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 1440, height: 900 })
