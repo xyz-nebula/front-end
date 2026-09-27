@@ -45,6 +45,7 @@ export function useRepeatNegotiation(
         mode: command.mode,
         clientCommandId: command.clientCommandId,
         preparations: previousPreparation ? serializePreparation(previousPreparation.draft) : '# Подготовка\n\nПользователь не заполнял карточку подготовки.',
+        selectedRole: previousPreparation?.selectedRole ?? 0,
       })
       if (previousPreparation) saveSessionPreparation(ownerKey, created.id, previousPreparation)
       clearPendingSessionCreate(storageKey)

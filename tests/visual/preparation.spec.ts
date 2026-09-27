@@ -113,6 +113,7 @@ test('preparation drafts and snapshots are isolated by auth-session owner', asyn
       caseTitle: 'Общий кейс',
       userRole: 'Роль A',
       opponentRole: 'Роль B',
+      selectedRole: 0 as const,
       draft,
     }
     const legacyKey = 'arena.preparation-draft.v1.shared-case.0'

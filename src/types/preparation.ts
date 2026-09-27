@@ -34,5 +34,6 @@ export interface SessionPreparationSnapshot {
   caseTitle: string
   userRole: string
   opponentRole: string
+  selectedRole: 0 | 1
   draft: PreparationDraft
 }

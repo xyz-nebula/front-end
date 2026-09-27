@@ -167,7 +167,8 @@ export function readSessionPreparation(ownerKey: string, sessionId: string): Ses
     const source = value as Record<string, unknown>
     const draft = parsePreparationDraft(source.draft)
     if (!draft || !['caseId', 'caseTitle', 'userRole', 'opponentRole'].every((key) => typeof source[key] === 'string')) return null
-    return { caseId: source.caseId as string, caseTitle: source.caseTitle as string, userRole: source.userRole as string, opponentRole: source.opponentRole as string, draft }
+    const selectedRole = source.selectedRole === 1 ? 1 : 0
+    return { caseId: source.caseId as string, caseTitle: source.caseTitle as string, userRole: source.userRole as string, opponentRole: source.opponentRole as string, selectedRole, draft }
   } catch {
     return null
   }

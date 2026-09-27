@@ -41,12 +41,13 @@ export function useStartNegotiation(negotiationClient: NegotiationClient, input:
     setIsStarting(true)
     setError(null)
     try {
-      const session = await negotiationClient.createSession({ caseId: trainingCase.id, caseName: trainingCase.title, mode, clientCommandId: command.clientCommandId, preparations })
+      const session = await negotiationClient.createSession({ caseId: trainingCase.id, caseName: trainingCase.title, mode, clientCommandId: command.clientCommandId, preparations, selectedRole: roleIndex })
       saveSessionPreparation(ownerKey, session.id, {
         caseId: trainingCase.id,
         caseTitle: trainingCase.title,
         userRole: trainingCase.roles[roleIndex],
         opponentRole: trainingCase.roles[roleIndex === 0 ? 1 : 0],
+        selectedRole: roleIndex,
         draft,
       })
       clearPendingSessionCreate(storageKey)
