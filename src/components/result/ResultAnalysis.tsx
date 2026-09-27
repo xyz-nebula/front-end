@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import coachArtwork from '@/assets/judge/coach.webp'
 import hiringJudgeArtwork from '@/assets/judge/hiring.webp'
 import sendingToNegotiationsJudgeArtwork from '@/assets/judge/sending-to-negotiations.webp'
 import trusteeOfPropertyJudgeArtwork from '@/assets/judge/trustee-of-property.webp'
@@ -157,7 +158,12 @@ export function ResultAnalysis({ result, session, preparation, isDemo, isRestart
 
       <section className="result-section result-coach" aria-labelledby="result-coach-title">
         <h2 id="result-coach-title">Разбор тренера</h2>
-        <p className="result-coach__summary"><span className="result-judge__avatar tone-1" aria-hidden="true"><i /></span>{analysis.coachSummary}</p>
+        <p className="result-coach__summary">
+          <span className="result-judge__avatar result-judge__avatar--photo" aria-hidden="true">
+            <img src={coachArtwork} alt="" width={192} height={192} loading="lazy" decoding="async" />
+          </span>
+          {analysis.coachSummary}
+        </p>
         <div className="result-coach__grid">
           <CoachColumn title="Что сработало" tone="green" items={analysis.worked} />
           <CoachColumn title="Что помешало" tone="red" items={analysis.hindered} />
