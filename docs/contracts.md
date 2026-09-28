@@ -71,7 +71,8 @@ same-origin backend `/api/v1/*`: токен AI-сервиса и заголов�
 `defeat` преобразуются соответственно в frontend-состояния `active`,
 `finishing` и `finished`. `selected_role` и `preparations` разбираются как часть
 публичного chat response; скрытая подготовка ролей из case response в UI не
-попадает.
+попадает. При создании чата frontend инвертирует выбранный
+пользователем индекс и передаёт в `selected_role` индекс роли AI-оппонента.
 
 `AudioEngineClient` открывает `/v1/audio-stream?token=...`, отправляет control и
 base64 PCM `audio` messages, принимает `audio_frame`, `transcript`, `error` и

@@ -890,8 +890,8 @@ export function parseBackendError(value: unknown, status: number): ServiceError 
   })
 }
 
-export function toCreateChatDto(name: string, caseId: string, preparations: string, selectedRole: 0 | 1): ChatCreateRequestDto {
-  return { name, case_uuid: caseId, preparations, selected_role: selectedRole }
+export function toCreateChatDto(name: string, caseId: string, preparations: string, userSelectedRole: 0 | 1): ChatCreateRequestDto {
+  return { name, case_uuid: caseId, preparations, selected_role: userSelectedRole === 0 ? 1 : 0 }
 }
 export function toActivateChatDto(id: string): ChatActivateRequestDto { return { uuid: id } }
 export function toAudioInputDto(audio: string): AudioInputMessageDto { return { type: 'audio', audio } }
