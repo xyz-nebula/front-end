@@ -335,7 +335,156 @@ test('real negotiation client creates, activates, reads and lists remote chats',
   }
 })
 
-test('real negotiation client requires authorization while demo-only operations remain local', async () => {
+test('real negotiation client starts evaluation without a request body and reads pending state', async () => {
+  const originalFetch = globalThis.fetch
+  const requests: Array<{ url: string; method: string; body: BodyInit | null | undefined }> = []
+  globalThis.fetch = async (input, init) => {
+    const url = String(input)
+    requests.push({ url, method: init?.method ?? 'GET', body: init?.body })
+    if (url.endsWith('/evaluate')) {
+      return new Response(JSON.stringify(evaluateTriggerFixture), { status: 202 })
+    }
+    return new Response(JSON.stringify({ status: 'pending', result: null, error: null }), { status: 200 })
+  }
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+
+    await expect(client.finishSession({
+      sessionId: chatFixture.uuid,
+      clientCommandId: 'finish-command-not-sent',
+    })).resolves.toEqual({ status: 'processing' })
+    await expect(client.getResult(chatFixture.uuid)).resolves.toEqual({ status: 'processing' })
+
+    expect(requests).toEqual([
+      {
+        url: `/api/v1/chats/${chatFixture.uuid}/evaluate`,
+        method: 'POST',
+        body: undefined,
+      },
+      {
+        url: `/api/v1/chats/${chatFixture.uuid}/result`,
+        method: 'GET',
+        body: undefined,
+      },
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('real negotiation client recovers already-running evaluation and sanitizes endpoint errors', async () => {
+  const originalFetch = globalThis.fetch
+  const responses = [
+    new Response(JSON.stringify({
+      code: 'already_evaluating',
+      message: 'Internal evaluation job detail',
+    }), { status: 409 }),
+    new Response(JSON.stringify({
+      code: 'chat_not_found',
+      message: 'Internal chat lookup detail',
+    }), { status: 404 }),
+  ]
+  globalThis.fetch = async () => responses.shift() ?? new Response(null, { status: 500 })
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+
+    await expect(client.finishSession({
+      sessionId: chatFixture.uuid,
+      clientCommandId: 'finish-1',
+    })).resolves.toEqual({ status: 'processing' })
+
+    const rejected: unknown = await client.finishSession({
+      sessionId: chatFixture.uuid,
+      clientCommandId: 'finish-2',
+    }).then(() => null, (error: unknown) => error)
+    expect(rejected).toMatchObject({
+      message: 'Переговоры не найдены.',
+      reason: 'http',
+      status: 404,
+      code: 'chat_not_found',
+    })
+    expect(rejected).not.toHaveProperty('message', 'Internal chat lookup detail')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('real negotiation client parses a completed server result against the remote transcript', async () => {
+  const originalFetch = globalThis.fetch
+  const requests: string[] = []
+  globalThis.fetch = async (input) => {
+    const url = String(input)
+    requests.push(url)
+    if (url.endsWith('/result')) {
+      return new Response(JSON.stringify(evaluationResultFixture), { status: 200 })
+    }
+    return new Response(JSON.stringify(chatFixture), { status: 200 })
+  }
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+    const result = await client.getResult(chatFixture.uuid)
+
+    expect(result.status).toBe('ready')
+    if (result.status === 'ready') {
+      expect(result.result).toMatchObject({
+        sessionId: chatFixture.uuid,
+        source: 'server',
+        contractVersion: '2.0.0-rc.1',
+      })
+    }
+    expect(requests).toEqual([
+      `/api/v1/chats/${chatFixture.uuid}/result`,
+      `/api/v1/chats/${chatFixture.uuid}`,
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('real negotiation client hides failed job details and reports a missing evaluation', async () => {
+  const originalFetch = globalThis.fetch
+  const responses = [
+    new Response(JSON.stringify({
+      status: 'failed', result: null, error: 'Provider token and internal trace',
+    }), { status: 200 }),
+    new Response(JSON.stringify({
+      code: 'evaluation_not_found', message: 'Internal lookup detail',
+    }), { status: 404 }),
+  ]
+  globalThis.fetch = async () => responses.shift() ?? new Response(null, { status: 500 })
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+
+    await expect(client.getResult(chatFixture.uuid)).resolves.toEqual({
+      status: 'failed',
+      message: 'Не удалось подготовить разбор переговоров.',
+    })
+    await expect(client.getResult(chatFixture.uuid)).resolves.toEqual({
+      status: 'failed',
+      message: 'Разбор переговоров ещё не запускался.',
+    })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('real negotiation client requires authorization for backend evaluation operations', async () => {
   const negotiation = new BackendNegotiationClient()
   const audio = new AudioEngineClient()
 
@@ -357,10 +506,7 @@ test('real negotiation client requires authorization while demo-only operations 
   const results = await Promise.allSettled(calls)
 
   expect(results).toHaveLength(9)
-  expect(results[4].status).toBe('fulfilled')
-  expect(results[5].status).toBe('fulfilled')
-  for (const [index, result] of results.entries()) {
-    if (index === 4 || index === 5) continue
+  for (const result of results) {
     expect(result.status).toBe('rejected')
     if (result.status === 'rejected') {
       expect(isServiceError(result.reason)).toBe(true)
@@ -416,8 +562,8 @@ test('real client uses HTTP only for implemented chat operations', async ({ page
       ? (entry.reason as { reason?: string }).reason : 'resolved')
   })
 
-  expect(result).toEqual(['http', 'http', 'feature-unavailable', 'feature-unavailable', 'resolved', 'resolved', 'http', 'http', 'feature-unavailable'])
-  expect(domainRequests).toHaveLength(4)
+  expect(result).toEqual(['http', 'http', 'feature-unavailable', 'feature-unavailable', 'http', 'http', 'http', 'http', 'feature-unavailable'])
+  expect(domainRequests).toHaveLength(6)
 })
 
 test('pages and arena hooks depend only on service ports', async () => {

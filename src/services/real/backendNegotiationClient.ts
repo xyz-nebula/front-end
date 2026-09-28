@@ -6,6 +6,8 @@ import {
   parseChat,
   parseChatList,
   parseChatWithMessages,
+  parseEvaluateTrigger,
+  parseEvaluationResult,
   toActivateChatDto,
   toCreateChatDto,
   type ParsedChat,
@@ -13,14 +15,12 @@ import {
 } from '@/services/real/targetContract'
 import { featureUnavailable, isServiceError, ServiceError } from '@/types/api'
 import type {
-  NegotiationResultState,
   NegotiationSession,
   NegotiationSessionSummary,
   NegotiationStatus,
 } from '@/types/negotiation'
 import type { CaseAccent, CaseIcon, TrainingCase } from '@/types/case'
 import { trainingCases } from '@/mocks/cases'
-import { createMockResultAnalysis } from '@/mocks/resultAnalysis'
 
 interface BackendNegotiationClientOptions {
   baseUrl: string
@@ -101,6 +101,50 @@ function mapSummary(chat: ParsedChat): NegotiationSessionSummary {
     backendStatus: chat.status,
     startedAt: chat.createdAt,
   }
+}
+
+function evaluationSessionStub(sessionId: string): NegotiationSession {
+  return {
+    id: sessionId,
+    caseId: '',
+    mode: 'voice',
+    status: 'finishing',
+    startedAt: '',
+    messages: [],
+  }
+}
+
+function isDoneEvaluation(value: unknown): boolean {
+  return typeof value === 'object'
+    && value !== null
+    && 'status' in value
+    && value.status === 'done'
+}
+
+function evaluationHttpError(error: ServiceError, action: 'start' | 'read'): ServiceError {
+  const messages = action === 'start'
+    ? {
+        404: 'Переговоры не найдены.',
+        409: 'Не удалось запустить разбор для текущего состояния переговоров.',
+        422: 'Сервис не смог запустить разбор переговоров.',
+      }
+    : {
+        404: 'Переговоры не найдены.',
+        409: 'Разбор переговоров пока недоступен.',
+        422: 'Сервис не смог получить разбор переговоров.',
+      }
+  const message = error.status === 404 || error.status === 409 || error.status === 422
+    ? messages[error.status]
+    : undefined
+  if (!message) return error
+  return new ServiceError(message, {
+    reason: 'http',
+    status: error.status,
+    code: error.code,
+    field: error.field,
+    recoverable: true,
+    cause: error,
+  })
 }
 
 export class BackendNegotiationClient implements NegotiationClient {
@@ -223,30 +267,51 @@ export class BackendNegotiationClient implements NegotiationClient {
   }
 
   async finishSession(input: Parameters<NegotiationClient['finishSession']>[0]): ReturnType<NegotiationClient['finishSession']> {
-    return this.demoResult(input.sessionId)
+    return this.authorized(async (accessToken) => {
+      try {
+        const trigger = parseEvaluateTrigger(await this.request(
+          accessToken,
+          `/v1/chats/${encodeURIComponent(input.sessionId)}/evaluate`,
+          { method: 'POST' },
+        ))
+        if (trigger.status === 'failed') {
+          return { status: 'failed', message: 'Не удалось запустить разбор переговоров.' }
+        }
+        return { status: 'processing' }
+      } catch (error) {
+        if (isServiceError(error) && error.status === 409 && error.code === 'already_evaluating') {
+          return { status: 'processing' }
+        }
+        if (isServiceError(error)) throw evaluationHttpError(error, 'start')
+        throw error
+      }
+    })
   }
 
   async getResult(sessionId: string): ReturnType<NegotiationClient['getResult']> {
-    return this.demoResult(sessionId)
-  }
+    return this.authorized(async (accessToken) => {
+      let payload: unknown
+      try {
+        payload = await this.request(
+          accessToken,
+          `/v1/chats/${encodeURIComponent(sessionId)}/result`,
+        )
+      } catch (error) {
+        if (isServiceError(error) && error.status === 404 && error.code === 'evaluation_not_found') {
+          return { status: 'failed', message: 'Разбор переговоров ещё не запускался.' }
+        }
+        if (isServiceError(error)) throw evaluationHttpError(error, 'read')
+        throw error
+      }
 
-  private demoResult(sessionId: string): NegotiationResultState {
-    const session: NegotiationSession = {
-      id: sessionId,
-      caseId: 'server-demo',
-      mode: 'voice',
-      status: 'finished',
-      startedAt: new Date().toISOString(),
-      messages: [],
-    }
-    return {
-      status: 'ready',
-      result: {
-        sessionId,
-        source: 'mock',
-        ...createMockResultAnalysis(session, 'partial-agreement'),
-      },
-    }
+      const session = isDoneEvaluation(payload)
+        ? mapSession(parseChatWithMessages(await this.request(
+            accessToken,
+            `/v1/chats/${encodeURIComponent(sessionId)}`,
+          )))
+        : evaluationSessionStub(sessionId)
+      return parseEvaluationResult(payload, session)
+    })
   }
 
   listSessions(): Promise<NegotiationSessionSummary[]> {
