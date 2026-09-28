@@ -27,10 +27,10 @@ export function FinishDialog({ onCancel, onConfirm, busy = false, error = null, 
       .map((element) => ({ element, inert: element.inert }))
     const focusable = () => [...(dialogRef.current?.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    ) ?? []), ...document.querySelectorAll<HTMLElement>('[data-product-tour-tooltip] button:not([disabled])')]
+    ) ?? []), ...document.querySelectorAll<HTMLElement>('[data-product-tour-tooltip] button:not([disabled]), .react-joyride__beacon:not([disabled])')]
       .filter((element) => element.getClientRects().length > 0)
     const containsFocus = (node: Node | null) => Boolean(
-      node && (dialogRef.current?.contains(node) || document.querySelector('[data-product-tour-tooltip]')?.contains(node)),
+      node && (dialogRef.current?.contains(node) || document.querySelector('[data-product-tour-tooltip]')?.contains(node) || document.querySelector('.react-joyride__beacon')?.contains(node)),
     )
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !busyRef.current) {

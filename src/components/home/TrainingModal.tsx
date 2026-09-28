@@ -44,10 +44,10 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
 
     const focusableElements = () => [...(modalRef.current?.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    ) ?? []), ...document.querySelectorAll<HTMLElement>('[data-product-tour-tooltip] button:not([disabled])')]
+    ) ?? []), ...document.querySelectorAll<HTMLElement>('[data-product-tour-tooltip] button:not([disabled]), .react-joyride__beacon:not([disabled])')]
       .filter((element) => !element.hidden && element.getClientRects().length > 0)
     const containsFocus = (node: Node | null) => Boolean(
-      node && (modalRef.current?.contains(node) || document.querySelector('[data-product-tour-tooltip]')?.contains(node)),
+      node && (modalRef.current?.contains(node) || document.querySelector('[data-product-tour-tooltip]')?.contains(node) || document.querySelector('.react-joyride__beacon')?.contains(node)),
     )
 
     const handleKeyDown = (event: KeyboardEvent) => {

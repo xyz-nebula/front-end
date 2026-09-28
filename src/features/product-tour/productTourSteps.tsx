@@ -7,11 +7,6 @@ export const PRODUCT_TOUR_STEP_ORDER: readonly ProductTourStepId[] = [
   'start-duel', 'microphone', 'dialogue', 'finish', 'confirm-finish', 'result',
 ]
 
-export const PRODUCT_TOUR_CHECKLIST = [
-  'Кейс', 'Роль', 'Голосовой формат', 'Анализ', 'Стратегия', 'Тактика',
-  'Поединок', 'Микрофон', 'Диалог', 'Завершение', 'Подтверждение', 'Разбор',
-] as const
-
 export interface ProductTourStepDefinition {
   id: ProductTourStepId
   title: string
@@ -42,7 +37,7 @@ export function getProductTourStepDefinition(stepId: ProductTourStepId): Product
   return definitions[PRODUCT_TOUR_STEP_ORDER.indexOf(stepId)]
 }
 
-export function getProductTourSteps(resultReady: boolean): Step[] {
+export function getProductTourSteps(resultReady: boolean, collapsed = false): Step[] {
   return definitions.map((definition) => {
     const waitingForResult = definition.id === 'result' && !resultReady
     return {
@@ -53,6 +48,8 @@ export function getProductTourSteps(resultReady: boolean): Step[] {
         : definition.content,
       target: waitingForResult ? '[data-tour-id="result-status"]' : definition.target,
       placement: definition.placement,
+      beaconPlacement: 'top',
+      skipBeacon: !collapsed,
     }
   })
 }

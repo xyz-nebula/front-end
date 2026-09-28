@@ -1,9 +1,13 @@
 import type { TooltipRenderProps } from 'react-joyride'
 
-import { PRODUCT_TOUR_CHECKLIST, PRODUCT_TOUR_STEP_ORDER, getProductTourStepDefinition } from '@/features/product-tour/productTourSteps'
+import { PRODUCT_TOUR_STEP_ORDER, getProductTourStepDefinition } from '@/features/product-tour/productTourSteps'
 import { useProductTour } from '@/features/product-tour/useProductTour'
 
-export function ProductTourTooltip({ step, tooltipProps }: TooltipRenderProps) {
+interface ProductTourTooltipProps extends TooltipRenderProps {
+  onCollapse: () => void
+}
+
+export function ProductTourTooltip({ onCollapse, step, tooltipProps }: ProductTourTooltipProps) {
   const productTour = useProductTour()
   const state = productTour.state
   if (!state || state.status !== 'active') return null
@@ -26,17 +30,11 @@ export function ProductTourTooltip({ step, tooltipProps }: TooltipRenderProps) {
     <section {...tooltipProps} className="product-tour-tooltip" data-product-tour-tooltip="" role="dialog" aria-live="polite" aria-modal="false" aria-labelledby={titleId} aria-describedby={contentId}>
       <div className="product-tour-tooltip__heading">
         <div><span className="product-tour-tooltip__eyebrow">Тур по продукту</span><h2 id={titleId}>{errorCopy?.title ?? step.title}</h2></div>
-        <button className="product-tour-tooltip__close" type="button" aria-label="Закрыть тур" onClick={() => productTour.send({ type: 'pause' })}>×</button>
+        <button className="product-tour-tooltip__close" type="button" aria-label="Свернуть подсказку" onClick={onCollapse}>×</button>
       </div>
       <p id={contentId} className="product-tour-tooltip__content">{errorCopy?.content ?? step.content}</p>
-      <ol className="product-tour-tooltip__checklist" aria-label="Шаги тура">
-        {PRODUCT_TOUR_CHECKLIST.map((label, index) => {
-          const stateName = index < currentIndex ? 'complete' : index === currentIndex ? 'current' : 'upcoming'
-          return <li className={`is-${stateName}`} key={label} aria-current={stateName === 'current' ? 'step' : undefined}><span aria-hidden="true">{stateName === 'complete' ? '✓' : index + 1}</span><span>{label}</span></li>
-        })}
-      </ol>
       <div className="product-tour-tooltip__footer">
-        <span className="product-tour-tooltip__progress" role="status" aria-label={`Шаг ${currentIndex + 1} из ${PRODUCT_TOUR_CHECKLIST.length}`}>{currentIndex + 1} из {PRODUCT_TOUR_CHECKLIST.length}</span>
+        <span className="product-tour-tooltip__progress" role="status" aria-label={`Шаг ${currentIndex + 1} из ${PRODUCT_TOUR_STEP_ORDER.length}`}>{currentIndex + 1} из {PRODUCT_TOUR_STEP_ORDER.length}</span>
         <div className="product-tour-tooltip__actions">
           {scenarioError === 'microphone' || scenarioError === 'audio'
             ? <><button className="is-primary" type="button" onClick={productTour.retryScenario}>Попробовать снова</button><button type="button" onClick={() => productTour.send({ type: 'pause' })}>Закрыть тур</button></>
