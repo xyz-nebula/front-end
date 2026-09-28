@@ -21,7 +21,7 @@ export function ResultPage() {
   const openCreatedSession = useCallback((createdSessionId: string) => navigate(`/arena/${createdSessionId}`), [navigate])
   const repeated = useRepeatNegotiation(negotiationClient, mockOwnerKey, loaded.session, openCreatedSession)
   const ready = loaded.result?.status === 'ready' ? loaded.result.result : null
-  const preparation = getDuelPreparation(loaded.session?.caseId ?? '')
+  const preparation = ready?.source === 'mock' ? getDuelPreparation(loaded.session?.caseId ?? '') : null
 
   return <div className="result-page">
     <ResultHeader />

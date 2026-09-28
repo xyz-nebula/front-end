@@ -36,6 +36,8 @@ test('result polls processing, shows analysis and repeats case as a new session'
   await expect(page.getByRole('heading', { name: 'Договорённость достигнута' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Что решили судьи' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Разбор тренера' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Упущенные возможности' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Цель достигнута' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'План vs реальность' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Что попробовать в следующей попытке' })).toBeVisible()
   await expectNoHorizontalOverflow(page)
