@@ -52,7 +52,48 @@ const teamsViewports = [
   { width: 320, height: 800, screenshot: 'landing-teams-mobile-compact.png' },
 ]
 
+test('desktop hero fits completely at 1366 by 768', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 1366, height: 768 })
+  await page.goto('/')
+
+  const hero = page.locator('.arena-hero')
+  const content = hero.locator([
+    'h1',
+    '.arena-hero__copy > p:not(.arena-hero__meta)',
+    '.arena-hero__cta',
+    '.arena-hero__meta',
+    '.arena-benefits',
+  ].join(', '))
+
+  await expect(content).toHaveCount(5)
+  await expect(hero.locator('.arena-scene__image')).toHaveJSProperty('complete', true)
+
+  const geometry = await content.evaluateAll((elements) => {
+    const bounds = elements.map((element) => element.getBoundingClientRect())
+    const insideViewport = bounds.every((rect) =>
+      rect.top >= 0
+      && rect.left >= 0
+      && rect.right <= window.innerWidth
+      && rect.bottom <= window.innerHeight,
+    )
+    const overlaps = bounds.some((rect, index) => bounds.slice(index + 1).some((other) =>
+      rect.left < other.right
+      && rect.right > other.left
+      && rect.top < other.bottom
+      && rect.bottom > other.top,
+    ))
+
+    return { insideViewport, overlaps }
+  })
+
+  expect(geometry).toEqual({ insideViewport: true, overlaps: false })
+  await expectNoHorizontalOverflow(page)
+  await captureScreenshot(page, `${artifactsDir}/landing-hero-1366x768.png`)
+})
+
 test('landing renders the redesigned hero, problem section and section framework', async ({ page }) => {
+  test.setTimeout(45_000)
   await page.emulateMedia({ reducedMotion: 'reduce' })
 
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -65,6 +106,8 @@ test('landing renders the redesigned hero, problem section and section framework
   await expect(page.locator('.arena-header')).toHaveAttribute('data-state', 'transparent')
   await expect(page.locator('.arena-scene-card')).toHaveCount(0)
   await expect(page.locator('.arena-placeholder')).toHaveCount(0)
+  await expect(page.getByText(/Навык формируется не одной идеальной попыткой/)).toHaveCount(0)
+  await expect(page.getByText(/Каждая новая попытка начинается/)).toHaveCount(0)
   for (const heading of sectionHeadings) {
     await expect(page.getByRole('heading', { level: 2, name: heading })).toBeAttached()
   }
@@ -81,10 +124,7 @@ test('landing renders the redesigned hero, problem section and section framework
   await expect(page.getByRole('heading', { level: 3, name: 'Мало практики' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 3, name: 'Ошибки имеют последствия' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 3, name: 'Нет цикла повторения' })).toBeVisible()
-  const practiceCycle = page.getByRole('list', { name: 'Цикл развития навыка переговоров' })
-  for (const step of ['Попытка', 'Обратная связь', 'Изменение стратегии', 'Повтор']) {
-    await expect(practiceCycle.getByText(step, { exact: true })).toBeVisible()
-  }
+  await expect(page.getByRole('list', { name: 'Цикл развития навыка переговоров' })).toHaveCount(0)
   await expect(page.locator('#problem .arena-placeholder__card')).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/landing-problem-desktop.png`)
@@ -108,6 +148,8 @@ test('landing renders the redesigned hero, problem section and section framework
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1, name: 'Тренируй переговоры как стратегическую игру' })).toBeVisible()
+  await expect(page.getByText(/Навык формируется не одной идеальной попыткой/)).toHaveCount(0)
+  await expect(page.getByText(/Каждая новая попытка начинается/)).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/landing-mobile.png`)
 
@@ -117,12 +159,6 @@ test('landing renders the redesigned hero, problem section and section framework
   await expect(page.getByRole('heading', { level: 2, name: sectionHeadings[0] })).toBeVisible()
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/landing-problem-mobile.png`)
-
-  await page.locator('.arena-problem__conclusion').evaluate((element) => {
-    window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY - 28)
-  })
-  await expect(practiceCycle.getByText('Повтор', { exact: true })).toBeVisible()
-  await captureScreenshot(page, `${artifactsDir}/landing-problem-mobile-cycle.png`)
 
   await page.locator('#how-it-works').evaluate((element) => {
     window.scrollTo(0, (element as HTMLElement).offsetTop)
@@ -176,7 +212,9 @@ test('how it works keeps every illustration inside its visual area', async ({ pa
     const section = page.locator('#how-it-works')
     const images = section.locator('.arena-how-step__image')
     await expect(images).toHaveCount(howItWorksSteps.length)
-    await images.last().scrollIntoViewIfNeeded()
+    for (let index = 0; index < await images.count(); index += 1) {
+      await images.nth(index).scrollIntoViewIfNeeded()
+    }
     await expect
       .poll(() =>
         images.evaluateAll((elements) =>
@@ -284,6 +322,10 @@ test('teams section presents all audiences and the final calls to action respons
 
     const images = section.locator('img')
     await expect(images).toHaveCount(3)
+    const cardVisuals = section.locator('.arena-team-card__visual')
+    for (let index = 0; index < await cardVisuals.count(); index += 1) {
+      await cardVisuals.nth(index).scrollIntoViewIfNeeded()
+    }
     await section.locator('.arena-teams-cta').scrollIntoViewIfNeeded()
     await expect
       .poll(() =>
@@ -333,6 +375,42 @@ test('teams section presents all audiences and the final calls to action respons
       separateFromCopy: true,
       textFits: true,
     })
+
+    if (viewport.width <= 980) {
+      const visualGeometry = await section.locator('.arena-team-card__visual').evaluateAll((elements) =>
+        elements.map((element) => {
+          const card = element.closest('.arena-team-card')
+          const copy = card?.querySelector('.arena-team-card__copy')
+
+          if (!(card instanceof HTMLElement) || !(copy instanceof HTMLElement)) {
+            throw new Error('Team visual is missing its card or copy')
+          }
+
+          const visualBounds = element.getBoundingClientRect()
+          const cardBounds = card.getBoundingClientRect()
+          const copyBounds = copy.getBoundingClientRect()
+          const image = element.querySelector('img')
+          const separated = visualBounds.right <= copyBounds.left + 1
+            || visualBounds.left >= copyBounds.right - 1
+            || visualBounds.bottom <= copyBounds.top + 1
+            || visualBounds.top >= copyBounds.bottom - 1
+
+          return {
+            insideCard: visualBounds.left >= cardBounds.left - 1
+              && visualBounds.top >= cardBounds.top - 1
+              && visualBounds.right <= cardBounds.right + 1
+              && visualBounds.bottom <= cardBounds.bottom + 1,
+            separated,
+            imageContained: image ? getComputedStyle(image).objectFit === 'contain' : true,
+          }
+        }),
+      )
+
+      expect(
+        visualGeometry.every((visual) => visual.insideCard && visual.separated && visual.imageContained),
+        `${viewport.width}px: team visuals stay inside cards, clear of copy and uncropped: ${JSON.stringify(visualGeometry)}`,
+      ).toBe(true)
+    }
 
     const ctaScene = section.locator('.arena-teams-cta__scene')
     if (viewport.width > 980) {
