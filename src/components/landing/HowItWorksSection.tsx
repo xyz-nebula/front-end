@@ -137,10 +137,6 @@ export function HowItWorksSection() {
           </div>
         </div>
 
-        <p className="arena-how__conclusion">
-          Каждая новая попытка начинается с того, что ты узнал в предыдущей.
-        </p>
-
         <div className="arena-how__repeat">
           <RepeatIcon />
           <p><strong>Разбери.</strong> Измени стратегию.<br />Попробуй снова.</p>
