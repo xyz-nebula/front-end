@@ -308,7 +308,7 @@ export async function runFinishRetryScenario() {
       finishCalls.push(input.clientCommandId)
       attempt += 1
       return attempt === 1
-        ? Promise.reject(new Error('Временная ошибка завершения'))
+        ? Promise.resolve({ status: 'failed', message: 'Не удалось запустить разбор переговоров.' })
         : Promise.resolve({ status: 'processing' })
     },
   })

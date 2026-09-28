@@ -7,6 +7,7 @@ export interface StoredAuthSession {
   tokens: AuthTokens
   source: ServiceSource
   mockOwnerKey: string
+  tourOwnerKey?: string
 }
 
 export interface StoredSessionResult {
@@ -46,6 +47,9 @@ function parseStoredValue(serialized: string | null): StoredAuthSession | null {
         tokens: parsed.tokens,
         source: parsed.source,
         mockOwnerKey: parsed.mockOwnerKey,
+        ...(typeof parsed.tourOwnerKey === 'string' && parsed.tourOwnerKey.length > 0
+          ? { tourOwnerKey: parsed.tourOwnerKey }
+          : {}),
       }
     }
 
@@ -144,10 +148,15 @@ export function removeStoredSessionIfRefreshTokenMatches(
   }
 }
 
-export function createStoredSession(tokens: AuthTokens, source: ServiceSource): StoredAuthSession {
+export function createStoredSession(
+  tokens: AuthTokens,
+  source: ServiceSource,
+  tourOwnerKey?: string,
+): StoredAuthSession {
   return {
     tokens,
     source,
     mockOwnerKey: createMockOwnerKey(),
+    ...(tourOwnerKey ? { tourOwnerKey } : {}),
   }
 }

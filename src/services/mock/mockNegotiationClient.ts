@@ -85,7 +85,6 @@ export class MockNegotiationClient implements NegotiationClient {
       .filter((session) => session.ownerKey === ownerKey)
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
       .map((session) => {
-        const result = data.results.find((candidate) => candidate.sessionId === session.id)
         return {
           id: session.id,
           caseId: session.caseId,
@@ -93,7 +92,6 @@ export class MockNegotiationClient implements NegotiationClient {
           status: session.status,
           startedAt: session.startedAt,
           ...(session.finishedAt ? { finishedAt: session.finishedAt } : {}),
-          ...(result?.result ? { score: result.result.score } : {}),
         }
       }))
   }

@@ -100,7 +100,7 @@ export function VoiceControls({ state, error, isPlaying, disabled, isDemo = true
           <span className="voice-controls__ring voice-controls__ring--outer" aria-hidden="true" />
           <span className="voice-controls__ring voice-controls__ring--middle" aria-hidden="true" />
           <span className="voice-controls__ring voice-controls__ring--inner" aria-hidden="true" />
-          <button className={`voice-controls__mic ${active ? 'is-active' : ''}`} type="button" onClick={primaryAction} disabled={disabled || connecting} aria-label={primaryLabel}>
+          <button className={`voice-controls__mic ${active ? 'is-active' : ''}`} type="button" onClick={primaryAction} disabled={disabled || connecting} aria-label={primaryLabel} data-tour-id="microphone">
             <svg viewBox="0 0 32 40" fill="none" aria-hidden="true"><rect x="10" y="2" width="12" height="23" rx="6" fill="currentColor"/><path d="M4 19v2a12 12 0 0 0 24 0v-2M16 33v5m-8 0h16" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>
           </button>
         </span>

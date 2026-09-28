@@ -1,6 +1,7 @@
 import {
   artifactsDir,
   captureScreenshot,
+  dismissProductTourInvitation,
   expect,
   expectNoHorizontalOverflow,
   test,
@@ -479,6 +480,7 @@ test('product home keeps its own styles after landing navigation', async ({ page
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
   await page.getByRole('link', { name: 'Открыть demo-ссылку активации' }).click()
   await page.getByRole('link', { name: 'Перейти в приложение' }).click()
+  await dismissProductTourInvitation(page)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await page.getByRole('link', { name: 'Начать поединок' }).click()

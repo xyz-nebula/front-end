@@ -153,7 +153,7 @@ test('mock result processing becomes stable and finish remains idempotent', asyn
       ready: ready.status,
       repeated: repeated.status,
       stableScore: ready.status === 'ready' && repeated.status === 'ready'
-        ? ready.result.score === repeated.result.score
+        ? JSON.stringify(ready.result.outcome) === JSON.stringify(repeated.result.outcome)
         : false,
       sessionStatus: runtime.getSession('owner', session.id).status,
     }
@@ -165,6 +165,108 @@ test('mock result processing becomes stable and finish remains idempotent', asyn
     repeated: 'ready',
     stableScore: true,
     sessionStatus: 'finished',
+  })
+})
+
+test('mock result fixtures cover every outcome and all result states', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(async () => {
+    const { createMockResultStateFixtures, mockOutcomeFixtureKinds } = await import('/src/mocks/resultFixtures.ts')
+    const session = {
+      id: 'fixture-session',
+      caseId: 'salary-review',
+      mode: 'text' as const,
+      status: 'finished' as const,
+      startedAt: '2026-09-28T10:00:00.000Z',
+      finishedAt: '2026-09-28T10:05:00.000Z',
+      messages: [
+        { id: 'user-1', sequence: 1, speaker: 'user' as const, text: 'Предлагаю обсудить условия.', createdAt: '2026-09-28T10:01:00.000Z' },
+        { id: 'ai-1', sequence: 2, speaker: 'ai' as const, text: 'Какие условия для вас приоритетны?', createdAt: '2026-09-28T10:02:00.000Z' },
+      ],
+    }
+    const fixtures = mockOutcomeFixtureKinds.map((kind) => createMockResultStateFixtures(session, kind))
+    return {
+      kinds: fixtures.map((fixture) => fixture.ready.result.outcome.status === 'ready'
+        ? fixture.ready.result.outcome.kind
+        : null),
+      stateStatuses: Object.keys(fixtures[0] ?? {}).map((key) => (
+        fixtures[0]?.[key as keyof (typeof fixtures)[number]].status
+      )),
+      sources: fixtures.map((fixture) => fixture.ready.result.source),
+      judgeColleges: fixtures.map((fixture) => fixture.ready.result.judges.map((judge) => judge.college)),
+      trainersReady: fixtures.every((fixture) => fixture.ready.result.trainer.status === 'ready'),
+      planEvidenceIsUser: fixtures.every((fixture) => (
+        fixture.ready.result.trainer.status === 'ready'
+        && fixture.ready.result.trainer.feedback.planVsReality?.items.every((item) => (
+          item.evidence === null || item.evidence.isAi === false
+        ))
+      )),
+    }
+  })
+
+  expect(result).toEqual({
+    kinds: ['agreement', 'partial-agreement', 'deferred', 'no-agreement', 'not-assessable'],
+    stateStatuses: ['processing', 'ready', 'failed'],
+    sources: ['mock', 'mock', 'mock', 'mock', 'mock'],
+    judgeColleges: Array.from({ length: 5 }, () => ['hiring', 'negotiation', 'ownership']),
+    trainersReady: true,
+    planEvidenceIsUser: true,
+  })
+})
+
+test('mock runtime preserves failed results and ignores legacy result storage', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(async () => {
+    const [{ MockRuntime }, { MockStorage, MOCK_DATA_STORAGE_KEY }] = await Promise.all([
+      import('/src/services/mock/mockRuntime.ts'),
+      import('/src/services/mock/mockStorage.ts'),
+    ])
+    localStorage.removeItem(MOCK_DATA_STORAGE_KEY)
+    localStorage.setItem('arena.mock.data.v1', JSON.stringify({
+      version: 1,
+      users: [{ id: 'legacy-user' }],
+      sessions: [],
+      results: [{ sessionId: 'legacy', outcome: 'victory', score: 90 }],
+      audioTickets: [],
+    }))
+
+    const storage = new MockStorage(localStorage)
+    const legacyIgnored = storage.read((data) => data.users.length === 0 && data.results.length === 0)
+    const runtime = new MockRuntime(storage)
+    const session = await runtime.createSession('owner-a', {
+      caseId: 'refund',
+      mode: 'text',
+      clientCommandId: 'failed-create',
+    })
+    await storage.mutate((data) => {
+      data.results.push({
+        sessionId: session.id,
+        status: 'failed',
+        readyAt: Date.now(),
+        message: 'Не удалось подготовить демонстрационный разбор.',
+      })
+    })
+    const failed = await runtime.getResult('owner-a', session.id)
+    let hiddenFromOtherOwner = false
+    try {
+      await runtime.getResult('owner-b', session.id)
+    } catch {
+      hiddenFromOtherOwner = true
+    }
+    storage.dispose()
+    return {
+      legacyIgnored,
+      failed,
+      hiddenFromOtherOwner,
+      storageKey: MOCK_DATA_STORAGE_KEY,
+    }
+  })
+
+  expect(result).toEqual({
+    legacyIgnored: true,
+    failed: { status: 'failed', message: 'Не удалось подготовить демонстрационный разбор.' },
+    hiddenFromOtherOwner: true,
+    storageKey: 'arena.mock.data.v2',
   })
 })
 
@@ -196,9 +298,16 @@ test('mock audio requires fresh tickets, commits through runtime and cleans sche
     })
     const client = new MockAudioClient(runtime, { latencyMs: 2, requestMicrophone: true })
     const events: string[] = []
-    const unsubscribe = client.subscribe((event) => events.push(event.type))
+    let resolveTranscriptCompletion = () => undefined
+    const transcriptCompleted = new Promise<void>((resolve) => { resolveTranscriptCompletion = resolve })
+    const unsubscribe = client.subscribe((event) => {
+      events.push(event.type)
+      if (events.filter((eventType) => eventType === 'message_committed').length === 2) {
+        resolveTranscriptCompletion()
+      }
+    })
     await client.connect({ sessionId: session.id, ticket: firstTicket })
-    await new Promise((resolve) => setTimeout(resolve, 80))
+    await transcriptCompleted
     const committedBeforeReconnect = events.filter((event) => event === 'message_committed').length
 
     let reusedTicketRejected = false

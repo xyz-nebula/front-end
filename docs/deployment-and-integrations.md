@@ -29,7 +29,7 @@ Frontend поставляется как статическая Vite-сборк�
 | Audio | WebSocket через `AudioEngineClient`, control events, reconnect после auth error и backpressure guard |
 | Захват | `getUserMedia` + AudioWorklet, преобразование в mono PCM s16le 24 kHz и отправка base64 chunks |
 | Воспроизведение | Декодирование входящих PCM frames и очередь Web Audio |
-| Результат | Локальный демонстрационный разбор; backend finish/result не вызываются |
+| Результат | `POST /v1/chats/{uuid}/evaluate`, polling `GET /v1/chats/{uuid}/result` и строгая проверка AI-контракта `2.0.0-rc.1` |
 
 Реализация real adapters сама по себе не подтверждает совместимость живых
 сервисов. Канонические спецификации и текущий drift описаны в
@@ -126,14 +126,21 @@ Auth-запросы идут с browser на `/api/v1/auth/*`. Защищённ�
 `{type: "audio", audio: "..."}`. Audio-engine возвращает PCM и транскрипты.
 История перечитывается из backend после завершения транскрипта.
 
+При завершении переговоров frontend запускает evaluation через backend. Страница
+результата читает состояние задания до `done` или `failed`; для `done` она
+дополнительно получает актуальный транскрипт чата и валидирует привязку evidence
+перед отображением. Прямых запросов browser к AI-сервису нет.
+
 ## Известные ограничения
 
 - Frontend и backend `docker/dev` используют разные chat paths и create DTO.
 - Frontend ожидает другую форму case response.
 - Значение `transcript` из AsyncAPI трактуется frontend как текстовая дельта.
-- Пользователь выбирает роль в UI, но role ID/index не передаётся backend.
+- Целевой create-chat payload передаёт `selected_role` и `preparations`, но
+  поддержку этих полей нужно подтвердить на развёрнутом backend.
 - Real negotiation поддерживает только voice: текстовый ход отсутствует.
-- Finish и result остаются локальной демонстрацией и не меняют backend-статус.
+- Полнота `plan_vs_reality` зависит от сохранения `preparations` backend; при
+  `null` frontend не подмешивает локальный анализ.
 - Нет подтверждённого живого E2E-прогона frontend + backend + audio-engine.
 
 Поэтому `real/real/real` следует маркировать как частично поддерживаемый
@@ -144,5 +151,6 @@ Auth-запросы идут с browser на `/api/v1/auth/*`. Защищённ�
 
 Перед демонстрацией real-профиля вручную проверьте auth/TOTP, загрузку кейсов,
 создание и активацию чата, разрешение микрофона, двустороннее аудио, оба
-транскрипта, восстановление после reload и обрыва WebSocket, а также честную
-маркировку демонстрационного результата.
+транскрипта, восстановление после reload и обрыва WebSocket, запуск evaluation,
+переход `pending/processing` в `done`, соответствие evidence транскрипту и
+отсутствие демонстрационной пометки у server result.

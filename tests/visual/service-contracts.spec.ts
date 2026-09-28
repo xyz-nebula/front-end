@@ -10,6 +10,8 @@ import {
   parseCases,
   parseChatList,
   parseChatWithMessages,
+  parseEvaluateTrigger,
+  parseEvaluationResult,
   toActivateChatDto,
   toAudioControlDto,
   toAudioInputDto,
@@ -23,6 +25,9 @@ import {
   backendErrorFixture,
   chatFixture,
   chatListFixture,
+  evaluateTriggerFixture,
+  evaluationResultFixture,
+  evaluationSessionFixture,
 } from '../fixtures/serviceContracts'
 
 test('remote backend DTO fixtures validate and map to frontend naming', () => {
@@ -30,6 +35,7 @@ test('remote backend DTO fixtures validate and map to frontend naming', () => {
   const list = parseChatList(chatListFixture)
 
   expect(chat).toMatchObject({ id: chatFixture.uuid, name: 'Срок поставки', status: 'ongoing' })
+  expect(chat).toMatchObject({ selectedRole: 0, preparations: chatFixture.preparations })
   expect(chat.messages.map((message) => [message.sequence, message.speaker])).toEqual([
     [1, 'user'],
     [2, 'ai'],
@@ -80,6 +86,106 @@ test('invalid DTO and event payloads fail with a typed invalid-response error', 
       expect(isServiceError(error)).toBe(true)
       if (isServiceError(error)) expect(error.reason).toBe('invalid-response')
     }
+  }
+})
+
+test('evaluation parser validates the complete 2.0.0-rc.1 payload', () => {
+  expect(parseEvaluateTrigger(evaluateTriggerFixture)).toEqual({
+    jobId: evaluateTriggerFixture.job_uuid,
+    status: 'pending',
+  })
+
+  const parsed = parseEvaluationResult(evaluationResultFixture, evaluationSessionFixture)
+  expect(parsed.status).toBe('ready')
+  if (parsed.status !== 'ready') return
+  expect(parsed.result.source).toBe('server')
+  expect(parsed.result.contractVersion).toBe('2.0.0-rc.1')
+  expect(parsed.result.outcome.status).toBe('ready')
+  if (parsed.result.outcome.status === 'ready') expect(parsed.result.outcome.kind).toBe('partial-agreement')
+  expect(parsed.result.judges.map((slot) => slot.college)).toEqual([
+    'hiring', 'negotiation', 'ownership',
+  ])
+  expect(parsed.result.judges[0].status).toBe('ready')
+  if (parsed.result.judges[0].status === 'ready') expect(parsed.result.judges[0].verdict.choice).toBe('user')
+  expect(parsed.result.trainer.status).toBe('ready')
+  if (parsed.result.trainer.status === 'ready') {
+    expect(parsed.result.trainer.feedback.nextTry).toHaveLength(2)
+    expect(parsed.result.trainer.feedback.goalAssessment.status).toBe('partially-achieved')
+  }
+})
+
+test('evaluation parser maps consistent job states without exposing backend errors', () => {
+  expect(parseEvaluationResult(
+    { status: 'processing', result: null, error: null },
+    evaluationSessionFixture,
+  )).toEqual({ status: 'processing' })
+  expect(parseEvaluationResult(
+    { status: 'failed', result: null, error: 'provider timeout: internal details' },
+    evaluationSessionFixture,
+  )).toEqual({ status: 'failed', message: 'Не удалось подготовить разбор переговоров.' })
+})
+
+test('evaluation parser preserves valid failed slots and nullable analysis fields', () => {
+  const partialFailure = structuredClone(evaluationResultFixture)
+  partialFailure.result.outcome.status = 'failed'
+  partialFailure.result.outcome.assessment = null
+  partialFailure.result.outcome.error_code = 'outcome_analysis_unavailable'
+  partialFailure.result.judge_verdicts[0].status = 'failed'
+  partialFailure.result.judge_verdicts[0].verdict = null
+  partialFailure.result.judge_verdicts[0].error_code = 'insufficient_evidence'
+  partialFailure.result.trainer_feedback.status = 'failed'
+  partialFailure.result.trainer_feedback.feedback = null
+  partialFailure.result.trainer_feedback.error_code = 'trainer_unavailable'
+
+  const parsed = parseEvaluationResult(partialFailure, evaluationSessionFixture)
+  expect(parsed.status).toBe('ready')
+  if (parsed.status !== 'ready') return
+  expect(parsed.result.outcome).toEqual({ status: 'failed', reason: 'analysis-unavailable' })
+  expect(parsed.result.judges[0]).toEqual({ college: 'hiring', status: 'failed', reason: 'insufficient-evidence' })
+  expect(parsed.result.trainer).toEqual({ status: 'failed', reason: 'unavailable' })
+
+  const nullable = structuredClone(evaluationResultFixture)
+  const feedback = nullable.result.trainer_feedback.feedback
+  if (feedback) {
+    feedback.plan_vs_reality = null
+    feedback.goal_assessment.goal_text = null
+    feedback.goal_assessment.status = 'not_assessable'
+  }
+  const nullableParsed = parseEvaluationResult(nullable, evaluationSessionFixture)
+  expect(nullableParsed.status).toBe('ready')
+  if (nullableParsed.status === 'ready' && nullableParsed.result.trainer.status === 'ready') {
+    expect(nullableParsed.result.trainer.feedback.planVsReality).toBeNull()
+    expect(nullableParsed.result.trainer.feedback.goalAssessment.goalText).toBeNull()
+    expect(nullableParsed.result.trainer.feedback.goalAssessment.status).toBe('not-assessable')
+  }
+})
+
+test('evaluation parser rejects incompatible versions, evidence and slot combinations', () => {
+  const incompatibleVersion = structuredClone(evaluationResultFixture)
+  incompatibleVersion.result.contract_version = '2.0.0' as '2.0.0-rc.1'
+
+  const wrongSpeaker = structuredClone(evaluationResultFixture)
+  const assessment = wrongSpeaker.result.outcome.assessment
+  if (assessment) assessment.evidence[0].is_ai = true
+
+  const duplicateCollege = structuredClone(evaluationResultFixture)
+  duplicateCollege.result.judge_verdicts[1].college = 'hiring'
+  const duplicateVerdict = duplicateCollege.result.judge_verdicts[1].verdict
+  if (duplicateVerdict) duplicateVerdict.college = 'hiring'
+
+  const invalidPlanEvidence = structuredClone(evaluationResultFixture)
+  const plan = invalidPlanEvidence.result.trainer_feedback.feedback?.plan_vs_reality
+  if (plan?.items[0].evidence) plan.items[0].evidence = null
+
+  for (const value of [
+    incompatibleVersion,
+    wrongSpeaker,
+    duplicateCollege,
+    invalidPlanEvidence,
+    { status: 'done', result: null, error: null },
+    { status: 'processing', result: evaluationResultFixture.result, error: null },
+  ]) {
+    expect(() => parseEvaluationResult(value, evaluationSessionFixture)).toThrow(/Некорректный ответ сервиса/)
   }
 })
 
@@ -188,6 +294,8 @@ test('real negotiation client creates, activates, reads and lists remote chats',
         name: chatFixture.name,
         status: chatFixture.status,
         created_at: chatFixture.created_at,
+        selected_role: chatFixture.selected_role,
+        preparations: chatFixture.preparations,
       }), { status: 200 })
     }
     if (url.endsWith('/v1/chats/') && (init?.method ?? 'GET') === 'GET') {
@@ -227,7 +335,190 @@ test('real negotiation client creates, activates, reads and lists remote chats',
   }
 })
 
-test('real negotiation client requires authorization while demo-only operations remain local', async () => {
+test('real negotiation client starts evaluation without a request body and reads pending state', async () => {
+  const originalFetch = globalThis.fetch
+  const requests: Array<{ url: string; method: string; body: BodyInit | null | undefined }> = []
+  globalThis.fetch = async (input, init) => {
+    const url = String(input)
+    requests.push({ url, method: init?.method ?? 'GET', body: init?.body })
+    if (url.endsWith('/evaluate')) {
+      return new Response(JSON.stringify(evaluateTriggerFixture), { status: 202 })
+    }
+    return new Response(JSON.stringify({ status: 'pending', result: null, error: null }), { status: 200 })
+  }
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+
+    await expect(client.finishSession({
+      sessionId: chatFixture.uuid,
+      clientCommandId: 'finish-command-not-sent',
+    })).resolves.toEqual({ status: 'processing' })
+    await expect(client.getResult(chatFixture.uuid)).resolves.toEqual({ status: 'processing' })
+
+    expect(requests).toEqual([
+      {
+        url: `/api/v1/chats/${chatFixture.uuid}/evaluate`,
+        method: 'POST',
+        body: undefined,
+      },
+      {
+        url: `/api/v1/chats/${chatFixture.uuid}/result`,
+        method: 'GET',
+        body: undefined,
+      },
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('real negotiation client returns failed when evaluation cannot be started', async () => {
+  const originalFetch = globalThis.fetch
+  const requests: Array<{ url: string; method: string; body: BodyInit | null | undefined }> = []
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: String(input), method: init?.method ?? 'GET', body: init?.body })
+    return new Response(JSON.stringify({
+      job_uuid: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      status: 'failed',
+    }), { status: 200 })
+  }
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+
+    await expect(client.finishSession({
+      sessionId: chatFixture.uuid,
+      clientCommandId: 'stable-finish-command',
+    })).resolves.toEqual({
+      status: 'failed',
+      message: 'Не удалось запустить разбор переговоров.',
+    })
+    expect(requests).toEqual([{
+      url: `/api/v1/chats/${chatFixture.uuid}/evaluate`,
+      method: 'POST',
+      body: undefined,
+    }])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('real negotiation client recovers already-running evaluation and sanitizes endpoint errors', async () => {
+  const originalFetch = globalThis.fetch
+  const responses = [
+    new Response(JSON.stringify({
+      code: 'already_evaluating',
+      message: 'Internal evaluation job detail',
+    }), { status: 409 }),
+    new Response(JSON.stringify({
+      code: 'chat_not_found',
+      message: 'Internal chat lookup detail',
+    }), { status: 404 }),
+  ]
+  globalThis.fetch = async () => responses.shift() ?? new Response(null, { status: 500 })
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+
+    await expect(client.finishSession({
+      sessionId: chatFixture.uuid,
+      clientCommandId: 'finish-1',
+    })).resolves.toEqual({ status: 'processing' })
+
+    const rejected: unknown = await client.finishSession({
+      sessionId: chatFixture.uuid,
+      clientCommandId: 'finish-2',
+    }).then(() => null, (error: unknown) => error)
+    expect(rejected).toMatchObject({
+      message: 'Переговоры не найдены.',
+      reason: 'http',
+      status: 404,
+      code: 'chat_not_found',
+    })
+    expect(rejected).not.toHaveProperty('message', 'Internal chat lookup detail')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('real negotiation client parses a completed server result against the remote transcript', async () => {
+  const originalFetch = globalThis.fetch
+  const requests: string[] = []
+  globalThis.fetch = async (input) => {
+    const url = String(input)
+    requests.push(url)
+    if (url.endsWith('/result')) {
+      return new Response(JSON.stringify(evaluationResultFixture), { status: 200 })
+    }
+    return new Response(JSON.stringify(chatFixture), { status: 200 })
+  }
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+    const result = await client.getResult(chatFixture.uuid)
+
+    expect(result.status).toBe('ready')
+    if (result.status === 'ready') {
+      expect(result.result).toMatchObject({
+        sessionId: chatFixture.uuid,
+        source: 'server',
+        contractVersion: '2.0.0-rc.1',
+      })
+    }
+    expect(requests).toEqual([
+      `/api/v1/chats/${chatFixture.uuid}/result`,
+      `/api/v1/chats/${chatFixture.uuid}`,
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('real negotiation client hides failed job details and reports a missing evaluation', async () => {
+  const originalFetch = globalThis.fetch
+  const responses = [
+    new Response(JSON.stringify({
+      status: 'failed', result: null, error: 'Provider token and internal trace',
+    }), { status: 200 }),
+    new Response(JSON.stringify({
+      code: 'evaluation_not_found', message: 'Internal lookup detail',
+    }), { status: 404 }),
+  ]
+  globalThis.fetch = async () => responses.shift() ?? new Response(null, { status: 500 })
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+
+    await expect(client.getResult(chatFixture.uuid)).resolves.toEqual({
+      status: 'failed',
+      message: 'Не удалось подготовить разбор переговоров.',
+    })
+    await expect(client.getResult(chatFixture.uuid)).resolves.toEqual({
+      status: 'failed',
+      message: 'Разбор переговоров ещё не запускался.',
+    })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('real negotiation client requires authorization for backend evaluation operations', async () => {
   const negotiation = new BackendNegotiationClient()
   const audio = new AudioEngineClient()
 
@@ -249,10 +540,7 @@ test('real negotiation client requires authorization while demo-only operations 
   const results = await Promise.allSettled(calls)
 
   expect(results).toHaveLength(9)
-  expect(results[4].status).toBe('fulfilled')
-  expect(results[5].status).toBe('fulfilled')
-  for (const [index, result] of results.entries()) {
-    if (index === 4 || index === 5) continue
+  for (const result of results) {
     expect(result.status).toBe('rejected')
     if (result.status === 'rejected') {
       expect(isServiceError(result.reason)).toBe(true)
@@ -308,8 +596,8 @@ test('real client uses HTTP only for implemented chat operations', async ({ page
       ? (entry.reason as { reason?: string }).reason : 'resolved')
   })
 
-  expect(result).toEqual(['http', 'http', 'feature-unavailable', 'feature-unavailable', 'resolved', 'resolved', 'http', 'http', 'feature-unavailable'])
-  expect(domainRequests).toHaveLength(4)
+  expect(result).toEqual(['http', 'http', 'feature-unavailable', 'feature-unavailable', 'http', 'http', 'http', 'http', 'feature-unavailable'])
+  expect(domainRequests).toHaveLength(6)
 })
 
 test('pages and arena hooks depend only on service ports', async () => {

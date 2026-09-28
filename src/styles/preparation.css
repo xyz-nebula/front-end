@@ -7,6 +7,7 @@
 .preparation-header__profile { display: flex; align-items: center; gap: 24px; }
 .preparation-header__profile > span { padding: 9px 16px; border-radius: 999px; color: #9d2830; background: #fff0f1; }
 .preparation-header__profile img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+.preparation-header__profile-control { position: relative; }
 .preparation-main { padding-block: 22px 96px; }
 .preparation-context { display: flex; align-items: center; gap: 18px; min-height: 40px; color: #63728c; font-size: 14px; }
 .preparation-context > a { color: #0870ed; }

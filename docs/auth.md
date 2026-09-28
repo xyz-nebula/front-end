@@ -24,10 +24,19 @@ frontend-сценарии локально. Auth storage содержит `sourc
 
 Без сохранённых токенов стартуем гостем. Наличие токенов запускает bootstrap
 refresh один раз, в том числе под React StrictMode. Пара access/refresh,
-`source` и стабильный `mockOwnerKey` хранятся под `arena.auth.tokens.v1`; wire
+`source`, стабильный `mockOwnerKey` и frontend-only `tourOwnerKey` хранятся под
+`arena.auth.tokens.v1`; wire
 API использует snake_case, клиент — camelCase.
 Успешный HTTP-ответ сам по себе недостаточен: клиент проверяет структуру токенов,
 регистрации и TOTP enrollment, несовместимый ответ становится `invalid-response`.
+
+`tourOwnerKey` — локальный псевдоним владельца для прогресса продуктового тура.
+Он вычисляется после login/activation как SHA-256 от нормализованного email,
+источника auth и случайной локальной соли. Email не входит в ключи tour storage
+и не отправляется в новые API. Существующий auth envelope без `tourOwnerKey`
+остаётся читаемым: ключ восстанавливается при следующем успешном создании
+сессии. Refresh сохраняет identity, а logout очищает только session-scoped
+отсрочку приглашения, не удаляя owner-scoped прогресс тура.
 
 ## Инварианты AuthContext
 
@@ -96,6 +105,7 @@ API использует snake_case, клиент — camelCase.
 | Временные ошибки и окончательный отказ | `auth-resilience.spec.ts`: `keeps tokens after a transient bootstrap failure…`, network/timeout варианты, `clears a session when refresh is rejected with 403`, `keeps an authenticated session when refresh fails…`; invalid refresh также проверяется в `auth.spec.ts`. |
 | Защита новой сессии от операций старой | `auth-resilience.spec.ts`: `does not retry a protected request with a replacement session`, `discards a late protected success…`, `closes an open security modal…`. |
 | Storage, memory и межвкладочная ротация | `auth-resilience.spec.ts`: `survives corrupted storage…`, `uses a one-tab memory session…`, `synchronizes login, token rotation, and logout between tabs`, `serializes simultaneous bootstrap refreshes between tabs`, `does not let a stale refresh overwrite…`. |
+| Tour owner identity и миграция auth envelope | [product-tour-storage.spec.ts](../tests/visual/product-tour-storage.spec.ts): нормализация, псевдонимность, source scope, owner isolation и fallback; auth specs сохраняют чтение прежнего envelope. |
 
 Эта карта связывает инварианты с имеющимися проверками, но не утверждает, что
 каждая внутренняя ветвь отдельно покрыта: при изменении конкретного механизма

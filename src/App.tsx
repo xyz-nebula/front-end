@@ -10,6 +10,7 @@ const LandingPage = lazy(() => import('@/pages/LandingPage').then((module) => ({
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((module) => ({ default: module.LoginPage })))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((module) => ({ default: module.NotFoundPage })))
 const PreparationPage = lazy(() => import('@/pages/PreparationPage').then((module) => ({ default: module.PreparationPage })))
+const ProtectedProductShell = lazy(() => import('@/pages/ProtectedProductShell').then((module) => ({ default: module.ProtectedProductShell })))
 const RegisterPage = lazy(() => import('@/pages/RegisterPage').then((module) => ({ default: module.RegisterPage })))
 const ResultPage = lazy(() => import('@/pages/ResultPage').then((module) => ({ default: module.ResultPage })))
 
@@ -39,10 +40,12 @@ export function App() {
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
         <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
         <Route path="/activate" element={<ActivationRoute><ActivatePage /></ActivationRoute>} />
-        <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-        <Route path="/cases/:caseId/preparation" element={<ProtectedRoute><PreparationPage /></ProtectedRoute>} />
-        <Route path="/arena/:sessionId" element={<ProtectedRoute><ArenaPage /></ProtectedRoute>} />
-        <Route path="/result/:sessionId" element={<ProtectedRoute><ResultPage /></ProtectedRoute>} />
+        <Route element={<ProtectedRoute><ProtectedProductShell /></ProtectedRoute>}>
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/cases/:caseId/preparation" element={<PreparationPage />} />
+          <Route path="/arena/:sessionId" element={<ArenaPage />} />
+          <Route path="/result/:sessionId" element={<ResultPage />} />
+        </Route>
         <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>

@@ -19,7 +19,7 @@ export function PreparationNavigation({ activeSectionId, activeStep, completed, 
     {preparationSections.map((section) => {
       const isActive = section.id === activeSectionId
       return <section className={isActive ? 'is-active' : ''} key={section.id}>
-        <button className="preparation-section-toggle" type="button" aria-expanded={isActive} onClick={() => onSectionSelect(section.id)}><span><strong>{section.label}</strong><small>{completedInSection(section, completed)} из {section.steps.length}</small></span><i aria-hidden="true">{isActive ? '⌃' : '⌄'}</i></button>
+        <button className="preparation-section-toggle" type="button" aria-expanded={isActive} onClick={() => onSectionSelect(section.id)} data-tour-id={`preparation-navigation-${section.id}-${mobile ? 'mobile' : 'desktop'}`}><span><strong>{section.label}</strong><small>{completedInSection(section, completed)} из {section.steps.length}</small></span><i aria-hidden="true">{isActive ? '⌃' : '⌄'}</i></button>
         {isActive && <div className="preparation-section-steps">{preparationSteps.filter((step) => step.section === section.id).map((step) => <button type="button" className={activeStep === step.id ? 'is-active' : ''} onClick={() => onStepSelect(step.id)} key={step.id}><span className={completed.includes(step.id) ? 'is-complete' : ''}>{completed.includes(step.id) ? '✓' : ''}</span>{step.label}</button>)}</div>}
       </section>
     })}
