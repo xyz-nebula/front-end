@@ -1,5 +1,5 @@
 import { getMockAiResponse } from '@/mocks/negotiation-scenarios'
-import { createMockResultAnalysis } from '@/mocks/resultAnalysis'
+import { createMockResultFixture } from '@/mocks/resultFixtures'
 import { MockStorage, type MockData, type MockSessionRecord } from '@/services/mock/mockStorage'
 import type {
   AudioTicket,
@@ -61,12 +61,7 @@ function appendMessage(
 function createResult(session: MockSessionRecord): NegotiationResult {
   const userTurns = session.messages.filter((message) => message.speaker === 'user').length
   const outcome = userTurns >= 2 ? 'agreement' : 'no-agreement'
-  const publicSession = toSession(session)
-  return {
-    sessionId: session.id,
-    source: 'mock',
-    ...createMockResultAnalysis(publicSession, outcome),
-  }
+  return createMockResultFixture(toSession(session), outcome)
 }
 
 export interface ConsumedAudioTicket {
