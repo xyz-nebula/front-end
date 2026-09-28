@@ -27,7 +27,11 @@ export function FinishDialog({ onCancel, onConfirm, busy = false, error = null, 
       .map((element) => ({ element, inert: element.inert }))
     const focusable = () => [...(dialogRef.current?.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    ) ?? [])].filter((element) => element.getClientRects().length > 0)
+    ) ?? []), ...document.querySelectorAll<HTMLElement>('[data-product-tour-tooltip] button:not([disabled])')]
+      .filter((element) => element.getClientRects().length > 0)
+    const containsFocus = (node: Node | null) => Boolean(
+      node && (dialogRef.current?.contains(node) || document.querySelector('[data-product-tour-tooltip]')?.contains(node)),
+    )
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !busyRef.current) {
         event.preventDefault()
@@ -39,7 +43,7 @@ export function FinishDialog({ onCancel, onConfirm, busy = false, error = null, 
       const first = items[0]
       const last = items[items.length - 1]
       if (!first || !last) return
-      if (!dialogRef.current?.contains(document.activeElement)) {
+      if (!containsFocus(document.activeElement)) {
         event.preventDefault()
         first.focus()
       } else if (event.shiftKey && document.activeElement === first) {
@@ -51,7 +55,7 @@ export function FinishDialog({ onCancel, onConfirm, busy = false, error = null, 
       }
     }
     const handleFocusIn = (event: FocusEvent) => {
-      if (event.target instanceof Node && !dialogRef.current?.contains(event.target)) focusable()[0]?.focus()
+      if (event.target instanceof Node && !containsFocus(event.target)) focusable()[0]?.focus()
     }
     const overflow = document.body.style.overflow
     background.forEach(({ element }) => { element.inert = true })

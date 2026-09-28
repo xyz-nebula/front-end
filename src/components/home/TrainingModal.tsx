@@ -44,7 +44,11 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
 
     const focusableElements = () => [...(modalRef.current?.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    ) ?? [])].filter((element) => !element.hidden && element.getClientRects().length > 0)
+    ) ?? []), ...document.querySelectorAll<HTMLElement>('[data-product-tour-tooltip] button:not([disabled])')]
+      .filter((element) => !element.hidden && element.getClientRects().length > 0)
+    const containsFocus = (node: Node | null) => Boolean(
+      node && (modalRef.current?.contains(node) || document.querySelector('[data-product-tour-tooltip]')?.contains(node)),
+    )
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -62,7 +66,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
       const active = document.activeElement
-      if (!modalRef.current?.contains(active)) {
+      if (!containsFocus(active)) {
         event.preventDefault()
         first.focus()
       } else if (event.shiftKey && active === first) {
@@ -74,7 +78,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
       }
     }
     const handleFocusIn = (event: FocusEvent) => {
-      if (event.target instanceof Node && !modalRef.current?.contains(event.target)) {
+      if (event.target instanceof Node && !containsFocus(event.target)) {
         closeButtonRef.current?.focus()
       }
     }

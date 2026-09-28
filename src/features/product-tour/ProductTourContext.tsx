@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useNavigate } from 'react-router-dom'
 
 import { useAuthRuntime } from '@/auth/runtime'
+import { ProductTourLayer } from '@/components/product-tour/ProductTourLayer'
 import { ProductTourContext, type ProductTourContextValue } from '@/features/product-tour/useProductTour'
 import {
   deferProductTourPrompt,
@@ -16,6 +17,7 @@ import { transitionProductTour, type ProductTourEvent } from '@/features/product
 function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode; ownerKey: string }) {
   const [snapshot, setSnapshot] = useState(() => readProductTourState(ownerKey))
   const [invitationOpen, setInvitationOpen] = useState(false)
+  const [resultReady, setResultReady] = useState(false)
   const invitationConsideredRef = useRef(false)
   const navigate = useNavigate()
 
@@ -29,6 +31,8 @@ function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode
   }, [ownerKey])
 
   const send = useCallback((event: ProductTourEvent) => {
+    if (event.type === 'result-ready') setResultReady(true)
+    if (event.type === 'session-finished' || event.type === 'start') setResultReady(false)
     setSnapshot((current) => {
       const next = transitionProductTour(current.state, event)
       if (!next || next === current.state) return current
@@ -99,15 +103,16 @@ function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode
     storageAvailable: snapshot.storageAvailable,
     menuLabel,
     invitationOpen,
+    resultReady,
     startOrResume,
     beginFromInvitation,
     deferInvitation,
     disableInvitation,
     considerInvitation,
     send,
-  }), [beginFromInvitation, considerInvitation, deferInvitation, disableInvitation, invitationOpen, menuLabel, ownerKey, send, snapshot, startOrResume])
+  }), [beginFromInvitation, considerInvitation, deferInvitation, disableInvitation, invitationOpen, menuLabel, ownerKey, resultReady, send, snapshot, startOrResume])
 
-  return <ProductTourContext.Provider value={value}>{children}</ProductTourContext.Provider>
+  return <ProductTourContext.Provider value={value}>{children}<ProductTourLayer /></ProductTourContext.Provider>
 }
 
 export function ProductTourProvider({ children }: { children: ReactNode }) {
@@ -120,6 +125,7 @@ export function ProductTourProvider({ children }: { children: ReactNode }) {
         storageAvailable: true,
         menuLabel: 'Пройти тур',
         invitationOpen: false,
+        resultReady: false,
         startOrResume: () => undefined,
         beginFromInvitation: () => undefined,
         deferInvitation: () => undefined,

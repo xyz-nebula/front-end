@@ -9,6 +9,7 @@ export interface ProductTourContextValue {
   storageAvailable: boolean
   menuLabel: 'Пройти тур' | 'Продолжить тур' | 'Пройти тур заново'
   invitationOpen: boolean
+  resultReady?: boolean
   startOrResume: () => void
   beginFromInvitation: () => void
   deferInvitation: () => void
