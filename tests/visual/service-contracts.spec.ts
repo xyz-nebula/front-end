@@ -10,6 +10,8 @@ import {
   parseCases,
   parseChatList,
   parseChatWithMessages,
+  parseEvaluateTrigger,
+  parseEvaluationResult,
   toActivateChatDto,
   toAudioControlDto,
   toAudioInputDto,
@@ -23,6 +25,9 @@ import {
   backendErrorFixture,
   chatFixture,
   chatListFixture,
+  evaluateTriggerFixture,
+  evaluationResultFixture,
+  evaluationSessionFixture,
 } from '../fixtures/serviceContracts'
 
 test('remote backend DTO fixtures validate and map to frontend naming', () => {
@@ -30,6 +35,7 @@ test('remote backend DTO fixtures validate and map to frontend naming', () => {
   const list = parseChatList(chatListFixture)
 
   expect(chat).toMatchObject({ id: chatFixture.uuid, name: 'Срок поставки', status: 'ongoing' })
+  expect(chat).toMatchObject({ selectedRole: 0, preparations: chatFixture.preparations })
   expect(chat.messages.map((message) => [message.sequence, message.speaker])).toEqual([
     [1, 'user'],
     [2, 'ai'],
@@ -80,6 +86,92 @@ test('invalid DTO and event payloads fail with a typed invalid-response error', 
       expect(isServiceError(error)).toBe(true)
       if (isServiceError(error)) expect(error.reason).toBe('invalid-response')
     }
+  }
+})
+
+test('evaluation parser validates the complete 2.0.0-rc.1 payload', () => {
+  expect(parseEvaluateTrigger(evaluateTriggerFixture)).toEqual({
+    jobId: evaluateTriggerFixture.job_uuid,
+    status: 'pending',
+  })
+
+  const parsed = parseEvaluationResult(evaluationResultFixture, evaluationSessionFixture)
+  expect(parsed.status).toBe('ready')
+  if (parsed.status !== 'ready') return
+  expect(parsed.result.contract_version).toBe('2.0.0-rc.1')
+  expect(parsed.result.outcome.assessment?.kind).toBe('partial_agreement')
+  expect(parsed.result.judge_verdicts.map((slot) => slot.college)).toEqual([
+    'hiring', 'negotiation', 'ownership',
+  ])
+  expect(parsed.result.trainer_feedback.feedback?.next_try).toHaveLength(2)
+})
+
+test('evaluation parser maps consistent job states without exposing backend errors', () => {
+  expect(parseEvaluationResult(
+    { status: 'processing', result: null, error: null },
+    evaluationSessionFixture,
+  )).toEqual({ status: 'processing' })
+  expect(parseEvaluationResult(
+    { status: 'failed', result: null, error: 'provider timeout: internal details' },
+    evaluationSessionFixture,
+  )).toEqual({ status: 'failed', message: 'Не удалось подготовить разбор переговоров.' })
+})
+
+test('evaluation parser preserves valid failed slots and nullable analysis fields', () => {
+  const partialFailure = structuredClone(evaluationResultFixture)
+  partialFailure.result.outcome.status = 'failed'
+  partialFailure.result.outcome.assessment = null
+  partialFailure.result.outcome.error_code = 'outcome_analysis_unavailable'
+  partialFailure.result.judge_verdicts[0].status = 'failed'
+  partialFailure.result.judge_verdicts[0].verdict = null
+  partialFailure.result.judge_verdicts[0].error_code = 'insufficient_evidence'
+  partialFailure.result.trainer_feedback.status = 'failed'
+  partialFailure.result.trainer_feedback.feedback = null
+  partialFailure.result.trainer_feedback.error_code = 'trainer_unavailable'
+
+  const parsed = parseEvaluationResult(partialFailure, evaluationSessionFixture)
+  expect(parsed.status).toBe('ready')
+  if (parsed.status !== 'ready') return
+  expect(parsed.result.outcome.error_code).toBe('outcome_analysis_unavailable')
+  expect(parsed.result.judge_verdicts[0].error_code).toBe('insufficient_evidence')
+  expect(parsed.result.trainer_feedback.error_code).toBe('trainer_unavailable')
+
+  const nullable = structuredClone(evaluationResultFixture)
+  const feedback = nullable.result.trainer_feedback.feedback
+  if (feedback) {
+    feedback.plan_vs_reality = null
+    feedback.goal_assessment.goal_text = null
+    feedback.goal_assessment.status = 'not_assessable'
+  }
+  expect(parseEvaluationResult(nullable, evaluationSessionFixture).status).toBe('ready')
+})
+
+test('evaluation parser rejects incompatible versions, evidence and slot combinations', () => {
+  const incompatibleVersion = structuredClone(evaluationResultFixture)
+  incompatibleVersion.result.contract_version = '2.0.0' as '2.0.0-rc.1'
+
+  const wrongSpeaker = structuredClone(evaluationResultFixture)
+  const assessment = wrongSpeaker.result.outcome.assessment
+  if (assessment) assessment.evidence[0].is_ai = true
+
+  const duplicateCollege = structuredClone(evaluationResultFixture)
+  duplicateCollege.result.judge_verdicts[1].college = 'hiring'
+  const duplicateVerdict = duplicateCollege.result.judge_verdicts[1].verdict
+  if (duplicateVerdict) duplicateVerdict.college = 'hiring'
+
+  const invalidPlanEvidence = structuredClone(evaluationResultFixture)
+  const plan = invalidPlanEvidence.result.trainer_feedback.feedback?.plan_vs_reality
+  if (plan?.items[0].evidence) plan.items[0].evidence = null
+
+  for (const value of [
+    incompatibleVersion,
+    wrongSpeaker,
+    duplicateCollege,
+    invalidPlanEvidence,
+    { status: 'done', result: null, error: null },
+    { status: 'processing', result: evaluationResultFixture.result, error: null },
+  ]) {
+    expect(() => parseEvaluationResult(value, evaluationSessionFixture)).toThrow(/Некорректный ответ сервиса/)
   }
 })
 
@@ -188,6 +280,8 @@ test('real negotiation client creates, activates, reads and lists remote chats',
         name: chatFixture.name,
         status: chatFixture.status,
         created_at: chatFixture.created_at,
+        selected_role: chatFixture.selected_role,
+        preparations: chatFixture.preparations,
       }), { status: 200 })
     }
     if (url.endsWith('/v1/chats/') && (init?.method ?? 'GET') === 'GET') {

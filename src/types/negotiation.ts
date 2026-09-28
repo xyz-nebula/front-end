@@ -16,7 +16,9 @@ export interface NegotiationSession {
   name?: string
   mode: NegotiationMode
   status: NegotiationStatus
-  backendStatus?: 'ongoing' | 'victory' | 'defeat'
+  backendStatus?: 'ongoing' | 'evaluating' | 'evaluated' | 'victory' | 'defeat'
+  selectedRole?: 0 | 1
+  preparations?: string
   startedAt: string
   finishedAt?: string
   messages: NegotiationMessage[]
@@ -82,15 +84,15 @@ export interface NegotiationSessionSummary {
   name?: string
   mode: NegotiationMode
   status: NegotiationStatus
-  backendStatus?: 'ongoing' | 'victory' | 'defeat'
+  backendStatus?: 'ongoing' | 'evaluating' | 'evaluated' | 'victory' | 'defeat'
   startedAt: string
   finishedAt?: string
   score?: number
 }
 
-export type NegotiationResultState =
+export type NegotiationResultState<TResult = NegotiationResult> =
   | { status: 'processing' }
-  | { status: 'ready'; result: NegotiationResult }
+  | { status: 'ready'; result: TResult }
   | { status: 'failed'; message: string }
 
 export interface TextTurnResult {

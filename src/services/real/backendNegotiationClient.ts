@@ -37,7 +37,9 @@ const defaultOptions: BackendNegotiationClientOptions = {
 }
 
 function mapStatus(status: ParsedChat['status']): NegotiationStatus {
-  return status === 'ongoing' ? 'active' : 'finished'
+  if (status === 'ongoing') return 'active'
+  if (status === 'evaluating') return 'finishing'
+  return 'finished'
 }
 
 function mapSession(chat: ParsedChatWithMessages): NegotiationSession {
@@ -48,6 +50,8 @@ function mapSession(chat: ParsedChatWithMessages): NegotiationSession {
     mode: 'voice',
     status: mapStatus(chat.status),
     backendStatus: chat.status,
+    selectedRole: chat.selectedRole,
+    preparations: chat.preparations,
     startedAt: chat.createdAt,
     messages: chat.messages,
   }
