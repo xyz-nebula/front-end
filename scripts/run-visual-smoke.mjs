@@ -16,32 +16,47 @@ const playwrightCli = fileURLToPath(import.meta.resolve('@playwright/test/cli'))
 const artifactsDir = fileURLToPath(new URL('../artifacts/visual-smoke/', import.meta.url))
 const testGroups = [
   {
-    name: 'real/mock/mock',
+    name: 'real/mock/mock auth resilience',
+    authSource: 'real',
+    specs: ['auth-resilience.spec.ts'],
+  },
+  {
+    name: 'real/mock/mock contracts and screens',
     authSource: 'real',
     specs: [
       'auth.spec.ts',
-      'auth-resilience.spec.ts',
       'authorized-operation.spec.ts',
       'product-tour-storage.spec.ts',
       'service-contracts.spec.ts',
     ],
   },
   {
-    name: 'mock/mock/mock',
+    name: 'mock/mock/mock domain and arena',
     authSource: 'mock',
     specs: [
-      'landing.spec.ts',
-      'home.spec.ts',
-      'product-tour-machine.spec.ts',
-      'product-tour-events.spec.ts',
-      'product-tour-recovery.spec.ts',
-      'preparation.spec.ts',
       'page-data-hooks.spec.ts',
+      'result-polling-resilience.spec.ts',
       'mock-domain.spec.ts',
       'domain-resilience.spec.ts',
       'arena-session-resilience.spec.ts',
       'arena-audio-resilience.spec.ts',
       'result-repeat-resilience.spec.ts',
+    ],
+  },
+  {
+    name: 'mock/mock/mock landing',
+    authSource: 'mock',
+    specs: ['landing.spec.ts'],
+  },
+  {
+    name: 'mock/mock/mock product screens and tour',
+    authSource: 'mock',
+    specs: [
+      'home.spec.ts',
+      'product-tour-machine.spec.ts',
+      'product-tour-events.spec.ts',
+      'product-tour-recovery.spec.ts',
+      'preparation.spec.ts',
       'arena-text.spec.ts',
       'arena-voice.spec.ts',
       'result.spec.ts',

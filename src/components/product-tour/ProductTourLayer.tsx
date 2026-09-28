@@ -1,53 +1,106 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { EVENTS, Joyride, type EventData, type TooltipRenderProps } from 'react-joyride'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 
 import { ProductTourErrorDialog } from '@/components/product-tour/ProductTourErrorDialog'
 import { ProductTourTooltip } from '@/components/product-tour/ProductTourTooltip'
-import { PRODUCT_TOUR_STEP_ORDER, getProductTourSteps } from '@/features/product-tour/productTourSteps'
+import { PRODUCT_TOUR_STEP_ORDER, getProductTourSteps, type ProductTourPlacement } from '@/features/product-tour/productTourSteps'
 import { useProductTour } from '@/features/product-tour/useProductTour'
 
-function ProductTourBeacon() {
-  return <span className="product-tour-beacon" aria-hidden="true"><span>?</span><strong>Подсказка</strong></span>
+const TARGET_WAIT_MS = 10_000
+const TOOLTIP_WIDTH = 392
+const VIEWPORT_GAP = 16
+
+function positionFor(target: Element, placement: ProductTourPlacement, collapsed: boolean): CSSProperties {
+  const rect = target.getBoundingClientRect()
+  const width = collapsed ? 132 : Math.min(TOOLTIP_WIDTH, window.innerWidth - VIEWPORT_GAP * 2)
+  const height = collapsed ? 40 : 280
+  let left = rect.left + rect.width / 2 - width / 2
+  let top = rect.bottom + 14
+
+  if (placement === 'top') top = rect.top - height - 14
+  if (placement === 'right') {
+    left = rect.right + 14
+    top = rect.top + rect.height / 2 - height / 2
+  }
+  if (left + width > window.innerWidth - VIEWPORT_GAP) left = window.innerWidth - width - VIEWPORT_GAP
+  if (left < VIEWPORT_GAP) left = VIEWPORT_GAP
+  if (top + height > window.innerHeight - VIEWPORT_GAP) top = window.innerHeight - height - VIEWPORT_GAP
+  if (top < VIEWPORT_GAP) top = VIEWPORT_GAP
+
+  return { left, top, width }
+}
+
+function ProductTourBeacon({ onRestore }: { onRestore: () => void }) {
+  return (
+    <button className="react-joyride__beacon" type="button" aria-label="Показать подсказку" onClick={onRestore}>
+      <span className="product-tour-beacon" aria-hidden="true"><span>?</span><strong>Подсказка</strong></span>
+    </button>
+  )
 }
 
 export function ProductTourLayer() {
   const productTour = useProductTour()
   const [collapsed, setCollapsed] = useState(false)
+  const [targetElement, setTargetElement] = useState<Element | null>(null)
+  const [positionVersion, setPositionVersion] = useState(0)
   const focusTooltipAfterRestoreRef = useRef(false)
   const active = productTour.state?.status === 'active'
   const stepId = productTour.state?.stepId
   const stepIndex = stepId ? PRODUCT_TOUR_STEP_ORDER.indexOf(stepId) : 0
-  const steps = useMemo(() => getProductTourSteps(Boolean(productTour.resultReady), collapsed), [collapsed, productTour.resultReady])
-  const target = active ? steps[stepIndex]?.target : null
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const collapseTooltip = useCallback(() => setCollapsed(true), [])
-  const Tooltip = useCallback((props: TooltipRenderProps) => <ProductTourTooltip {...props} onCollapse={collapseTooltip} />, [collapseTooltip])
-
-  const focusBeacon = useCallback(() => {
-    window.setTimeout(() => document.querySelector<HTMLElement>('.react-joyride__beacon')?.focus(), 0)
-  }, [])
+  const steps = useMemo(() => getProductTourSteps(Boolean(productTour.resultReady)), [productTour.resultReady])
+  const step = active ? steps[stepIndex] : undefined
+  const target = step?.target
+  const reportTargetUnavailable = productTour.reportTargetUnavailable
 
   useEffect(() => {
-    if (!active || typeof target !== 'string') return
-    let highlighted: Element | null = null
-    const updateHighlight = () => {
-      const next = document.querySelector(target)
-      if (highlighted === next) return
-      highlighted?.classList.remove('product-tour-target')
-      next?.classList.add('product-tour-target')
-      highlighted = next
+    if (!active || !target) {
+      return
     }
-    updateHighlight()
-    const observer = new MutationObserver(updateHighlight)
+
+    let highlighted: Element | null = null
+    let found = false
+    const updateTarget = () => {
+      const next = document.querySelector(target)
+      if (highlighted !== next) {
+        highlighted?.classList.remove('product-tour-target')
+        next?.classList.add('product-tour-target')
+        highlighted = next
+        setTargetElement(next)
+      }
+      if (next && !found) {
+        found = true
+        next.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center', inline: 'nearest' })
+      }
+    }
+
+    updateTarget()
+    const observer = new MutationObserver(updateTarget)
     observer.observe(document.body, { childList: true, subtree: true })
-    return () => { observer.disconnect(); highlighted?.classList.remove('product-tour-target') }
-  }, [active, target])
+    const timeout = window.setTimeout(() => {
+      if (!found) reportTargetUnavailable()
+    }, TARGET_WAIT_MS)
+
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(timeout)
+      highlighted?.classList.remove('product-tour-target')
+    }
+  }, [active, reportTargetUnavailable, target])
+
+  useEffect(() => {
+    if (!active || !targetElement) return
+    const updatePosition = () => setPositionVersion((version) => version + 1)
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [active, targetElement])
 
   useEffect(() => {
     if (!active || collapsed) return
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      if (document.querySelector('[aria-modal="true"]')) return
+      if (event.key !== 'Escape' || document.querySelector('[aria-modal="true"]')) return
       event.preventDefault()
       event.stopImmediatePropagation()
       setCollapsed(true)
@@ -57,37 +110,27 @@ export function ProductTourLayer() {
   }, [active, collapsed])
 
   useEffect(() => {
-    if (active && collapsed) focusBeacon()
-  }, [active, collapsed, focusBeacon])
-
-  useEffect(() => {
-    if (!active || collapsed || !focusTooltipAfterRestoreRef.current) return
-    focusTooltipAfterRestoreRef.current = false
-    window.setTimeout(() => document.querySelector<HTMLElement>('.product-tour-tooltip__close')?.focus(), 0)
-  }, [active, collapsed])
+    if (!active || !targetElement) return
+    if (collapsed) {
+      window.setTimeout(() => document.querySelector<HTMLElement>('.react-joyride__beacon')?.focus(), 0)
+    } else if (focusTooltipAfterRestoreRef.current) {
+      focusTooltipAfterRestoreRef.current = false
+      window.setTimeout(() => document.querySelector<HTMLElement>('.product-tour-tooltip__close')?.focus(), 0)
+    }
+  }, [active, collapsed, targetElement])
 
   if (productTour.error) {
     return <ProductTourErrorDialog kind={productTour.error} onClose={productTour.dismissError} onRestart={productTour.restart} />
   }
+  if (!active || !step || !targetElement) return null
 
-  return <Joyride
-    key={collapsed ? 'product-tour-collapsed' : 'product-tour-expanded'}
-    run={active}
-    stepIndex={stepIndex}
-    steps={steps}
-    scrollToFirstStep
-    beaconComponent={ProductTourBeacon}
-    tooltipComponent={Tooltip}
-    onEvent={(event: EventData) => {
-      if (event.type === EVENTS.TARGET_NOT_FOUND) productTour.reportTargetUnavailable()
-      if (event.type === EVENTS.BEACON) focusBeacon()
-      if (event.type === EVENTS.TOOLTIP && collapsed) {
-        focusTooltipAfterRestoreRef.current = true
-        setCollapsed(false)
-      }
-    }}
-    locale={{ back: 'Назад', close: 'Свернуть подсказку', last: 'Готово', next: 'Далее', nextWithProgress: 'Далее ({current} из {total})', open: 'Показать подсказку', skip: 'Пропустить' }}
-    options={{ blockTargetInteraction: false, buttons: ['close'], disableFocusTrap: true, dismissKeyAction: false, hideOverlay: true, scrollDuration: reducedMotion ? 0 : 300, scrollOffset: 24, spotlightPadding: 6, targetWaitTimeout: 10_000, width: 'min(392px, calc(100vw - 32px))', zIndex: 1400 }}
-    floatingOptions={{ flipOptions: { padding: 16 }, shiftOptions: { padding: 16 } }}
-  />
+  void positionVersion
+  const style = positionFor(targetElement, step.placement, collapsed)
+  return (
+    <div className="product-tour-floater" style={style}>
+      {collapsed
+        ? <ProductTourBeacon onRestore={() => { focusTooltipAfterRestoreRef.current = true; setCollapsed(false) }} />
+        : <ProductTourTooltip step={step} onCollapse={() => setCollapsed(true)} />}
+    </div>
+  )
 }

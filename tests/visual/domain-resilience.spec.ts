@@ -194,8 +194,8 @@ test('invalid version and malformed nested mock data recover without leaking use
     ])
     const invalidValues = [
       '{broken',
-      JSON.stringify({ version: 2, users: [], sessions: [], results: [], audioTickets: [] }),
-      JSON.stringify({ version: 1, users: [], sessions: [{ id: 'bad' }], results: [], audioTickets: [] }),
+      JSON.stringify({ version: 3, users: [], sessions: [], results: [], audioTickets: [] }),
+      JSON.stringify({ version: 2, users: [], sessions: [{ id: 'bad' }], results: [], audioTickets: [] }),
     ]
     const recovered: boolean[] = []
     for (const serialized of invalidValues) {
@@ -210,7 +210,7 @@ test('invalid version and malformed nested mock data recover without leaking use
       }
       let otherOwnerDenied = false
       try { runtime.getSession('owner-b', session.id) } catch { otherOwnerDenied = true }
-      recovered.push(data.version === 1 && data.sessions.length === 1 && otherOwnerDenied)
+      recovered.push(data.version === 2 && data.sessions.length === 1 && otherOwnerDenied)
       storage.dispose()
     }
     return recovered

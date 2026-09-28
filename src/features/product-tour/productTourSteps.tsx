@@ -1,6 +1,6 @@
-import type { Placement, Step } from 'react-joyride'
-
 import type { ProductTourStepId } from '@/features/product-tour/productTourStorage'
+
+export type ProductTourPlacement = 'top' | 'right' | 'bottom'
 
 export const PRODUCT_TOUR_STEP_ORDER: readonly ProductTourStepId[] = [
   'case', 'role', 'voice-format', 'analysis', 'strategy', 'tactics',
@@ -12,7 +12,7 @@ export interface ProductTourStepDefinition {
   title: string
   content: string
   target: string
-  placement: Placement
+  placement: ProductTourPlacement
   back: boolean
   next: boolean
   complete?: boolean
@@ -37,19 +37,16 @@ export function getProductTourStepDefinition(stepId: ProductTourStepId): Product
   return definitions[PRODUCT_TOUR_STEP_ORDER.indexOf(stepId)]
 }
 
-export function getProductTourSteps(resultReady: boolean, collapsed = false): Step[] {
+export function getProductTourSteps(resultReady: boolean): ProductTourStepDefinition[] {
   return definitions.map((definition) => {
     const waitingForResult = definition.id === 'result' && !resultReady
     return {
-      id: definition.id,
+      ...definition,
       title: waitingForResult ? 'Готовим разбор' : definition.title,
       content: waitingForResult
         ? 'Собираем выводы по твоим репликам. Финальный шаг откроется, когда разбор будет готов.'
         : definition.content,
       target: waitingForResult ? '[data-tour-id="result-status"]' : definition.target,
-      placement: definition.placement,
-      beaconPlacement: 'top',
-      skipBeacon: !collapsed,
     }
   })
 }

@@ -56,6 +56,29 @@ Playwright specs и harnesses сейчас исполняются Playwright и 
 но не включены в отдельный TypeScript project. Это известное ограничение
 тестовой инфраструктуры.
 
+## Проверки серверного результата
+
+`tests/visual/service-contracts.spec.ts` фиксирует границу real adapter без
+живого backend: запуск `/evaluate` без body, состояния `pending`/`processing`,
+восстановление после `already_evaluating`, безопасные сообщения для failed job и
+`evaluation_not_found`, а также полный `done` с дополнительной загрузкой
+транскрипта. Fixtures контракта `2.0.0-rc.1` проверяют готовые и failed slots,
+nullable `plan_vs_reality`/`goal_text` и отклонение несовместимой версии,
+неверного evidence, дубликатов судей и несогласованных job states.
+
+`tests/visual/result-polling-resilience.spec.ts` проверяет интервалы и
+шестиминутный deadline, последовательные запросы без параллельных `GET`, отмену
+устаревшего цикла при смене session или unmount и продолжение чтения после
+ручной проверки. `tests/visual/result.spec.ts` покрывает processing, готовый
+разбор, ошибку с recovery actions, повтор кейса и отсутствие горизонтального
+overflow на desktop/mobile. Все пять outcome kinds дополнительно фиксируются
+fixtures mock runtime в `tests/visual/mock-domain.spec.ts`.
+
+Эти проверки подтверждают frontend-контракт и поведение интерфейса, но не
+заменяют smoke на стенде. Для `real/real/real` вручную пройдите полный цикл от
+завершения voice-сессии до `done`, проверьте транскрипт/evidence, частично
+недоступные секции и отсутствие mock-пометки у server result.
+
 ## Артефакты и визуальная проверка
 
 `artifacts/visual-smoke/` содержит временные PNG, а `test-results/` — traces

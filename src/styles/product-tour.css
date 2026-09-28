@@ -82,7 +82,12 @@
   box-shadow: 0 0 0 7px rgb(116 71 214 / 18%), 0 12px 34px rgb(69 37 139 / 24%);
 }
 
-.react-joyride__floater:has(.product-tour-tooltip) {
+.product-tour-floater {
+  position: fixed;
+  z-index: 1400;
+}
+
+.product-tour-floater:has(.product-tour-tooltip) {
   width: min(392px, calc(100vw - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right))));
   max-width: calc(100vw - max(16px, env(safe-area-inset-left)) - max(16px, env(safe-area-inset-right))) !important;
   box-sizing: border-box;
@@ -132,12 +137,14 @@
   white-space: nowrap;
 }
 
+.react-joyride__beacon { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+
 .product-tour-beacon span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: #7447d6; color: #fff; font-size: 14px; font-weight: 850; }
 .product-tour-beacon strong { font-size: 12px; font-weight: 800; }
 .react-joyride__beacon:focus-visible { outline: 3px solid #f4b942 !important; outline-offset: 3px; }
 
 @media (max-width: 520px) {
-  .react-joyride__floater:has(.product-tour-tooltip) { width: min(350px, calc(100vw - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right)))); max-width: calc(100vw - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right))) !important; }
+  .product-tour-floater:has(.product-tour-tooltip) { width: min(350px, calc(100vw - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right)))); max-width: calc(100vw - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right))) !important; }
   .product-tour-tooltip { border-radius: 17px; }
   .product-tour-tooltip__heading { padding: 17px 17px 0; }
   .product-tour-tooltip h2 { font-size: 20px; }
@@ -154,5 +161,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .react-joyride__floater, .product-tour-tooltip, .product-tour-tooltip *, .product-tour-beacon, .product-tour-target { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+  .product-tour-floater, .product-tour-tooltip, .product-tour-tooltip *, .product-tour-beacon, .product-tour-target { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
 }

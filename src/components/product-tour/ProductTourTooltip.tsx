@@ -1,13 +1,12 @@
-import type { TooltipRenderProps } from 'react-joyride'
-
-import { PRODUCT_TOUR_STEP_ORDER, getProductTourStepDefinition } from '@/features/product-tour/productTourSteps'
+import { PRODUCT_TOUR_STEP_ORDER, getProductTourStepDefinition, type ProductTourStepDefinition } from '@/features/product-tour/productTourSteps'
 import { useProductTour } from '@/features/product-tour/useProductTour'
 
-interface ProductTourTooltipProps extends TooltipRenderProps {
+interface ProductTourTooltipProps {
   onCollapse: () => void
+  step: ProductTourStepDefinition
 }
 
-export function ProductTourTooltip({ onCollapse, step, tooltipProps }: ProductTourTooltipProps) {
+export function ProductTourTooltip({ onCollapse, step }: ProductTourTooltipProps) {
   const productTour = useProductTour()
   const state = productTour.state
   if (!state || state.status !== 'active') return null
@@ -27,7 +26,7 @@ export function ProductTourTooltip({ onCollapse, step, tooltipProps }: ProductTo
   const contentId = `product-tour-content-${state.stepId}`
 
   return (
-    <section {...tooltipProps} className="product-tour-tooltip" data-product-tour-tooltip="" role="dialog" aria-live="polite" aria-modal="false" aria-labelledby={titleId} aria-describedby={contentId}>
+    <section className="product-tour-tooltip" data-product-tour-tooltip="" role="dialog" aria-live="polite" aria-modal="false" aria-labelledby={titleId} aria-describedby={contentId}>
       <div className="product-tour-tooltip__heading">
         <div><span className="product-tour-tooltip__eyebrow">Тур по продукту</span><h2 id={titleId}>{errorCopy?.title ?? step.title}</h2></div>
         <button className="product-tour-tooltip__close" type="button" aria-label="Свернуть подсказку" onClick={onCollapse}>×</button>

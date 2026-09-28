@@ -18,7 +18,7 @@ function session(id: string): NegotiationSession {
 }
 
 const summary: NegotiationSessionSummary = { ...session('history-1') }
-const ready: NegotiationResultState = { status: 'ready', result: { sessionId: 'new', outcome: 'victory', score: 80, summary: 'Готово', strengths: [], improvements: [], recommendations: [] } }
+const ready: NegotiationResultState = { status: 'ready', result: { sessionId: 'new', source: 'mock', outcome: { status: 'failed', reason: 'analysis-unavailable' }, judges: [{ college: 'hiring', status: 'failed', reason: 'unavailable' }, { college: 'negotiation', status: 'failed', reason: 'unavailable' }, { college: 'ownership', status: 'failed', reason: 'unavailable' }], trainer: { status: 'failed', reason: 'unavailable' } } }
 const unavailable = async (): Promise<never> => { throw new Error('Unexpected call') }
 
 function createClient(overrides: Partial<NegotiationClient>): NegotiationClient {
@@ -116,7 +116,7 @@ export async function runResultDataHookScenario() {
   await act(async () => { root.render(<Probe />) })
   sessionId = 'new'
   await act(async () => { root.render(<Probe />) })
-  await flush(430)
+  await flush(530)
   resolveOld(session('old'))
   await flush()
   const afterStale = value as unknown as ReturnType<typeof useNegotiationResult>

@@ -318,6 +318,7 @@ test('optimistic logout clears the UI and storage before a hanging request finis
     await route.fulfill({ status: 204 }).catch(() => undefined)
   })
   await login(page)
+  await dismissProductTourInvitation(page)
 
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
@@ -344,6 +345,7 @@ test('retries remote logout after refreshing a rejected snapshot', async ({ page
     refresh_token: 'logout-refresh',
   }))
   await login(page)
+  await dismissProductTourInvitation(page)
 
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
@@ -553,6 +555,7 @@ test('uses a one-tab memory session when localStorage is unavailable', async ({ 
   await mockLogin(page)
 
   await login(page)
+  await dismissProductTourInvitation(page)
   const notice = page.getByRole('status').filter({ hasText: 'Сессия действует только в этой вкладке' })
   await expect(notice).toBeVisible()
   await expectNoHorizontalOverflow(page)
@@ -672,23 +675,29 @@ test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, 
   let releaseLockBarrier = () => undefined
   const bothTabsRequestedLock = new Promise<void>((resolve) => { releaseLockBarrier = resolve })
   const lockOrder: string[] = []
-  await context.exposeBinding('__testRefreshLockRequested', ({ page: sourcePage }) => {
+  const lockStorageSnapshots: Array<string | null> = []
+  let bothTabsHadInitialStorage = false
+  await context.exposeBinding('__testRefreshLockRequested', async ({ page: sourcePage }) => {
+    lockStorageSnapshots.push(await readStoredTokens(sourcePage))
     lockAttempts += 1
     lockOrder.push(sourcePage === page ? 'first-tab' : 'second-tab')
-    if (lockAttempts === 2) releaseLockBarrier()
+    if (lockAttempts === 2) {
+      bothTabsHadInitialStorage = lockStorageSnapshots.every((value) => value?.includes('shared-refresh'))
+      releaseLockBarrier()
+    }
+    await bothTabsRequestedLock
   })
   await context.addInitScript(() => {
-    const notify = (window as typeof window & {
-      __testRefreshLockRequested?: () => Promise<void>
-    }).__testRefreshLockRequested
-    if (!notify || !('locks' in navigator)) return
+    if (!('locks' in navigator)) return
     const originalRequest = navigator.locks.request.bind(navigator.locks)
     Object.defineProperty(navigator.locks, 'request', {
       configurable: true,
       value: new Proxy(originalRequest, {
         apply(target, thisArgument, argumentsList) {
-          void notify()
-          return Reflect.apply(target, thisArgument, argumentsList)
+          const notify = (window as typeof window & {
+            __testRefreshLockRequested: () => Promise<void>
+          }).__testRefreshLockRequested
+          return notify().then(() => Reflect.apply(target, thisArgument, argumentsList))
         },
       }),
     })
@@ -706,7 +715,6 @@ test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, 
   })
 
   const refreshTokenKinds: string[] = []
-  let bothTabsHadInitialStorage = false
   await context.route('**/api/v1/auth/token/refresh', async (route) => {
     const body: unknown = JSON.parse(route.request().postData() ?? 'null')
     const refreshToken = typeof body === 'object' && body !== null && 'refresh_token' in body
@@ -723,10 +731,6 @@ test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, 
     }
 
     await bothTabsRequestedLock
-    const storageSnapshots = await Promise.all([page, ...context.pages().filter((item) => item !== page)]
-      .slice(0, 2)
-      .map((item) => readStoredTokens(item)))
-    bothTabsHadInitialStorage = storageSnapshots.every((value) => value?.includes('shared-refresh'))
     await json(route, 200, {
       access_token: 'rotated-access',
       refresh_token: 'rotated-refresh',
@@ -739,10 +743,10 @@ test('serializes simultaneous bootstrap refreshes between tabs', async ({ page, 
     otherPage.goto('/home'),
   ])
 
-  await expect(page.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible({ timeout: 15_000 })
-  await expect(otherPage.getByRole('heading', { name: /Добро пожаловать/ })).toBeVisible({ timeout: 15_000 })
-  await expect.poll(() => readStoredTokens(page)).toContain('rotated-refresh')
-  await expect.poll(() => readStoredTokens(otherPage)).toContain('rotated-refresh')
+  await expect.poll(() => readStoredTokens(page), { timeout: 15_000 }).toContain('rotated-refresh')
+  await expect.poll(() => readStoredTokens(otherPage), { timeout: 15_000 }).toContain('rotated-refresh')
+  await expect(page).toHaveURL(/\/home$/)
+  await expect(otherPage).toHaveURL(/\/home$/)
   const diagnostics = { lockOrder, refreshTokenKinds, bothTabsHadInitialStorage }
   expect(lockOrder, JSON.stringify(diagnostics)).toHaveLength(2)
   expect(bothTabsHadInitialStorage, JSON.stringify(diagnostics)).toBe(true)

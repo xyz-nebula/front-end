@@ -63,7 +63,7 @@ test('text arena creates, restores and finishes one atomic conversation without 
   const arenaUrl = page.url()
   const sessionId = arenaUrl.split('/').at(-1) ?? ''
   const persistedAfterTurn = await page.evaluate(() => {
-    const data = JSON.parse(window.localStorage.getItem('arena.mock.data.v1') ?? '{}') as {
+    const data = JSON.parse(window.localStorage.getItem('arena.mock.data.v2') ?? '{}') as {
       sessions?: Array<{ messages?: unknown[] }>
     }
     return data.sessions?.[0]?.messages?.length ?? 0
