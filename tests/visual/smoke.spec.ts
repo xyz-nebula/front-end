@@ -53,10 +53,21 @@ for (const viewport of viewports) {
 
     await page.goto('/home')
     await expect(page.locator('#home-cases-title')).toBeVisible()
-    await expect(page.locator('.home-case-card')).toHaveCount(6)
+    const caseCards = page.locator('.home-case-card')
+    await expect(caseCards).toHaveCount(6)
+    await expect(caseCards.first().locator('.home-case-card__description')).toHaveText('Вы считаете, что ваши результаты и выросшая ответственность заслуживают пересмотра зарплаты. Руководитель ценит ваш вклад, но бюджет команды ограничен и решение потребует убедительных аргументов.')
+    await expect(caseCards.first().locator('.home-case-card__difficulty-bars i')).toHaveCount(4)
+    await expect(caseCards.first().locator('.home-case-card__difficulty-bars i.is-active')).toHaveCount(2)
+    await expect(caseCards.nth(1).locator('.home-case-card__difficulty-bars i.is-active')).toHaveCount(3)
+    await expect(caseCards.nth(3).locator('.home-case-card__difficulty-bars i.is-active')).toHaveCount(1)
     await captureScreen(page, 'home', viewport.name)
 
-    await page.locator('.home-case-card').first().click()
+    await caseCards.first().click()
+    const modal = page.locator('.home-case-modal')
+    await expect(modal.locator('.home-case-modal__intro')).toHaveText('Аргументируй свою ценность и договорись о новых условиях с руководителем.')
+    await expect(modal.getByText('Аргументируй свою ценность и договорись о новых условиях с руководителем.', { exact: true })).toHaveCount(1)
+    await expect(modal.getByRole('heading', { name: 'Ситуация' })).toHaveCount(0)
+    await expect(modal.getByText('Формат тренировки', { exact: true })).toHaveCount(0)
     const roleCards = page.locator('.home-case-modal__role')
     await expect(roleCards).toHaveCount(2)
     await expect(roleCards.locator('img')).toHaveCount(0)
@@ -69,7 +80,8 @@ for (const viewport of viewports) {
     await expect(roleCards.nth(1).locator('img')).toHaveAttribute('src', /opponent\.webp$/)
     await captureScreen(page, 'role-selection-selected', viewport.name)
 
-    await page.goto('/cases/salary-review/preparation?role=0&mode=text&section=analysis')
+    await modal.getByRole('button', { name: 'Начать подготовку' }).click()
+    await expect(page).toHaveURL(/\/cases\/salary-review\/preparation\?role=0&mode=voice&section=analysis$/)
     await expect(page.getByRole('heading', { level: 1, name: 'Подготовка к переговорам' })).toBeVisible()
     await captureScreen(page, 'preparation', viewport.name)
 

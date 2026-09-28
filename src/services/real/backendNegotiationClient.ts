@@ -69,12 +69,6 @@ const icons: CaseIcon[] = ['wallet', 'people', 'clock', 'receipt', 'tag', 'dialo
 
 function normalizedTitle(value: string): string { return value.trim().toLocaleLowerCase('ru-RU') }
 
-function mapDifficulty(value: string): TrainingCase['difficulty'] {
-  if (value === 'easy') return 'Легко'
-  if (value === 'hard' || value === 'insane') return 'Сложно'
-  return 'Средне'
-}
-
 function formatTimeLimit(seconds: number): string {
   return `${Math.ceil(seconds / 60)} мин`
 }
@@ -89,7 +83,7 @@ function mapCase(item: ReturnType<typeof parseCases>[number], index: number): Tr
     category: item.category,
     duration: formatTimeLimit(item.timeLimit),
     timeLimitSeconds: item.timeLimit,
-    difficulty: mapDifficulty(item.difficulty),
+    difficulty: item.difficulty,
     opponent: item.secondRole,
     roles: [item.firstRole, item.secondRole],
     roleSummaries: known?.roleSummaries ?? ['Ваша роль в этом переговорном кейсе.', 'Роль AI-оппонента в этом кейсе.'],

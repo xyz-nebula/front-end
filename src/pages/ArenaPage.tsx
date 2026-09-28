@@ -29,7 +29,7 @@ function fallbackCase(title: string, timeLimitSeconds: number): TrainingCase {
     category: 'Карьера',
     duration: `${Math.ceil(timeLimitSeconds / 60)} мин`,
     timeLimitSeconds,
-    difficulty: 'Средне',
+    difficulty: 'moderate',
     opponent: 'AI-оппонент',
     roles: ['Участник', 'AI-оппонент'],
     roleSummaries: ['Участник переговоров.', 'AI-оппонент.'],

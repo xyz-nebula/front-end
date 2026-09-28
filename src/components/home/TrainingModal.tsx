@@ -3,10 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 import opponentArtwork from '@/assets/home/opponent.webp'
 import profileArtwork from '@/assets/home/profile.webp'
-import { useDomainServices } from '@/services/domainServices'
 import { useProductTour } from '@/features/product-tour/useProductTour'
-import type { TrainingCase } from '@/types/case'
-import type { NegotiationMode } from '@/types/negotiation'
+import { caseDifficultyLabels, type TrainingCase } from '@/types/case'
 
 interface TrainingModalProps {
   item: TrainingCase
@@ -17,14 +15,8 @@ const SWIPE_CLOSE_THRESHOLD = 90
 
 export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const navigate = useNavigate()
-  const { isRealVoice } = useDomainServices()
   const productTour = useProductTour()
-  const { send: sendTourEvent, state: tourState } = productTour
-  const isTourCase = tourState?.status === 'active'
-    && tourState.caseId === item.id
-    && (tourState.stepId === 'role' || tourState.stepId === 'voice-format')
-  const [mode, setMode] = useState<NegotiationMode>(isRealVoice || isTourCase ? 'voice' : 'text')
-  const effectiveMode = isTourCase ? 'voice' : mode
+  const { send: sendTourEvent } = productTour
   const [role, setRole] = useState<0 | 1 | null>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
   const modalRef = useRef<HTMLElement>(null)
@@ -98,8 +90,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
 
   const startPreparation = () => {
     if (role === null) return
-    const selectedMode = effectiveMode
-    navigate(`/cases/${encodeURIComponent(item.id)}/preparation?role=${role}&mode=${selectedMode}&section=analysis`)
+    navigate(`/cases/${encodeURIComponent(item.id)}/preparation?role=${role}&mode=voice&section=analysis`)
   }
 
   const handleDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -156,10 +147,9 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
         ><span /></div>
         <div className="home-case-modal__scroll">
           <button className="home-case-modal__close" ref={closeButtonRef} type="button" onClick={onClose} aria-label="Закрыть">×</button>
-          <div className="home-case-modal__badges"><span>{item.category}</span><span>{item.difficulty}</span><span>{item.duration}</span></div>
+          <div className="home-case-modal__badges"><span>{item.category}</span><span>{caseDifficultyLabels[item.difficulty]}</span><span>{item.duration}</span></div>
           <h2 id="training-modal-title">{item.title}</h2>
           <p className="home-case-modal__intro">{item.description}</p>
-          <div className="home-case-modal__section"><h3>Ситуация</h3><p>{item.synopsis}</p><p>{item.description}</p></div>
           <div className="home-case-modal__section">
             <h3>Выберите свою роль</h3>
             <p>Вторая роль автоматически станет AI-оппонентом.</p>
@@ -177,11 +167,6 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
             </div>
             <p className="home-case-modal__demo-note">Выбранная роль сохранится в подготовке и поединке.</p>
           </div>
-          <fieldset className="home-case-modal__modes">
-            <legend>Формат тренировки</legend>
-            {!isRealVoice && !isTourCase && <label className={mode === 'text' ? 'is-selected' : ''}><input type="radio" name="training-mode" value="text" checked={mode === 'text'} onChange={() => setMode('text')} />Текст</label>}
-            <label className={effectiveMode === 'voice' ? 'is-selected' : ''}><input type="radio" name="training-mode" value="voice" checked={effectiveMode === 'voice'} onChange={() => setMode('voice')} />Голос</label>
-          </fieldset>
         </div>
         <div className="home-case-modal__footer" data-tour-id="voice-preparation"><button className="arena-home__primary-button" type="button" onClick={startPreparation} disabled={role === null}>Начать подготовку <span aria-hidden="true">→</span></button></div>
       </section>

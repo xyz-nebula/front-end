@@ -1,5 +1,6 @@
 import type { AudioFormat } from '@/types/audio'
 import { ServiceError } from '@/types/api'
+import type { CaseDifficulty } from '@/types/case'
 import type {
   MessageSpeaker,
   NegotiationCoachingPoint,
@@ -40,7 +41,7 @@ export interface CaseResponseDto {
   name: string
   description: string
   category: string
-  difficulty: string
+  difficulty: CaseDifficulty
   time_limit: number
   first_role_preparations: string
   second_role_preparations: string
@@ -63,7 +64,7 @@ export interface ParsedCase {
   name: string
   description: string
   category: string
-  difficulty: string
+  difficulty: CaseDifficulty
   timeLimit: number
   synopsis: string
   firstRole: string
@@ -394,7 +395,7 @@ function parseCase(value: unknown, path: string): ParsedCase {
     name: nonEmptyString(dto.name, `${path}.name`),
     description: stringValue(dto.description, `${path}.description`),
     category: nonEmptyString(dto.category, `${path}.category`),
-    difficulty: nonEmptyString(dto.difficulty, `${path}.difficulty`),
+    difficulty: oneOf(dto.difficulty, ['easy', 'moderate', 'hard', 'insane'], `${path}.difficulty`),
     timeLimit: positiveInteger(dto.time_limit, `${path}.time_limit`),
     synopsis: stringValue(dto.synopsis, `${path}.synopsis`),
     firstRole: nonEmptyString(dto.first_role, `${path}.first_role`),

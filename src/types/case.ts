@@ -2,6 +2,21 @@ export type CaseCategory = 'Все' | 'Карьера' | 'Управление' 
 
 export type CaseAccent = 'violet' | 'lime' | 'orange' | 'blue' | 'pink' | 'mint'
 export type CaseIcon = 'wallet' | 'people' | 'clock' | 'receipt' | 'tag' | 'dialogue'
+export type CaseDifficulty = 'easy' | 'moderate' | 'hard' | 'insane'
+
+export const caseDifficultyLabels: Record<CaseDifficulty, string> = {
+  easy: 'Легко',
+  moderate: 'Средне',
+  hard: 'Сложно',
+  insane: 'Экстремально',
+}
+
+export const caseDifficultyLevels: Record<CaseDifficulty, number> = {
+  easy: 1,
+  moderate: 2,
+  hard: 3,
+  insane: 4,
+}
 
 export interface TrainingCase {
   id: string
@@ -11,7 +26,7 @@ export interface TrainingCase {
   category: string
   duration: string
   timeLimitSeconds: number
-  difficulty: 'Легко' | 'Средне' | 'Сложно'
+  difficulty: CaseDifficulty
   opponent: string
   roles: [string, string]
   roleSummaries: [string, string]
