@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 import { useDomainServices } from '@/services/domainServices'
+import { mergeMessages } from '@/features/arena/messageReconciliation'
 import { isServiceError } from '@/types/api'
 import type {
   NegotiationMessage,
@@ -96,15 +97,6 @@ function savePendingTurn(sessionId: string, turn: PendingTurn): void {
 function errorMessage(error: unknown, fallback: string): string {
   if (isServiceError(error) || error instanceof Error) return error.message
   return fallback
-}
-
-function mergeMessages(
-  current: readonly NegotiationMessage[],
-  incoming: readonly NegotiationMessage[],
-): NegotiationMessage[] {
-  const byId = new Map(current.map((message) => [message.id, message]))
-  incoming.forEach((message) => byId.set(message.id, message))
-  return [...byId.values()].sort((left, right) => left.sequence - right.sequence)
 }
 
 export function useArenaSession(sessionId: string): UseArenaSessionValue {
@@ -227,7 +219,12 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
   const refreshSession = useCallback(async () => {
     try {
       const loaded = await arenaContext.negotiationClient.getSession(arenaContext.sessionId)
-      if (isCurrent(arenaContext)) setSession(loaded)
+      if (isCurrent(arenaContext)) {
+        setSession((current) => current ? {
+          ...loaded,
+          messages: mergeMessages(current.messages, loaded.messages),
+        } : loaded)
+      }
       return isCurrent(arenaContext) ? loaded : null
     } catch (caught) {
       if (!isCurrent(arenaContext)) return null

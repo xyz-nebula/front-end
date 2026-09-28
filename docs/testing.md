@@ -7,13 +7,15 @@
 | `npm run typecheck` | Проверить TypeScript-проекты без сборки приложения |
 | `npm run lint` | Проверить исходники и тестовую инфраструктуру ESLint |
 | `npm run build` | Выполнить TypeScript build и собрать production bundle |
+| `npm run test:unit` | Проверить чистую логику сверки сообщений и транскриптов |
 | `npm test` | Запустить короткий Playwright smoke в mock-профиле |
 | `npm run test:e2e` | Та же browser-проверка |
 | `npm run visual:smoke` | Та же browser-проверка с диагностическими PNG |
-| `npm run check` | Последовательно выполнить lint, build и browser smoke |
+| `npm run check` | Последовательно выполнить lint, build, unit-тесты и browser smoke |
 
 `build` уже выполняет TypeScript-проверку, поэтому `check` не запускает
-`typecheck` отдельно. Browser smoke всегда идёт последним. Runner один раз
+`typecheck` отдельно. Unit-тесты используют встроенный Node test runner без
+дополнительной зависимости. Browser smoke всегда идёт последним. Runner один раз
 поднимает Vite на свободном loopback-порту, запускает Chrome и завершает оба
 процесса после прогона. Общий лимит runner — 110 секунд.
 
@@ -40,6 +42,9 @@ overflow, затем сохраняется PNG.
 конкурентные вкладки, повреждение storage, product tour state machine,
 audio-engine, polling и performance budgets. При изменении этих механизмов
 нужна отдельная целевая проверка в рамках соответствующей задачи.
+
+`tests/unit/messageReconciliation.test.mjs` проверяет разделение completed
+transcript, защиту от повторяющегося текста и монотонное объединение истории.
 
 ## Артефакты
 

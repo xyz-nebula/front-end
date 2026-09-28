@@ -4,6 +4,10 @@ import { useDomainServices } from '@/services/domainServices'
 import type { AudioClient } from '@/services/contracts/audioClient'
 import type { AudioCaptureMessage, AudioConnectionState, AudioEngineEvent, AudioTranscriptDrafts } from '@/types/audio'
 import type { MessageSpeaker, NegotiationMessage } from '@/types/negotiation'
+import {
+  createCompletedTranscriptDraft,
+  reconcileCompletedTranscript,
+} from '@/features/arena/messageReconciliation'
 import { AdaptiveVoiceLevel } from '@/features/arena/voiceLevel'
 
 const TYPING_INTERVAL_MS = 30
@@ -15,6 +19,7 @@ interface TranscriptStream {
   text: string
   phase: 'receiving' | 'finishing'
   committedMessageId?: string
+  completionId?: number
   timer?: number
 }
 
@@ -58,12 +63,14 @@ export function useArenaAudio(
   const playbackGenerationRef = useRef(0)
   const eventIdsRef = useRef(new Set<string>())
   const committedMessageIdsRef = useRef(new Set<string>())
+  const persistedMessageIdsRef = useRef(new Set<string>())
+  const claimedPersistedMessageIdsRef = useRef(new Set<string>())
   const contextGenerationRef = useRef(0)
+  const reconciliationGenerationRef = useRef(0)
   const connectAttemptRef = useRef(0)
   const busyRef = useRef(false)
   const onCommittedRef = useRef(onCommitted)
   const onReconnectRef = useRef(onReconnect)
-  const transcriptSyncRef = useRef({ user: 0, ai: 0 })
   const clearStreamsRef = useRef<() => void>(() => undefined)
 
   useEffect(() => { onCommittedRef.current = onCommitted }, [onCommitted])
@@ -239,12 +246,16 @@ export function useArenaAudio(
     busyRef.current = false
     eventIdsRef.current = new Set<string>()
     committedMessageIdsRef.current = new Set<string>()
+    persistedMessageIdsRef.current = new Set<string>()
+    claimedPersistedMessageIdsRef.current = new Set<string>()
     const client = createAudioClient()
     clientRef.current = client
     const playbackSources = sourceRefs.current
     const eventIds = eventIdsRef.current
     const committedMessageIds = committedMessageIdsRef.current
-    const transcriptSync = transcriptSyncRef.current
+    const persistedMessageIds = persistedMessageIdsRef.current
+    const claimedPersistedMessageIds = claimedPersistedMessageIdsRef.current
+    let nextCompletionId = 0
     const streams: Record<MessageSpeaker, TranscriptStream> = {
       user: { targetText: '', text: '', phase: 'receiving' },
       ai: { targetText: '', text: '', phase: 'receiving' },
@@ -295,15 +306,23 @@ export function useArenaAudio(
       }
       stream.timer = window.setTimeout(tick, 0)
     }
-    const updateStream = (speaker: MessageSpeaker, targetText: string, append: boolean) => {
+    const updatePartialStream = (speaker: MessageSpeaker, targetText: string) => {
       const stream = streams[speaker]
-      stream.targetText = append ? stream.targetText + targetText : targetText
+      stream.targetText = targetText
       if (!stream.targetText) return
       publishStream(speaker)
       scheduleTyping(speaker)
     }
-    const commitStream = (message: NegotiationMessage) => {
+    const beginCompletedStream = (speaker: MessageSpeaker, text: string, completionId: number) => {
+      const previous = streams[speaker]
+      if (previous.timer !== undefined) window.clearTimeout(previous.timer)
+      streams[speaker] = createCompletedTranscriptDraft(text, completionId)
+      publishStream(speaker)
+      scheduleTyping(speaker)
+    }
+    const commitStream = (message: NegotiationMessage, completionId?: number) => {
       const stream = streams[message.speaker]
+      if (completionId !== undefined && stream.completionId !== completionId) return
       stream.targetText = message.text
       stream.committedMessageId = message.id
       stream.phase = 'finishing'
@@ -325,30 +344,32 @@ export function useArenaAudio(
     })
     const unsubscribeEvent = client.subscribe((event) => {
       if (!isCurrent()) return
-      if (event.type === 'transcript_delta') {
-        updateStream(event.speaker, event.text, true)
-        const syncId = ++transcriptSync[event.speaker]
+      if (event.type === 'transcript_completed') {
+        const completionId = ++nextCompletionId
+        const baselineMessageIds = new Set(persistedMessageIds)
+        const reconciliationGeneration = reconciliationGenerationRef.current
+        beginCompletedStream(event.speaker, event.text, completionId)
         void (async () => {
-          for (const delay of [250, 500, 1_000, 1_500, 2_000]) {
-            await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
-            if (!isCurrent() || transcriptSync[event.speaker] !== syncId) return
-            const refreshed = await onReconnectRef.current()
-            if (!isCurrent() || transcriptSync[event.speaker] !== syncId) return
-            const expectedText = streams[event.speaker].targetText
-            const persisted = refreshed?.messages.find(
-              (message) => message.speaker === event.speaker && message.text === expectedText,
-            )
-            if (persisted) {
-              commitStream(persisted)
-              return
-            }
-          }
-          if (isCurrent() && transcriptSync[event.speaker] === syncId) {
+          const result = await reconcileCompletedTranscript({
+            speaker: event.speaker,
+            text: event.text,
+            baselineMessageIds,
+            claimedMessageIds: claimedPersistedMessageIds,
+            persistedMessageIds,
+            delays: [250, 500, 1_000, 1_500, 2_000],
+            wait: (delay) => new Promise<void>((resolve) => window.setTimeout(resolve, delay)),
+            refresh: () => onReconnectRef.current(),
+            isCurrent: () => isCurrent()
+              && reconciliationGenerationRef.current === reconciliationGeneration,
+          })
+          if (result.status === 'matched') {
+            commitStream(result.message, completionId)
+          } else if (result.status === 'not-found' && isCurrent()) {
             setError('Реплика получена, но пока не появилась в истории. Обновите диалог позже.')
           }
         })()
       } else if (event.type === 'transcript_partial') {
-        if (event.text) updateStream(event.speaker, event.text, false)
+        if (event.text) updatePartialStream(event.speaker, event.text)
       } else if (event.type === 'message_committed') {
         if (eventIds.has(event.eventId) || committedMessageIds.has(event.message.id)) return
         eventIds.add(event.eventId)
@@ -374,8 +395,7 @@ export function useArenaAudio(
     })
     return () => {
       contextGenerationRef.current += 1
-      transcriptSync.user += 1
-      transcriptSync.ai += 1
+      reconciliationGenerationRef.current += 1
       connectAttemptRef.current += 1
       busyRef.current = false
       unsubscribeEvent()
@@ -387,6 +407,8 @@ export function useArenaAudio(
       stopCapture()
       eventIds.clear()
       committedMessageIds.clear()
+      persistedMessageIds.clear()
+      claimedPersistedMessageIds.clear()
       for (const speaker of ['user', 'ai'] as const) {
         const timer = streams[speaker].timer
         if (timer !== undefined) window.clearTimeout(timer)
@@ -439,11 +461,15 @@ export function useArenaAudio(
       setError('Звук недоступен в этом браузере. Текст ответа будет доступен в диалоге.')
     }
     busyRef.current = true
+    reconciliationGenerationRef.current += 1
     clearStreamsRef.current()
     eventIdsRef.current.clear()
+    claimedPersistedMessageIdsRef.current.clear()
     try {
-      await onReconnectRef.current()
+      const synced = await onReconnectRef.current()
       if (!isCurrent()) return
+      persistedMessageIdsRef.current.clear()
+      synced?.messages.forEach((message) => persistedMessageIdsRef.current.add(message.id))
       await negotiationClient.activateSession(sessionId)
       if (!isCurrent()) return
       const ticket = client.requiresTicket
@@ -467,6 +493,7 @@ export function useArenaAudio(
 
   const stop = useCallback(async () => {
     connectAttemptRef.current += 1
+    reconciliationGenerationRef.current += 1
     busyRef.current = false
     const client = clientRef.current
     let transportFailed = false

@@ -79,7 +79,7 @@ export interface AudioFormatDto {
 }
 
 export type RemoteAudioEngineEvent =
-  | { type: 'transcript_delta'; speaker: MessageSpeaker; text: string }
+  | { type: 'transcript_completed'; speaker: MessageSpeaker; text: string }
   | { type: 'audio_frame'; sequence: number; timestamp: number; format: AudioFormat; payload: string }
   | { type: 'error'; code: string; message: string }
   | {
@@ -413,7 +413,7 @@ export function parseAudioEngineEvent(value: unknown): RemoteAudioEngineEvent {
   if (type === 'transcript') {
     const role = oneOf(dto.role, ['user', 'assistant'], 'audioEvent.role')
     return {
-      type: 'transcript_delta',
+      type: 'transcript_completed',
       speaker: role === 'assistant' ? 'ai' : 'user',
       text: nonEmptyChunk(dto.text, 'audioEvent.text'),
     }

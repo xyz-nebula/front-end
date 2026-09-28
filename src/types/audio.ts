@@ -51,7 +51,7 @@ export interface AudioTranscriptDrafts {
 
 export type AudioEngineEvent =
   | {
-      type: 'transcript_delta'
+      type: 'transcript_completed'
       speaker: MessageSpeaker
       text: string
     }

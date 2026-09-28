@@ -77,25 +77,25 @@ same-origin backend `/api/v1/*`: токен AI-сервиса и заголов�
 `AudioEngineClient` открывает `/v1/audio-stream?token=...`, отправляет control и
 base64 PCM `audio` messages, принимает `audio_frame`, `transcript`, `error` и
 `auth_error`. Захват формирует mono PCM s16le с частотой 24 kHz; входящие PCM-
-кадры воспроизводятся Web Audio.
+кадры воспроизводятся Web Audio. `transcript.text` является полным завершённым
+текстом одной реплики. Frontend временно показывает его как отдельный snapshot,
+а затем сопоставляет с новым сообщением backend по роли, тексту и `message.id`.
 
-## Известные расхождения
+## Проверенные контракты и ограничения
 
-До исправления этих пунктов живой `real/real/real` нельзя считать подтверждённым
-сквозным режимом:
+Развёрнутый backend OpenAPI проверен по `/api/openapi.json`: используемые
+frontend пути `/v1/chats/*`, create payload с `case_uuid`, `preparations` и
+`selected_role`, case response и message response соответствуют runtime parser.
 
-- backend ветки `docker/dev` публикует `/v1/chat/*` и принимает при создании
-  только `name`, тогда как frontend использует `/v1/chats/*` и дополнительные
-  поля;
-- ожидаемая frontend форма case response отличается от текущей спецификации
-  сервиса, в том числе полями подготовки ролей;
-- целевой frontend create-chat contract содержит `case_uuid`, `preparations` и
-  `selected_role`, но это нужно сверять с OpenAPI развёрнутого backend;
-- AsyncAPI описывает `transcript.text` как завершённый текст, а frontend
-  преобразует его в `transcript_delta` и накапливает как дельту;
-- пока backend не сохраняет пользовательскую подготовку, серверный
-  `plan_vs_reality` ожидаемо равен `null`; frontend не подмешивает вместо него
-  локальный mock-анализ.
+- WebSocket audio-engine не принимает chat UUID и разрешает чат через
+  `/v1/chats/active`. Параллельные голосовые подключения одного аккаунта в
+  разных вкладках могут переключить глобальный active chat; устранение требует
+  согласованного изменения межсервисного контракта.
+- `transcript` не содержит backend `message.id`, поэтому frontend перечитывает
+  историю и принимает только новое, ещё не сопоставленное сообщение. Backend
+  остаётся источником истины для сохранённой истории.
+- Real negotiation поддерживает только voice; текстовый ход отсутствует.
+- Живой E2E frontend + backend + audio-engine остаётся ручной проверкой стенда.
 
 Изменение этих контрактов является отдельной межсервисной задачей. Нельзя
 «исправлять» документацию копированием желаемой схемы в этот репозиторий:
