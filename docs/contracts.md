@@ -7,6 +7,8 @@ Frontend не хранит копии OpenAPI или AsyncAPI. Канониче�
 
 - [backend, ветка `docker/dev`](https://github.com/xyz-nebula/backend/tree/docker/dev) —
   OpenAPI генерируется приложением и публикуется его `/openapi.json`;
+- [AI evaluation response](https://github.com/xyz-nebula/ai-system/blob/dev/src/arena_ai/v2/evaluation_response.py) —
+  публичная wire-модель результата версии `2.0.0-rc.1`;
 - [audio-engine OpenAPI](https://github.com/xyz-nebula/audio-engine/blob/dev/audio-engine-openapi.yaml)
   и [AsyncAPI](https://github.com/xyz-nebula/audio-engine/blob/dev/audio-engine-asyncapi.yaml)
   из рабочей ветки `dev`.
@@ -42,9 +44,34 @@ TOTP через `/v1/auth/*`.
 | `GET` | `/v1/chats/` | Получить идентификаторы чатов |
 | `GET` | `/v1/chats/{uuid}` | Загрузить статус, кейс и сообщения |
 | `PUT` | `/v1/chats/active` | Сделать чат активным перед voice-подключением |
+| `POST` | `/v1/chats/{uuid}/evaluate` | Запустить серверную оценку без request body |
+| `GET` | `/v1/chats/{uuid}/result` | Получить состояние задания и готовый результат |
 
-Текстовый ход и audio ticket в real adapter не реализованы. `finishSession` и
-`getResult` не вызывают backend и возвращают локальный демонстрационный разбор.
+Текстовый ход и audio ticket в real adapter не реализованы. `finishSession`
+запускает evaluation, а `getResult` читает существующее задание: ручная проверка
+после ошибки или долгого ожидания не делает повторный `POST /evaluate`.
+
+Backend возвращает для evaluation статусы `pending`, `processing`, `done` и
+`failed`. Ответ чтения имеет обёртку `{ status, result, error }`: `result`
+обязателен только для `done`, а для незавершённых состояний и ошибки задания
+frontend использует стабильные пользовательские сообщения. Конфликт
+`already_evaluating` считается восстановлением уже запущенного задания;
+`evaluation_not_found` — отсутствующим результатом, а не бесконечной обработкой.
+
+В `done` backend передаёт публичный AI-контракт `EvaluationResponse`
+`2.0.0-rc.1`. Frontend строго проверяет версию, все outcome/judge/trainer slots,
+enum и error codes, три уникальные коллегии судей, а также индексы, авторство и
+цитаты evidence относительно транскрипта из `GET /v1/chats/{uuid}`. Только после
+этого wire DTO преобразуется в доменную модель. Несовместимый payload становится
+ошибкой `invalid-response` и не отображается частично. Browser использует только
+same-origin backend `/api/v1/*`: токен AI-сервиса и заголовок версии контракта не
+являются ответственностью frontend.
+
+Статусы чата `ongoing`, `evaluating`, `evaluated`, а также legacy `victory` и
+`defeat` преобразуются соответственно в frontend-состояния `active`,
+`finishing` и `finished`. `selected_role` и `preparations` разбираются как часть
+публичного chat response; скрытая подготовка ролей из case response в UI не
+попадает.
 
 `AudioEngineClient` открывает `/v1/audio-stream?token=...`, отправляет control и
 base64 PCM `audio` messages, принимает `audio_frame`, `transcript`, `error` и
@@ -61,12 +88,13 @@ base64 PCM `audio` messages, принимает `audio_frame`, `transcript`, `er
   поля;
 - ожидаемая frontend форма case response отличается от текущей спецификации
   сервиса, в том числе полями подготовки ролей;
-- выбранная пользователем роль хранится локально, но не входит в create-chat
-  contract;
+- целевой frontend create-chat contract содержит `case_uuid`, `preparations` и
+  `selected_role`, но это нужно сверять с OpenAPI развёрнутого backend;
 - AsyncAPI описывает `transcript.text` как завершённый текст, а frontend
   преобразует его в `transcript_delta` и накапливает как дельту;
-- завершение backend-чата и получение серверного анализа отсутствуют во
-  frontend real adapter.
+- пока backend не сохраняет пользовательскую подготовку, серверный
+  `plan_vs_reality` ожидаемо равен `null`; frontend не подмешивает вместо него
+  локальный mock-анализ.
 
 Изменение этих контрактов является отдельной межсервисной задачей. Нельзя
 «исправлять» документацию копированием желаемой схемы в этот репозиторий:
