@@ -29,7 +29,8 @@ npm test -- --grep desktop
 
 В `tests/visual/smoke.spec.ts` находятся ровно два сценария: desktop
 `1440×900` и mobile `390×844`. Каждый сценарий открывает landing, login,
-register, activation, 404, home, preparation, текстовую arena и готовый result.
+register, activation, 404, home, окно выбора роли до и после выбора,
+preparation, текстовую arena и готовый result.
 Для каждого экрана проверяются основной UI и отсутствие горизонтального
 overflow, затем сохраняется PNG.
 
@@ -48,8 +49,8 @@ transcript, защиту от повторяющегося текста и мо�
 
 ## Артефакты
 
-`artifacts/visual-smoke/` содержит 18 временных PNG: по одному desktop и mobile
-кадру для каждого из девяти экранов. `test-results/` содержит диагностические
+`artifacts/visual-smoke/` содержит 22 временных PNG: по одному desktop и mobile
+кадру для каждого из одиннадцати экранов и состояний. `test-results/` содержит диагностические
 артефакты неудачных прогонов. Эти каталоги не коммитятся.
 
 После UI, CSS или адаптивных изменений запустите `npm run visual:smoke` и

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation } from 'react-router-dom'
 
-import profileArtwork from '@/assets/home/profile-kirill.webp'
+import profileArtwork from '@/assets/home/profile.webp'
 import { useAuth } from '@/auth/useAuth'
 import { TotpModal } from '@/components/auth/TotpModal'
 import { useProductTour } from '@/features/product-tour/useProductTour'

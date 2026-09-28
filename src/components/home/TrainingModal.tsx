@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import profileArtwork from '@/assets/home/profile-kirill.webp'
-import directorArtwork from '@/assets/home/role-director.webp'
+import opponentArtwork from '@/assets/home/opponent.webp'
+import profileArtwork from '@/assets/home/profile.webp'
 import { useDomainServices } from '@/services/domainServices'
 import { useProductTour } from '@/features/product-tour/useProductTour'
 import type { TrainingCase } from '@/types/case'
@@ -164,13 +164,13 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
             <h3>Выберите свою роль</h3>
             <p>Вторая роль автоматически станет AI-оппонентом.</p>
             <div className="home-case-modal__roles" role="radiogroup" aria-label="Выберите свою роль" data-tour-id="role-selector">
-              {item.roles.map((title, index) => <label className={`home-case-modal__role ${role === index ? 'is-selected' : role !== null ? 'is-opponent' : ''}`} key={title}>
+              {item.roles.map((title, index) => <label className={`home-case-modal__role ${role !== null ? 'has-avatar' : ''} ${role === index ? 'is-selected' : role !== null ? 'is-opponent' : ''}`} key={title}>
                 <input type="radio" name="case-role" checked={role === index} onChange={() => {
                   const roleIndex = index as 0 | 1
                   setRole(roleIndex)
                   sendTourEvent({ type: 'role-selected', roleIndex })
                 }} />
-                <img src={/руководител|директор/i.test(title) ? directorArtwork : profileArtwork} alt="" width={400} height={400} loading="lazy" decoding="async" />
+                {role !== null && <img src={role === index ? profileArtwork : opponentArtwork} alt="" width={400} height={400} loading="lazy" decoding="async" />}
                 <span className="home-case-modal__role-copy">{role !== null && <span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span>}<strong>{title}</strong><small>{item.roleSummaries[index]}</small></span>
                 <span className="home-case-modal__radio-mark" aria-hidden="true">{role === index ? '✓' : ''}</span>
               </label>)}

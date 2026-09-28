@@ -1,7 +1,7 @@
 import type { RefObject } from 'react'
 
-import profileArtwork from '@/assets/home/profile-kirill.webp'
-import directorArtwork from '@/assets/home/role-director.webp'
+import opponentArtwork from '@/assets/home/opponent.webp'
+import profileArtwork from '@/assets/home/profile.webp'
 import { ProductHeader } from '@/components/chrome/ProductHeader'
 import type { AudioConnectionState } from '@/types/audio'
 import type { NegotiationMode } from '@/types/negotiation'
@@ -42,7 +42,7 @@ export function ArenaHeader({ title, userRole, opponentRole, remainingSeconds, t
       <section className="duel-shell duel-participants" aria-label="Участники и время поединка">
         <div className="duel-participants__person duel-participants__person--user"><img src={profileArtwork} alt="" width={400} height={400} decoding="async" /><div><strong>{userRole}</strong><span>Вы</span></div></div>
         <div className={`duel-participants__center${remainingSeconds <= 60 && timerStarted ? ' duel-participants__center--urgent' : ''}`}><time aria-label="Оставшееся время">{formatRemainingTime(remainingSeconds)}</time><strong>{status}</strong><span>{timerExpired ? 'Завершаем переговоры и готовим разбор' : !timerStarted ? 'Таймер начнётся после первой реплики' : mode === 'voice' ? audioState === 'connected' ? isDemoVoice ? 'Демо-реплики появятся автоматически' : 'Говорите — система завершит реплику по паузе' : 'Подключите голосовой разговор' : isSending ? 'Ожидайте ответ оппонента' : 'Напишите реплику ниже'}</span></div>
-        <div className="duel-participants__person duel-participants__person--ai"><img src={directorArtwork} alt="" width={400} height={400} decoding="async" /><div><strong>{opponentRole}</strong><span>AI-оппонент</span></div></div>
+        <div className="duel-participants__person duel-participants__person--ai"><img src={opponentArtwork} alt="" width={400} height={400} decoding="async" /><div><strong>{opponentRole}</strong><span>AI-оппонент</span></div></div>
       </section>
     </>
   )

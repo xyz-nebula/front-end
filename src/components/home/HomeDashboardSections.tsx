@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 
 import heroArtwork from '@/assets/home/hero-negotiation.webp'
-import profileArtwork from '@/assets/home/profile-kirill.webp'
+import profileArtwork from '@/assets/home/profile.webp'
 import { CaseCard } from '@/components/home/CaseCard'
 import { caseArtwork } from '@/mocks/caseArtwork'
 import type { TrainingCase } from '@/types/case'

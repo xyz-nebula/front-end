@@ -56,6 +56,19 @@ for (const viewport of viewports) {
     await expect(page.locator('.home-case-card')).toHaveCount(6)
     await captureScreen(page, 'home', viewport.name)
 
+    await page.locator('.home-case-card').first().click()
+    const roleCards = page.locator('.home-case-modal__role')
+    await expect(roleCards).toHaveCount(2)
+    await expect(roleCards.locator('img')).toHaveCount(0)
+    await roleCards.first().scrollIntoViewIfNeeded()
+    await captureScreen(page, 'role-selection-empty', viewport.name)
+
+    await roleCards.first().getByRole('radio').check()
+    await expect(roleCards.locator('img')).toHaveCount(2)
+    await expect(roleCards.first().locator('img')).toHaveAttribute('src', /profile\.webp$/)
+    await expect(roleCards.nth(1).locator('img')).toHaveAttribute('src', /opponent\.webp$/)
+    await captureScreen(page, 'role-selection-selected', viewport.name)
+
     await page.goto('/cases/salary-review/preparation?role=0&mode=text&section=analysis')
     await expect(page.getByRole('heading', { level: 1, name: 'Подготовка к переговорам' })).toBeVisible()
     await captureScreen(page, 'preparation', viewport.name)
@@ -66,6 +79,13 @@ for (const viewport of viewports) {
     await expect(page.getByText('Таймер начнётся после первой реплики')).toBeVisible()
     await expect(page.getByLabel('Ваша реплика')).toBeVisible()
     await captureScreen(page, 'arena', viewport.name)
+
+    await page.getByLabel('Ваша реплика').fill('Проверяем аватары участников.')
+    await page.getByLabel('Отправить сообщение').click()
+    const messages = page.locator('.arena-message')
+    await expect(messages).toHaveCount(2)
+    await expect(messages.filter({ has: page.locator('.arena-message__avatar[src$="profile.webp"]') })).toHaveCount(1)
+    await expect(messages.filter({ has: page.locator('.arena-message__avatar[src$="opponent.webp"]') })).toHaveCount(1)
 
     await page.goto(`/result/${state.finishedSessionId}`)
     await expect(page.locator('.result-intro h1')).toHaveText('Разбор поединка')
