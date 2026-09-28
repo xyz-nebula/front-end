@@ -24,58 +24,97 @@ export interface NegotiationSession {
   messages: NegotiationMessage[]
 }
 
-export interface NegotiationResult {
-  sessionId: string
-  outcome: 'victory' | 'defeat'
-  score: number
-  summary: string
-  strengths: string[]
-  improvements: string[]
-  recommendations: string[]
-  analysis?: NegotiationResultAnalysis
-}
-
 export type NegotiationVerdict = 'user' | 'opponent'
 export type NegotiationPlanStatus = 'followed' | 'adapted' | 'unused'
+export type NegotiationOutcomeKind =
+  | 'agreement'
+  | 'partial-agreement'
+  | 'deferred'
+  | 'no-agreement'
+  | 'not-assessable'
+export type NegotiationJudgeCollege = 'hiring' | 'negotiation' | 'ownership'
+export type NegotiationGoalStatus = 'achieved' | 'partially-achieved' | 'not-achieved' | 'not-assessable'
 
-export interface NegotiationAgreement {
-  title: string
-  points: string[]
-  tradeoff: string
-  nextStep: string
+export interface NegotiationEvidence {
+  messageIndex: number
+  isAi: boolean
+  quote: string
 }
 
-export interface NegotiationJudgeReview {
-  name: string
-  question: string
+export type NegotiationOutcome =
+  | {
+      status: 'ready'
+      kind: NegotiationOutcomeKind
+      summary: string
+      agreedTerms: string[]
+      openPoints: string[]
+      nextStep: string | null
+      evidence: NegotiationEvidence[]
+    }
+  | {
+      status: 'failed'
+      reason: 'analysis-unavailable' | 'invalid-analysis'
+    }
+
+export interface NegotiationJudgeVerdict {
+  choice: NegotiationVerdict
   criterion: string
-  verdict: NegotiationVerdict
-  quote: string
+  evidence: NegotiationEvidence
   observation: string
   effect: string
   comparison: string
 }
 
-export interface NegotiationCoachEpisode {
-  quote: string
+export type NegotiationJudge =
+  | { college: NegotiationJudgeCollege; status: 'ready'; verdict: NegotiationJudgeVerdict }
+  | {
+      college: NegotiationJudgeCollege
+      status: 'failed'
+      reason: 'unavailable' | 'invalid-output' | 'retrieval-unavailable' | 'invalid-retrieval' | 'insufficient-evidence'
+    }
+
+export interface NegotiationCoachingPoint {
+  evidence: NegotiationEvidence
   action: string
-  change: string
+  situationChange: string
   consequence: string
 }
 
 export interface NegotiationPlanComparison {
-  plan: string
-  reality: string
+  preparationText: string
   status: NegotiationPlanStatus
+  evidence: NegotiationEvidence | null
+  observation: string
 }
 
-export interface NegotiationResultAnalysis {
-  agreement: NegotiationAgreement
-  judges: NegotiationJudgeReview[]
-  coachSummary: string
-  worked: NegotiationCoachEpisode[]
-  hindered: NegotiationCoachEpisode[]
-  planComparison: NegotiationPlanComparison[]
+export interface NegotiationGoalAssessment {
+  status: NegotiationGoalStatus
+  goalText: string | null
+  explanation: string
+  evidence: NegotiationEvidence[]
+}
+
+export interface NegotiationTrainerFeedback {
+  summary: string
+  strengths: NegotiationCoachingPoint[]
+  mistakes: NegotiationCoachingPoint[]
+  missedOpportunities: NegotiationCoachingPoint[]
+  nextTry: string[]
+  planVsReality: { summary: string; items: NegotiationPlanComparison[] } | null
+  goalAssessment: NegotiationGoalAssessment
+}
+
+export type NegotiationTrainer =
+  | { status: 'ready'; feedback: NegotiationTrainerFeedback }
+  | { status: 'failed'; reason: 'unavailable' | 'invalid-output' | 'insufficient-evidence' }
+
+export interface NegotiationResult {
+  sessionId: string
+  source: 'mock' | 'server'
+  contractVersion?: '2.0.0-rc.1'
+  outcome: NegotiationOutcome
+  judges: [NegotiationJudge, NegotiationJudge, NegotiationJudge]
+  trainer: NegotiationTrainer
 }
 
 export interface NegotiationSessionSummary {

@@ -2,9 +2,18 @@ import type { AudioFormat } from '@/types/audio'
 import { ServiceError } from '@/types/api'
 import type {
   MessageSpeaker,
+  NegotiationCoachingPoint,
+  NegotiationEvidence,
+  NegotiationGoalStatus,
+  NegotiationJudge,
+  NegotiationOutcome,
+  NegotiationOutcomeKind,
+  NegotiationPlanStatus,
+  NegotiationResult,
   NegotiationMessage,
   NegotiationResultState,
   NegotiationSession,
+  NegotiationTrainer,
 } from '@/types/negotiation'
 
 export type ChatStatusDto = 'ongoing' | 'evaluating' | 'evaluated' | 'victory' | 'defeat'
@@ -730,7 +739,7 @@ export function parseEvaluateTrigger(value: unknown): ParsedEvaluateTrigger {
 export function parseEvaluationResult(
   value: unknown,
   session: NegotiationSession,
-): NegotiationResultState<EvaluationResponseDto> {
+): NegotiationResultState {
   const dto = exactRecord(value, ['status', 'result', 'error'], 'evaluationResult')
   const status = oneOf(dto.status, evaluationJobStatuses, 'evaluationResult.status')
   if (status === 'pending' || status === 'processing') {
@@ -741,12 +750,134 @@ export function parseEvaluationResult(
     if (dto.error !== null) return invalidResponse('evaluationResult.error')
     return {
       status: 'ready',
-      result: parseEvaluationResponse(dto.result, 'evaluationResult.result', session),
+      result: toNegotiationResult(
+        parseEvaluationResponse(dto.result, 'evaluationResult.result', session),
+        session.id,
+      ),
     }
   }
   if (dto.result !== null) return invalidResponse('evaluationResult.result')
   nonEmptyString(dto.error, 'evaluationResult.error')
   return { status: 'failed', message: 'Не удалось подготовить разбор переговоров.' }
+}
+
+function toEvidence(evidence: EvaluationEvidenceDto): NegotiationEvidence {
+  return {
+    messageIndex: evidence.message_index,
+    isAi: evidence.is_ai,
+    quote: evidence.quote,
+  }
+}
+
+function toOutcome(slot: EvaluationOutcomeSlotDto): NegotiationOutcome {
+  if (slot.status === 'failed') {
+    return {
+      status: 'failed',
+      reason: slot.error_code === 'outcome_analysis_unavailable'
+        ? 'analysis-unavailable'
+        : 'invalid-analysis',
+    }
+  }
+  if (slot.assessment === null) return invalidResponse('evaluationResult.result.outcome.assessment')
+  return {
+    status: 'ready',
+    kind: slot.assessment.kind.replaceAll('_', '-') as NegotiationOutcomeKind,
+    summary: slot.assessment.summary,
+    agreedTerms: slot.assessment.agreed_terms,
+    openPoints: slot.assessment.open_points,
+    nextStep: slot.assessment.next_step,
+    evidence: slot.assessment.evidence.map(toEvidence),
+  }
+}
+
+function toJudge(slot: EvaluationJudgeSlotDto): NegotiationJudge {
+  if (slot.status === 'failed') {
+    const reasons: Record<EvaluationJudgeErrorCodeDto, Extract<NegotiationJudge, { status: 'failed' }>['reason']> = {
+      judge_unavailable: 'unavailable',
+      invalid_judge_output: 'invalid-output',
+      judge_retrieval_unavailable: 'retrieval-unavailable',
+      invalid_judge_retrieval: 'invalid-retrieval',
+      insufficient_evidence: 'insufficient-evidence',
+    }
+    if (slot.error_code === null) return invalidResponse('evaluationResult.result.judge_verdicts.error_code')
+    return { college: slot.college, status: 'failed', reason: reasons[slot.error_code] }
+  }
+  if (slot.verdict === null) return invalidResponse('evaluationResult.result.judge_verdicts.verdict')
+  return {
+    college: slot.college,
+    status: 'ready',
+    verdict: {
+      choice: slot.verdict.choice === 'player' ? 'user' : 'opponent',
+      criterion: slot.verdict.decisive_criterion,
+      evidence: toEvidence(slot.verdict.evidence),
+      observation: slot.verdict.observation,
+      effect: slot.verdict.effect,
+      comparison: slot.verdict.comparison,
+    },
+  }
+}
+
+function toCoachingPoint(point: EvaluationCoachingPointDto): NegotiationCoachingPoint {
+  return {
+    evidence: toEvidence(point.evidence),
+    action: point.action,
+    situationChange: point.situation_change,
+    consequence: point.consequence,
+  }
+}
+
+function toTrainer(slot: EvaluationTrainerSlotDto): NegotiationTrainer {
+  if (slot.status === 'failed') {
+    const reasons: Record<EvaluationTrainerErrorCodeDto, Extract<NegotiationTrainer, { status: 'failed' }>['reason']> = {
+      trainer_unavailable: 'unavailable',
+      invalid_trainer_output: 'invalid-output',
+      insufficient_evidence: 'insufficient-evidence',
+    }
+    if (slot.error_code === null) return invalidResponse('evaluationResult.result.trainer_feedback.error_code')
+    return { status: 'failed', reason: reasons[slot.error_code] }
+  }
+  const feedback = slot.feedback
+  if (feedback === null) return invalidResponse('evaluationResult.result.trainer_feedback.feedback')
+  return {
+    status: 'ready',
+    feedback: {
+      summary: feedback.summary,
+      strengths: feedback.strengths.map(toCoachingPoint),
+      mistakes: feedback.mistakes.map(toCoachingPoint),
+      missedOpportunities: feedback.missed_opportunities.map(toCoachingPoint),
+      nextTry: feedback.next_try,
+      planVsReality: feedback.plan_vs_reality === null ? null : {
+        summary: feedback.plan_vs_reality.summary,
+        items: feedback.plan_vs_reality.items.map((item) => ({
+          preparationText: item.preparation_text,
+          status: (item.status === 'not_observed' ? 'unused' : item.status) as NegotiationPlanStatus,
+          evidence: item.evidence === null ? null : toEvidence(item.evidence),
+          observation: item.observation,
+        })),
+      },
+      goalAssessment: {
+        status: feedback.goal_assessment.status.replaceAll('_', '-') as NegotiationGoalStatus,
+        goalText: feedback.goal_assessment.goal_text,
+        explanation: feedback.goal_assessment.explanation,
+        evidence: feedback.goal_assessment.evidence.map(toEvidence),
+      },
+    },
+  }
+}
+
+function toNegotiationResult(response: EvaluationResponseDto, sessionId: string): NegotiationResult {
+  return {
+    sessionId,
+    source: 'server',
+    contractVersion: response.contract_version,
+    outcome: toOutcome(response.outcome),
+    judges: [
+      toJudge(response.judge_verdicts[0]),
+      toJudge(response.judge_verdicts[1]),
+      toJudge(response.judge_verdicts[2]),
+    ],
+    trainer: toTrainer(response.trainer_feedback),
+  }
 }
 
 export function parseBackendError(value: unknown, status: number): ServiceError {

@@ -60,30 +60,12 @@ function appendMessage(
 
 function createResult(session: MockSessionRecord): NegotiationResult {
   const userTurns = session.messages.filter((message) => message.speaker === 'user').length
-  const score = Math.min(94, 68 + userTurns * 6 + (session.mode === 'voice' ? 2 : 0))
-  const outcome = score >= 75 ? 'victory' : 'defeat'
+  const outcome = userTurns >= 2 ? 'agreement' : 'no-agreement'
   const publicSession = toSession(session)
   return {
     sessionId: session.id,
-    outcome,
-    score,
-    summary: score >= 75
-      ? 'Вы удерживали фокус на интересах сторон и завершили разговор конкретными договорённостями.'
-      : 'Вы обозначили позицию, но договорённости стоит подкреплять вопросами и конкретными условиями.',
-    strengths: [
-      'Спокойная и последовательная аргументация',
-      'Фокус на решении вместо личного противостояния',
-    ],
-    improvements: [
-      'Чаще уточняйте мотивы и ограничения оппонента',
-      'Фиксируйте измеримые следующие шаги',
-    ],
-    recommendations: [
-      'Перед следующим раундом подготовьте три открытых вопроса',
-      'Сформулируйте желаемый результат и приемлемую альтернативу',
-      'Закрепляйте уступки встречными обязательствами и сроками',
-    ],
-    analysis: createMockResultAnalysis(publicSession, outcome),
+    source: 'mock',
+    ...createMockResultAnalysis(publicSession, outcome),
   }
 }
 

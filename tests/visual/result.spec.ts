@@ -55,8 +55,7 @@ test('result polls processing, shows analysis and repeats case as a new session'
   await page.getByRole('button', { name: 'Завершить' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Завершить' }).click()
   await expect(page).toHaveURL(/\/result\/[0-9a-f-]+$/)
-  await expect(page.getByRole('heading', { name: 'Решение требует доработки' })).toBeVisible()
-  await expect(page.getByText('Нужна ещё попытка')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Договорённость не достигнута' })).toBeVisible()
 })
 
 test('result error keeps retry and home actions available', async ({ page }) => {

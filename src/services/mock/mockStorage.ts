@@ -1,7 +1,7 @@
 import type { NegotiationMessage, NegotiationMode, NegotiationResult, NegotiationStatus } from '@/types/negotiation'
 import { ServiceError } from '@/types/api'
 
-export const MOCK_DATA_STORAGE_KEY = 'arena.mock.data.v1'
+export const MOCK_DATA_STORAGE_KEY = 'arena.mock.data.v2'
 const MOCK_LEASE_STORAGE_KEY = `${MOCK_DATA_STORAGE_KEY}.lease`
 const MOCK_LOCK_NAME = `${MOCK_DATA_STORAGE_KEY}.mutation`
 const LEASE_TTL_MS = 6_000
@@ -53,7 +53,7 @@ export interface MockAudioTicketRecord {
 }
 
 export interface MockData {
-  version: 1
+  version: 2
   users: MockUserRecord[]
   sessions: MockSessionRecord[]
   results: MockResultRecord[]
@@ -67,7 +67,7 @@ interface StorageLike {
 }
 
 function emptyData(): MockData {
-  return { version: 1, users: [], sessions: [], results: [], audioTickets: [] }
+  return { version: 2, users: [], sessions: [], results: [], audioTickets: [] }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -82,46 +82,54 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isString)
 }
 
-function isAgreement(value: unknown): boolean {
+function isEvidence(value: unknown): boolean {
   return isRecord(value)
-    && isString(value.title)
-    && isStringArray(value.points)
-    && isString(value.tradeoff)
-    && isString(value.nextStep)
+    && Number.isSafeInteger(value.messageIndex)
+    && typeof value.isAi === 'boolean'
+    && isString(value.quote)
 }
 
-function isJudgeReview(value: unknown): boolean {
+function isCoachingPoint(value: unknown): boolean {
   return isRecord(value)
-    && ['name', 'question', 'criterion', 'quote', 'observation', 'effect', 'comparison'].every(
-      (key) => isString(value[key]),
-    )
-    && (value.verdict === 'user' || value.verdict === 'opponent')
+    && isEvidence(value.evidence)
+    && ['action', 'situationChange', 'consequence'].every((key) => isString(value[key]))
 }
 
-function isCoachEpisode(value: unknown): boolean {
-  return isRecord(value)
-    && ['quote', 'action', 'change', 'consequence'].every((key) => isString(value[key]))
+function isOutcome(value: unknown): boolean {
+  if (!isRecord(value) || (value.status !== 'ready' && value.status !== 'failed')) return false
+  if (value.status === 'failed') return value.reason === 'analysis-unavailable' || value.reason === 'invalid-analysis'
+  return ['agreement', 'partial-agreement', 'deferred', 'no-agreement', 'not-assessable'].includes(String(value.kind))
+    && isString(value.summary)
+    && isStringArray(value.agreedTerms)
+    && isStringArray(value.openPoints)
+    && (value.nextStep === null || isString(value.nextStep))
+    && Array.isArray(value.evidence)
+    && value.evidence.every(isEvidence)
 }
 
-function isPlanComparison(value: unknown): boolean {
-  return isRecord(value)
-    && isString(value.plan)
-    && isString(value.reality)
-    && (value.status === 'followed' || value.status === 'adapted' || value.status === 'unused')
+function isJudge(value: unknown): boolean {
+  if (!isRecord(value) || !['hiring', 'negotiation', 'ownership'].includes(String(value.college))) return false
+  if (value.status === 'failed') return isString(value.reason)
+  const verdict = value.verdict
+  return value.status === 'ready'
+    && isRecord(verdict)
+    && (verdict.choice === 'user' || verdict.choice === 'opponent')
+    && ['criterion', 'observation', 'effect', 'comparison'].every((key) => isString(verdict[key]))
+    && isEvidence(verdict.evidence)
 }
 
-function isResultAnalysis(value: unknown): boolean {
-  return isRecord(value)
-    && isAgreement(value.agreement)
-    && Array.isArray(value.judges)
-    && value.judges.every(isJudgeReview)
-    && isString(value.coachSummary)
-    && Array.isArray(value.worked)
-    && value.worked.every(isCoachEpisode)
-    && Array.isArray(value.hindered)
-    && value.hindered.every(isCoachEpisode)
-    && Array.isArray(value.planComparison)
-    && value.planComparison.every(isPlanComparison)
+function isTrainer(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  if (value.status === 'failed') return isString(value.reason)
+  if (value.status !== 'ready' || !isRecord(value.feedback)) return false
+  const feedback = value.feedback
+  return isString(feedback.summary)
+    && ['strengths', 'mistakes', 'missedOpportunities'].every((key) => (
+      Array.isArray(feedback[key]) && feedback[key].every(isCoachingPoint)
+    ))
+    && isStringArray(feedback.nextTry)
+    && isRecord(feedback.goalAssessment)
+    && isString(feedback.goalAssessment.explanation)
 }
 
 function isMessage(value: unknown): value is NegotiationMessage {
@@ -150,14 +158,12 @@ function isTextTurnRecord(value: unknown): value is MockSessionRecord['textTurns
 function isNegotiationResult(value: unknown): value is NegotiationResult {
   return isRecord(value)
     && isString(value.sessionId)
-    && (value.outcome === 'victory' || value.outcome === 'defeat')
-    && typeof value.score === 'number'
-    && Number.isFinite(value.score)
-    && isString(value.summary)
-    && isStringArray(value.strengths)
-    && isStringArray(value.improvements)
-    && isStringArray(value.recommendations)
-    && (value.analysis === undefined || isResultAnalysis(value.analysis))
+    && (value.source === 'mock' || value.source === 'server')
+    && (value.contractVersion === undefined || value.contractVersion === '2.0.0-rc.1')
+    && isOutcome(value.outcome)
+    && Array.isArray(value.judges)
+    && value.judges.every(isJudge)
+    && isTrainer(value.trainer)
 }
 
 function isUser(value: unknown): value is MockUserRecord {
@@ -207,7 +213,7 @@ function parseData(serialized: string | null): MockData | null {
   if (!serialized) return emptyData()
   try {
     const value: unknown = JSON.parse(serialized)
-    if (!isRecord(value) || value.version !== 1) return null
+    if (!isRecord(value) || value.version !== 2) return null
     if (!Array.isArray(value.users) || !value.users.every(isUser)) return null
     if (!Array.isArray(value.sessions) || !value.sessions.every(isSession)) return null
     if (!Array.isArray(value.results) || !value.results.every(isResult)) return null

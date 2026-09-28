@@ -153,7 +153,7 @@ test('mock result processing becomes stable and finish remains idempotent', asyn
       ready: ready.status,
       repeated: repeated.status,
       stableScore: ready.status === 'ready' && repeated.status === 'ready'
-        ? ready.result.score === repeated.result.score
+        ? JSON.stringify(ready.result.outcome) === JSON.stringify(repeated.result.outcome)
         : false,
       sessionStatus: runtime.getSession('owner', session.id).status,
     }

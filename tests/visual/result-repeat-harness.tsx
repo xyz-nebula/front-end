@@ -40,12 +40,14 @@ const readyResult: NegotiationResultState = {
   status: 'ready',
   result: {
     sessionId: 'source',
-    outcome: 'victory',
-    score: 90,
-    summary: 'Готово',
-    strengths: ['Аргумент'],
-    improvements: ['Уточнить'],
-    recommendations: ['Повторить'],
+    source: 'mock',
+    outcome: { status: 'failed', reason: 'analysis-unavailable' },
+    judges: [
+      { college: 'hiring', status: 'failed', reason: 'unavailable' },
+      { college: 'negotiation', status: 'failed', reason: 'unavailable' },
+      { college: 'ownership', status: 'failed', reason: 'unavailable' },
+    ],
+    trainer: { status: 'failed', reason: 'unavailable' },
   },
 }
 

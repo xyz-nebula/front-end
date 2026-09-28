@@ -16,7 +16,7 @@ export function ResultPage() {
   const { mockOwnerKey } = useAuthRuntime()
   if (!mockOwnerKey) throw new Error('ResultPage requires an authenticated owner.')
   const navigate = useNavigate()
-  const { isRealVoice, negotiationClient } = useDomainServices()
+  const { negotiationClient } = useDomainServices()
   const loaded = useNegotiationResult(negotiationClient, sessionId)
   const openCreatedSession = useCallback((createdSessionId: string) => navigate(`/arena/${createdSessionId}`), [navigate])
   const repeated = useRepeatNegotiation(negotiationClient, mockOwnerKey, loaded.session, openCreatedSession)
@@ -30,7 +30,6 @@ export function ResultPage() {
         result={ready}
         session={loaded.session}
         preparation={preparation}
-        isDemo={isRealVoice}
         isRestarting={repeated.isRestarting}
         error={repeated.error}
         onRepeat={() => void repeated.repeat()}

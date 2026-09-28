@@ -39,7 +39,7 @@ test('mock registration, voice reconnect, committed history and result survive r
   await expect(page.locator('.voice-controls__partial')).toHaveCount(0)
   await captureScreenshot(page, `${artifactsDir}/arena-voice-partial-desktop.png`)
   const beforeCommit = await page.evaluate(() => {
-    const data = JSON.parse(window.localStorage.getItem('arena.mock.data.v1') ?? '{}') as { sessions?: Array<{ messages: unknown[] }> }
+    const data = JSON.parse(window.localStorage.getItem('arena.mock.data.v2') ?? '{}') as { sessions?: Array<{ messages: unknown[] }> }
     return data.sessions?.[0]?.messages.length ?? 0
   })
   expect(beforeCommit).toBe(0)
@@ -54,7 +54,7 @@ test('mock registration, voice reconnect, committed history and result survive r
   await expect(page.locator('.arena-message:not(.arena-message--partial)')).toHaveCount(4, { timeout: 10_000 })
   await expect(page.locator('.arena-message--partial')).toHaveCount(0)
   const persisted = await page.evaluate(() => {
-    const data = JSON.parse(window.localStorage.getItem('arena.mock.data.v1') ?? '{}') as { sessions?: Array<{ messages: Array<{ id: string; sequence: number }> }>; audioTickets?: Array<{ ticket: string }> }
+    const data = JSON.parse(window.localStorage.getItem('arena.mock.data.v2') ?? '{}') as { sessions?: Array<{ messages: Array<{ id: string; sequence: number }> }>; audioTickets?: Array<{ ticket: string }> }
     return { messages: data.sessions?.[0]?.messages ?? [], tickets: data.audioTickets?.length ?? 0 }
   })
   expect(new Set(persisted.messages.map((message) => message.id)).size).toBe(4)

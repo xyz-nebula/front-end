@@ -98,12 +98,20 @@ test('evaluation parser validates the complete 2.0.0-rc.1 payload', () => {
   const parsed = parseEvaluationResult(evaluationResultFixture, evaluationSessionFixture)
   expect(parsed.status).toBe('ready')
   if (parsed.status !== 'ready') return
-  expect(parsed.result.contract_version).toBe('2.0.0-rc.1')
-  expect(parsed.result.outcome.assessment?.kind).toBe('partial_agreement')
-  expect(parsed.result.judge_verdicts.map((slot) => slot.college)).toEqual([
+  expect(parsed.result.source).toBe('server')
+  expect(parsed.result.contractVersion).toBe('2.0.0-rc.1')
+  expect(parsed.result.outcome.status).toBe('ready')
+  if (parsed.result.outcome.status === 'ready') expect(parsed.result.outcome.kind).toBe('partial-agreement')
+  expect(parsed.result.judges.map((slot) => slot.college)).toEqual([
     'hiring', 'negotiation', 'ownership',
   ])
-  expect(parsed.result.trainer_feedback.feedback?.next_try).toHaveLength(2)
+  expect(parsed.result.judges[0].status).toBe('ready')
+  if (parsed.result.judges[0].status === 'ready') expect(parsed.result.judges[0].verdict.choice).toBe('user')
+  expect(parsed.result.trainer.status).toBe('ready')
+  if (parsed.result.trainer.status === 'ready') {
+    expect(parsed.result.trainer.feedback.nextTry).toHaveLength(2)
+    expect(parsed.result.trainer.feedback.goalAssessment.status).toBe('partially-achieved')
+  }
 })
 
 test('evaluation parser maps consistent job states without exposing backend errors', () => {
@@ -132,9 +140,9 @@ test('evaluation parser preserves valid failed slots and nullable analysis field
   const parsed = parseEvaluationResult(partialFailure, evaluationSessionFixture)
   expect(parsed.status).toBe('ready')
   if (parsed.status !== 'ready') return
-  expect(parsed.result.outcome.error_code).toBe('outcome_analysis_unavailable')
-  expect(parsed.result.judge_verdicts[0].error_code).toBe('insufficient_evidence')
-  expect(parsed.result.trainer_feedback.error_code).toBe('trainer_unavailable')
+  expect(parsed.result.outcome).toEqual({ status: 'failed', reason: 'analysis-unavailable' })
+  expect(parsed.result.judges[0]).toEqual({ college: 'hiring', status: 'failed', reason: 'insufficient-evidence' })
+  expect(parsed.result.trainer).toEqual({ status: 'failed', reason: 'unavailable' })
 
   const nullable = structuredClone(evaluationResultFixture)
   const feedback = nullable.result.trainer_feedback.feedback
@@ -143,7 +151,13 @@ test('evaluation parser preserves valid failed slots and nullable analysis field
     feedback.goal_assessment.goal_text = null
     feedback.goal_assessment.status = 'not_assessable'
   }
-  expect(parseEvaluationResult(nullable, evaluationSessionFixture).status).toBe('ready')
+  const nullableParsed = parseEvaluationResult(nullable, evaluationSessionFixture)
+  expect(nullableParsed.status).toBe('ready')
+  if (nullableParsed.status === 'ready' && nullableParsed.result.trainer.status === 'ready') {
+    expect(nullableParsed.result.trainer.feedback.planVsReality).toBeNull()
+    expect(nullableParsed.result.trainer.feedback.goalAssessment.goalText).toBeNull()
+    expect(nullableParsed.result.trainer.feedback.goalAssessment.status).toBe('not-assessable')
+  }
 })
 
 test('evaluation parser rejects incompatible versions, evidence and slot combinations', () => {

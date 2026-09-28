@@ -20,6 +20,7 @@ import type {
 } from '@/types/negotiation'
 import type { CaseAccent, CaseIcon, TrainingCase } from '@/types/case'
 import { trainingCases } from '@/mocks/cases'
+import { createMockResultAnalysis } from '@/mocks/resultAnalysis'
 
 interface BackendNegotiationClientOptions {
   baseUrl: string
@@ -230,16 +231,20 @@ export class BackendNegotiationClient implements NegotiationClient {
   }
 
   private demoResult(sessionId: string): NegotiationResultState {
+    const session: NegotiationSession = {
+      id: sessionId,
+      caseId: 'server-demo',
+      mode: 'voice',
+      status: 'finished',
+      startedAt: new Date().toISOString(),
+      messages: [],
+    }
     return {
       status: 'ready',
       result: {
         sessionId,
-        outcome: 'victory',
-        score: 74,
-        summary: 'Демонстрационный разбор показывает будущий формат обратной связи и не является ответом сервиса.',
-        strengths: ['Вы обозначили позицию и поддерживали диалог', 'Разговор сохранён в истории чата'],
-        improvements: ['Задавайте больше открытых вопросов', 'Фиксируйте конкретные следующие шаги'],
-        recommendations: ['Просмотрите сохранённые реплики и подготовьте альтернативный вариант предложения'],
+        source: 'mock',
+        ...createMockResultAnalysis(session, 'partial-agreement'),
       },
     }
   }

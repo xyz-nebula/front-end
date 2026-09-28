@@ -1,116 +1,67 @@
 import { getDuelPreparation } from '@/mocks/duelPreparation'
-import type {
-  NegotiationResultAnalysis,
-  NegotiationSession,
-} from '@/types/negotiation'
+import type { NegotiationEvidence, NegotiationOutcomeKind, NegotiationResult, NegotiationSession } from '@/types/negotiation'
 
-function userQuotes(session: NegotiationSession): string[] {
-  return session.messages
-    .filter((message) => message.speaker === 'user')
-    .map((message) => message.text)
+type MockAnalysis = Pick<NegotiationResult, 'outcome' | 'judges' | 'trainer'>
+
+function evidence(session: NegotiationSession, preferredIndex: number, fallback: string): NegotiationEvidence {
+  const messageIndex = session.messages.length === 0 ? 0 : Math.min(preferredIndex, session.messages.length - 1)
+  const message = session.messages[messageIndex]
+  return { messageIndex, isAi: message?.speaker === 'ai', quote: message?.text ?? fallback }
 }
 
-export function createMockResultAnalysis(
-  session: NegotiationSession,
-  outcome: 'victory' | 'defeat',
-): NegotiationResultAnalysis {
+export function createMockResultAnalysis(session: NegotiationSession, kind: NegotiationOutcomeKind): MockAnalysis {
   const preparation = getDuelPreparation(session.caseId)
-  const quotes = userQuotes(session)
-  const firstQuote = quotes[0] ?? 'Давайте сначала уточним интересы обеих сторон.'
-  const lastQuote = quotes.at(-1) ?? 'Предлагаю зафиксировать конкретные следующие шаги.'
+  const first = evidence(session, 0, 'Давайте сначала уточним интересы обеих сторон.')
+  const last = evidence(session, Math.max(0, session.messages.length - 1), 'Предлагаю зафиксировать конкретные следующие шаги.')
   const goal = preparation?.goal ?? 'Найти рабочее решение и зафиксировать следующие шаги.'
   const planSteps = preparation?.steps ?? [
     'Выяснить позицию второй стороны',
     'Предложить взаимовыгодное решение',
     'Зафиксировать договорённость',
   ]
+  const successful = kind === 'agreement' || kind === 'partial-agreement'
 
   return {
-    agreement: {
-      title: outcome === 'victory' ? 'Договорённость достигнута' : 'Решение требует доработки',
-      points: preparation?.limits.slice(0, 3) ?? [
-        'Стороны обозначили свои позиции',
-        'Обсудили возможные условия',
-        'Определили следующий шаг',
-      ],
-      tradeoff: outcome === 'victory'
-        ? 'Стороны сохранили ключевые интересы и нашли пространство для компромисса.'
-        : 'Предложение прозвучало, но встречные условия остались недостаточно конкретными.',
-      nextStep: outcome === 'victory'
-        ? 'Вернуться к договорённости в согласованный срок и сверить результат.'
-        : 'Уточнить критерии второй стороны и повторно обсудить условия.',
+    outcome: {
+      status: 'ready',
+      kind,
+      summary: successful
+        ? 'Вы удерживали фокус на интересах сторон и завершили разговор конкретными договорённостями.'
+        : 'Вы обозначили позицию, но договорённости стоит подкреплять вопросами и конкретными условиями.',
+      agreedTerms: preparation?.limits.slice(0, 3) ?? ['Стороны обозначили свои позиции', 'Обсудили возможные условия', 'Определили следующий шаг'],
+      openPoints: successful ? [] : ['Критерии второй стороны', 'Измеримые условия результата'],
+      nextStep: successful ? 'Вернуться к договорённости в согласованный срок и сверить результат.' : 'Уточнить критерии второй стороны и повторно обсудить условия.',
+      evidence: [first, last],
     },
     judges: [
-      {
-        name: 'Нанимающий на работу',
-        question: 'Пошёл бы я работать к этому человеку?',
-        criterion: 'Надёжность',
-        verdict: 'user',
-        quote: firstQuote,
-        observation: 'Вы обозначили понятную рамку разговора и предложили двигаться по шагам.',
-        effect: 'Разговор сохранил конструктивный тон.',
-        comparison: 'Ваша позиция звучала яснее и спокойнее позиции оппонента.',
-      },
-      {
-        name: 'Отправляющий на переговоры',
-        question: 'Кого я отправлю вместо себя на сложные переговоры?',
-        criterion: 'Движение к цели',
-        verdict: 'user',
-        quote: lastQuote,
-        observation: 'Вы возвращали обсуждение к цели и искали применимое решение.',
-        effect: 'Стороны приблизились к конкретным следующим шагам.',
-        comparison: 'Вы чаще связывали аргументы с целью переговоров.',
-      },
-      {
-        name: 'Доверяющий собственность',
-        question: 'Кому я доверю значимый ресурс?',
-        criterion: 'Управление рисками',
-        verdict: 'opponent',
-        quote: outcome === 'victory'
-          ? 'Давайте отдельно проверим условия и критерии результата.'
-          : 'Мне нужны более конкретные гарантии и критерии результата.',
-        observation: 'Не все ограничения и контрольные точки были проговорены до конца.',
-        effect: 'В договорённости осталось пространство для разных трактовок.',
-        comparison: 'Оппонент внимательнее удерживал риски и возможные ограничения.',
-      },
+      { college: 'hiring', status: 'ready', verdict: { choice: 'user', criterion: 'Надёжность', evidence: first, observation: 'Вы обозначили понятную рамку разговора и предложили двигаться по шагам.', effect: 'Разговор сохранил конструктивный тон.', comparison: 'Ваша позиция звучала яснее и спокойнее позиции оппонента.' } },
+      { college: 'negotiation', status: 'ready', verdict: { choice: 'user', criterion: 'Движение к цели', evidence: last, observation: 'Вы возвращали обсуждение к цели и искали применимое решение.', effect: 'Стороны приблизились к конкретным следующим шагам.', comparison: 'Вы чаще связывали аргументы с целью переговоров.' } },
+      { college: 'ownership', status: 'ready', verdict: { choice: 'opponent', criterion: 'Управление рисками', evidence: last, observation: 'Не все ограничения и контрольные точки были проговорены до конца.', effect: 'В договорённости осталось пространство для разных трактовок.', comparison: 'Оппонент внимательнее удерживал риски и возможные ограничения.' } },
     ],
-    coachSummary: `Целью было: ${goal} Вы вели разговор конструктивно, но часть критериев второй стороны стоило раскрыть подробнее.`,
-    worked: [
-      {
-        quote: firstQuote,
-        action: 'Задали рабочую рамку и обозначили предмет разговора.',
-        change: 'Диалог стал более предметным.',
-        consequence: 'Оппонент включился в обсуждение условий.',
+    trainer: {
+      status: 'ready',
+      feedback: {
+        summary: `Целью было: ${goal} Вы вели разговор конструктивно, но часть критериев второй стороны стоило раскрыть подробнее.`,
+        strengths: [{ evidence: first, action: 'Задали рабочую рамку и обозначили предмет разговора.', situationChange: 'Диалог стал более предметным.', consequence: 'Оппонент включился в обсуждение условий.' }],
+        mistakes: [{ evidence: last, action: 'Уступка прозвучала до фиксации встречного обязательства.', situationChange: 'Переговорная позиция стала слабее.', consequence: 'Часть ценности осталась у второй стороны.' }],
+        missedOpportunities: [{ evidence: last, action: 'Не уточнили критерий проверки результата.', situationChange: 'Следующий шаг остался недостаточно измеримым.', consequence: 'Договорённость можно истолковать по-разному.' }],
+        nextTry: ['Перед следующим раундом подготовьте три открытых вопроса', 'Сформулируйте желаемый результат и приемлемую альтернативу', 'Закрепляйте уступки встречными обязательствами и сроками'],
+        planVsReality: {
+          summary: 'Основные шаги плана были использованы, один из них потребовал адаптации.',
+          items: planSteps.slice(0, 3).map((preparationText, index) => ({
+            preparationText,
+            status: index === 0 ? 'followed' : index === 1 ? 'adapted' : 'unused',
+            evidence: index === 2 ? null : index === 0 ? first : last,
+            observation: index === 0 ? 'Вы начали с уточнения позиции и контекста второй стороны.' : index === 1 ? 'По ходу разговора адаптировали аргументы под ответ оппонента.' : 'Этот шаг явно не наблюдался в разговоре.',
+          })),
+        },
+        goalAssessment: {
+          status: successful ? 'achieved' : 'partially-achieved',
+          goalText: goal,
+          explanation: successful ? 'Цель подтверждается достигнутыми договорённостями.' : 'К цели удалось приблизиться, но часть условий осталась открытой.',
+          evidence: [last],
+        },
       },
-      {
-        quote: lastQuote,
-        action: 'Вернули разговор к конкретному следующему шагу.',
-        change: 'Снизили уровень неопределённости.',
-        consequence: 'Появилась основа для продолжения переговоров.',
-      },
-    ],
-    hindered: [
-      {
-        quote: 'Можно согласиться на эти условия.',
-        action: 'Уступка прозвучала до фиксации встречного обязательства.',
-        change: 'Переговорная позиция стала слабее.',
-        consequence: 'Часть ценности осталась у второй стороны.',
-      },
-      {
-        quote: 'Думаю, мы сможем вернуться к этому позже.',
-        action: 'Срок и критерий следующего обсуждения остались размытыми.',
-        change: 'Решение стало сложнее проверить.',
-        consequence: 'Договорённость можно истолковать по-разному.',
-      },
-    ],
-    planComparison: planSteps.slice(0, 3).map((plan, index) => ({
-      plan,
-      reality: index === 0
-        ? 'Вы начали с уточнения позиции и контекста второй стороны.'
-        : index === 1
-          ? 'По ходу разговора адаптировали аргументы под ответ оппонента.'
-          : 'Обозначили следующий шаг, но не все критерии зафиксировали явно.',
-      status: index === 0 ? 'followed' : index === 1 ? 'adapted' : 'unused',
-    })),
+    },
   }
 }
