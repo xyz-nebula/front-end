@@ -3,6 +3,7 @@ import type { Page, Route } from '@playwright/test'
 import {
   artifactsDir,
   captureScreenshot,
+  dismissProductTourInvitation,
   expect,
   expectNoHorizontalOverflow,
   test,
@@ -242,7 +243,7 @@ test('does not replace an existing session from an activation link', async ({ pa
 
 test('activation loading, success, and error states render on desktop and mobile', async ({ page }) => {
   // Six screenshots and several viewport changes share this test budget.
-  test.setTimeout(30_000)
+  test.setTimeout(60_000)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.route('**/api/v1/auth/register/activate', (route) => json(route, 422, {
     detail: [{ loc: ['body', 'code'], msg: 'Ссылка истекла или уже была использована', type: 'value_error' }],
@@ -269,14 +270,15 @@ test('activation loading, success, and error states render on desktop and mobile
 
   // Keep the intercepted request pending while taking loading screenshots;
   // the runner uses a short API timeout for dedicated resilience tests.
-  await page.clock.install()
-  await page.clock.pauseAt(new Date())
+  await page.addInitScript(() => {
+    const nativeSetTimeout = window.setTimeout.bind(window)
+    window.setTimeout = ((handler: TimerHandler, timeout?: number, ...arguments_: unknown[]) => (
+      nativeSetTimeout(handler, timeout === 600 ? 60_000 : timeout, ...arguments_)
+    )) as typeof window.setTimeout
+  })
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`/activate?code=${activationCode}`)
-  // Let React commit the lazy route, then freeze the pending API timeout again.
-  await page.clock.resume()
   await expect(page.getByRole('heading', { name: 'Активируем аккаунт' })).toBeVisible()
-  await page.clock.pauseAt(new Date())
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/activation-loading-desktop.png`)
 
@@ -286,7 +288,6 @@ test('activation loading, success, and error states render on desktop and mobile
 
   releaseActivation()
   await expect(page.getByRole('heading', { name: 'Аккаунт активирован' })).toBeVisible()
-  await page.clock.resume()
   await captureScreenshot(page, `${artifactsDir}/activation-success-mobile.png`)
 
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -319,6 +320,7 @@ test('returns to a protected route after password login and logs out locally', a
   await page.getByRole('button', { name: 'Войти' }).click()
   await expect(page).toHaveURL(/\/home$/)
   expect(loginPayload).toEqual({ email: 'user@example.com', password: 'strong-password' })
+  await dismissProductTourInvitation(page)
 
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()

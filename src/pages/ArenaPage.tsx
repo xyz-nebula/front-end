@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { useAuthRuntime } from '@/auth/runtime'
@@ -11,6 +11,7 @@ import { VoiceControls } from '@/components/arena/VoiceControls'
 import { AppButton } from '@/components/ui/AppButton'
 import { useArenaSession } from '@/features/arena/useArenaSession'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
+import { useProductTour } from '@/features/product-tour/useProductTour'
 import { trainingCases } from '@/mocks/cases'
 import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { readSessionPreparation } from '@/features/preparation/preparation'
@@ -42,14 +43,66 @@ export function ArenaPage() {
   const navigate = useNavigate()
   const { isRealVoice } = useDomainServices()
   const arena = useArenaSession(sessionId)
+  const productTour = useProductTour()
+  const {
+    clearScenarioError,
+    reportScenarioError,
+    send: sendTourEvent,
+    state: tourState,
+  } = productTour
   const audio = useArenaAudio(sessionId, arena.session?.mode === 'voice' && arena.session.status === 'active', arena.addCommittedMessage, arena.refreshSession)
+  const connectAudio = audio.connect
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const [finishError, setFinishError] = useState<string | null>(null)
+  const finishButtonRef = useRef<HTMLButtonElement>(null)
   const trainingCase = trainingCases.find(
     (item) => item.id === arena.session?.caseId || item.title === arena.session?.name,
   ) ?? (arena.session ? fallbackCase(arena.session.name ?? 'Переговоры с AI') : undefined)
   const sessionPreparation = arena.session ? readSessionPreparation(mockOwnerKey, arena.session.id) : null
+
+  useEffect(() => {
+    const session = arena.session
+    if (!session || session.mode !== 'voice' || tourState?.status !== 'active') return
+    const userMessages = session.messages.filter((message) => message.speaker === 'user').length
+    const aiMessages = session.messages.filter((message) => message.speaker === 'ai').length
+    if (!tourState.sessionId && ['voice-format', 'analysis', 'strategy', 'tactics', 'start-duel'].includes(tourState.stepId)) {
+      sendTourEvent({ type: 'session-created', sessionId: session.id, userMessages, aiMessages })
+    }
+    if (session.status !== 'active') sendTourEvent({ type: 'session-finished' })
+  }, [arena.session, sendTourEvent, tourState])
+
+  useEffect(() => {
+    if (audio.state !== 'connected' || !arena.session) return
+    sendTourEvent({
+      type: 'audio-connected',
+      userMessages: arena.session.messages.filter((message) => message.speaker === 'user').length,
+      aiMessages: arena.session.messages.filter((message) => message.speaker === 'ai').length,
+    })
+  }, [arena.session, audio.state, sendTourEvent])
+
+  useEffect(() => {
+    if (tourState?.status !== 'active' || tourState.stepId !== 'microphone') return
+    if (audio.state !== 'error' || !audio.error) {
+      clearScenarioError()
+      return
+    }
+    const kind = /микрофон|доступ/i.test(audio.error) ? 'microphone' : 'audio'
+    reportScenarioError(kind, () => { void connectAudio() })
+  }, [audio.error, audio.state, clearScenarioError, connectAudio, reportScenarioError, tourState])
+
+  useEffect(() => {
+    const baseline = tourState?.dialogueBaseline
+    const messages = arena.session?.messages ?? []
+    if (tourState?.status !== 'active' || tourState.stepId !== 'dialogue' || !baseline) return
+    const messagesAfterBaseline = messages
+      .slice(baseline.userMessages + baseline.aiMessages)
+      .sort((left, right) => left.sequence - right.sequence)
+    const userIndex = messagesAfterBaseline.findIndex((message) => message.speaker === 'user')
+    if (userIndex >= 0 && messagesAfterBaseline.slice(userIndex + 1).some((message) => message.speaker === 'ai')) {
+      sendTourEvent({ type: 'dialogue-completed' })
+    }
+  }, [arena.session?.messages, sendTourEvent, tourState])
 
   useEffect(() => {
     if (arena.viewState === 'finished') navigate(`/result/${sessionId}`, { replace: true })
@@ -89,7 +142,10 @@ export function ArenaPage() {
     try {
       if (arena.session?.mode === 'voice') await audio.stop()
       const finished = await arena.finishSession()
-      if (finished) setShowFinishDialog(false)
+      if (finished) {
+        sendTourEvent({ type: 'session-finished' })
+        setShowFinishDialog(false)
+      }
     } catch (caught) {
       setFinishError(caught instanceof Error
         ? caught.message
@@ -97,6 +153,16 @@ export function ArenaPage() {
     } finally {
       setIsFinishing(false)
     }
+  }
+
+  const openFinishDialog = () => {
+    sendTourEvent({ type: 'finish-opened' })
+    setShowFinishDialog(true)
+  }
+
+  const closeFinishDialog = () => {
+    sendTourEvent({ type: 'finish-cancelled' })
+    setShowFinishDialog(false)
   }
 
   return (
@@ -111,13 +177,14 @@ export function ArenaPage() {
         isDemoVoice={!isRealVoice}
         isSending={isSending}
         finishDisabled={isSending || isFinished || isConnecting}
-        onFinish={() => setShowFinishDialog(true)}
+        onFinish={openFinishDialog}
+        finishButtonRef={finishButtonRef}
       />
       <main className="duel-shell arena-layout">
         <section className="arena-dialog-panel">
           <h2 className="arena-dialog-panel__title">Диалог</h2>
           <ArenaConversation messages={arena.session.messages} opponent={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? trainingCase.opponent} isThinking={isSending} mode={arena.session.mode} partial={audio.partial} />
-          {arena.error && <div className="arena-inline-error" role="alert"><span>{arena.error}</span><button type="button" onClick={() => arena.turnState === 'error' ? void arena.sendTextTurn() : setShowFinishDialog(true)}>Повторить</button></div>}
+          {arena.error && <div className="arena-inline-error" role="alert"><span>{arena.error}</span><button type="button" onClick={() => arena.turnState === 'error' ? void arena.sendTextTurn() : openFinishDialog()}>Повторить</button></div>}
         </section>
         <DuelPreparation data={preparation} description={trainingCase.description} isRealVoice={isRealVoice} snapshot={sessionPreparation} />
         <div className="duel-controls">
@@ -139,8 +206,9 @@ export function ArenaPage() {
       {showFinishDialog && <FinishDialog
         busy={isFinishing}
         error={finishError ?? arena.error}
-        onCancel={() => setShowFinishDialog(false)}
+        onCancel={closeFinishDialog}
         onConfirm={() => { void confirmFinish() }}
+        returnFocusRef={finishButtonRef}
       />}
     </div>
   )

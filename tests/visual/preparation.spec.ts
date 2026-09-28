@@ -1,4 +1,4 @@
-import { artifactsDir, captureScreenshot, expect, expectNoHorizontalOverflow, test } from './helpers'
+import { artifactsDir, captureScreenshot, dismissProductTourInvitation, expect, expectNoHorizontalOverflow, test } from './helpers'
 
 async function registerAndOpenPreparation(page: import('@playwright/test').Page) {
   await page.goto('/register')
@@ -9,6 +9,7 @@ async function registerAndOpenPreparation(page: import('@playwright/test').Page)
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
   await page.getByRole('link', { name: 'Открыть demo-ссылку активации' }).click()
   await page.getByRole('link', { name: 'Перейти в приложение' }).click()
+  await dismissProductTourInvitation(page)
   await page.getByRole('button', { name: 'Выбрать кейс «Повышение зарплаты»' }).click()
   const dialog = page.getByRole('dialog', { name: 'Повышение зарплаты' })
   await dialog.getByRole('radio', { name: /Сотрудник/ }).check()
@@ -17,12 +18,19 @@ async function registerAndOpenPreparation(page: import('@playwright/test').Page)
 }
 
 test('preparation draft, progress and responsive layout', async ({ page }) => {
+  test.setTimeout(30_000)
   test.skip(process.env.VITE_AUTH_SOURCE !== 'mock', 'Requires mock auth.')
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 1440, height: 900 })
   await registerAndOpenPreparation(page)
   await expect(page.getByRole('heading', { name: 'Подготовка к переговорам' })).toBeVisible()
   await expect(page.getByText('Заполнено 0 из 10')).toBeVisible()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await expect(page.getByRole('link', { name: 'К кейсам' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Пройти тур' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Настроить 2FA' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Выйти' })).toBeVisible()
+  await page.keyboard.press('Escape')
   await expect(page).toHaveURL(/section=analysis/)
   const rootConflictCard = page.locator('#preparation-root-conflict')
   await expect(rootConflictCard.getByText('Корневой конфликт', { exact: true })).toHaveCount(1)

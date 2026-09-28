@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 import { AuthRuntimeContext } from '@/auth/runtime'
+import { AuthContext, type AuthContextValue } from '@/auth/useAuth'
+import { ProductTourContext } from '@/features/product-tour/useProductTour'
 import { ArenaPage } from '@/pages/ArenaPage'
 import type { RunAuthorized } from '@/services/serviceAdapters'
 import type { AudioClient } from '@/services/contracts/audioClient'
@@ -74,6 +76,23 @@ export async function runAudioFinishFailureScenario() {
     listSessions: unavailable,
   }
   const runAuthorized: RunAuthorized = (operation) => operation('harness-access-token')
+  const unavailableAuth = async (): Promise<never> => { throw new Error('Unexpected auth call') }
+  const authValue: AuthContextValue = {
+    status: 'authenticated', logoutRequested: false, persistence: 'memory', externalSessionVersion: 0,
+    showMemorySessionNotice: false, dismissMemorySessionNotice: () => undefined,
+    retrySession: async () => undefined, register: unavailableAuth, activate: unavailableAuth,
+    login: unavailableAuth, logout: async () => undefined, enrollTotp: unavailableAuth,
+    confirmTotp: unavailableAuth, disableTotp: unavailableAuth,
+  }
+  const tourValue = {
+    ownerKey: 'harness-tour-owner', state: null, storageAvailable: true,
+    menuLabel: 'Пройти тур' as const, invitationOpen: false,
+    startOrResume: () => undefined, beginFromInvitation: () => undefined,
+    error: null, restart: () => undefined, dismissError: () => undefined, reportTargetUnavailable: () => undefined,
+    scenarioError: null, retryScenario: () => undefined, reportScenarioError: () => undefined, clearScenarioError: () => undefined,
+    deferInvitation: () => undefined, disableInvitation: () => undefined,
+    considerInvitation: () => undefined, send: () => undefined,
+  }
   const unhandled: string[] = []
   const onUnhandled = (event: PromiseRejectionEvent) => {
     unhandled.push(String(event.reason))
@@ -93,16 +112,20 @@ export async function runAudioFinishFailureScenario() {
   try {
     await act(async () => {
       root.render(
-        <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', runAuthorized }}>
-          <DomainServicesContext.Provider value={{ negotiationClient, createAudioClient: () => audioClient }}>
-            <MemoryRouter initialEntries={['/arena/voice-finish']}>
-              <Routes>
-                <Route path="/arena/:sessionId" element={<ArenaPage />} />
-                <Route path="/result/:sessionId" element={<div data-testid="result-route">Результат</div>} />
-              </Routes>
-            </MemoryRouter>
-          </DomainServicesContext.Provider>
-        </AuthRuntimeContext.Provider>,
+        <AuthContext.Provider value={authValue}>
+          <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', tourOwnerKey: 'harness-tour-owner', runAuthorized }}>
+            <ProductTourContext.Provider value={tourValue}>
+              <DomainServicesContext.Provider value={{ negotiationClient, createAudioClient: () => audioClient }}>
+                <MemoryRouter initialEntries={['/arena/voice-finish']}>
+                  <Routes>
+                    <Route path="/arena/:sessionId" element={<ArenaPage />} />
+                    <Route path="/result/:sessionId" element={<div data-testid="result-route">Результат</div>} />
+                  </Routes>
+                </MemoryRouter>
+              </DomainServicesContext.Provider>
+            </ProductTourContext.Provider>
+          </AuthRuntimeContext.Provider>
+        </AuthContext.Provider>,
       )
     })
     for (let attempt = 0; attempt < 20 && finishButton()?.disabled !== false; attempt += 1) await flush()

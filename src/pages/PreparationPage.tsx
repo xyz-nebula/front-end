@@ -12,6 +12,7 @@ import type { PreparationStepId } from '@/features/preparation/preparation'
 import { usePreparationCase } from '@/features/preparation/usePreparationCase'
 import { usePreparationDraft } from '@/features/preparation/usePreparationDraft'
 import { useStartNegotiation } from '@/features/preparation/useStartNegotiation'
+import { useProductTour } from '@/features/product-tour/useProductTour'
 import { useDomainServices } from '@/services/domainServices'
 import type { NegotiationMode } from '@/types/negotiation'
 import '@/styles/preparation.css'
@@ -30,12 +31,17 @@ export function PreparationPage() {
   const activeSection = preparationSections.find((section) => section.id === activeSectionId) ?? preparationSections[0]
   const navigate = useNavigate()
   const { negotiationClient } = useDomainServices()
+  const productTour = useProductTour()
+  const { send: sendTourEvent, state: tourState } = productTour
   const loadedCase = usePreparationCase(negotiationClient, caseId)
   const preparation = usePreparationDraft(mockOwnerKey, caseId, roleIndex)
   const [activeStep, setActiveStep] = useState<PreparationStepId>(activeSection.steps[0])
   const [caseDrawerOpen, setCaseDrawerOpen] = useState(false)
   const caseButtonRef = useRef<HTMLButtonElement>(null)
-  const openArena = useCallback((sessionId: string) => navigate(`/arena/${sessionId}`), [navigate])
+  const openArena = useCallback((sessionId: string) => {
+    sendTourEvent({ type: 'session-created', sessionId, userMessages: 0, aiMessages: 0 })
+    navigate(`/arena/${sessionId}`)
+  }, [navigate, sendTourEvent])
   const starter = useStartNegotiation(negotiationClient, {
     draft: preparation.draft,
     mode,
@@ -51,12 +57,34 @@ export function PreparationPage() {
     setSearchParams(nextParams, { replace: true })
   }, [activeSectionId, searchParams, setSearchParams])
 
+  useEffect(() => {
+    if (
+      tourState?.status === 'active'
+      && tourState.stepId === 'voice-format'
+      && tourState.caseId === caseId
+      && tourState.roleIndex === roleIndex
+      && mode === 'voice'
+    ) sendTourEvent({ type: 'preparation-opened' })
+  }, [caseId, mode, roleIndex, sendTourEvent, tourState])
+
+  useEffect(() => {
+    const stepId = tourState?.status === 'active' ? tourState.stepId : null
+    const desiredSection = stepId === 'analysis' || stepId === 'strategy'
+      ? stepId
+      : stepId === 'tactics' || stepId === 'start-duel' ? 'tactics' : null
+    if (!desiredSection || desiredSection === activeSectionId) return
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('section', desiredSection)
+    setSearchParams(nextParams, { replace: true })
+  }, [activeSectionId, searchParams, setSearchParams, tourState])
+
   const selectSection = (sectionId: PreparationSectionId) => {
     const section = preparationSections.find((item) => item.id === sectionId) ?? preparationSections[0]
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set('section', section.id)
     setSearchParams(nextParams, { replace: true })
     setActiveStep(section.steps[0])
+    sendTourEvent({ type: 'section-opened', section: section.id })
     window.requestAnimationFrame(() => document.querySelector('.preparation-layout')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
@@ -79,7 +107,7 @@ export function PreparationPage() {
       <PreparationOverview completedCount={preparation.completed.length} isStarting={starter.isStarting} onStart={() => void starter.start()} />
       {starter.error && <div className="form-alert preparation-error" role="alert">{starter.error}</div>}
       <div className="preparation-mobile-nav"><PreparationNavigation mobile activeSectionId={activeSectionId} activeStep={activeStep} completed={preparation.completed} onSectionSelect={selectSection} onStepSelect={scrollToStep} /></div>
-      <div className="preparation-layout">
+      <div className="preparation-layout" data-tour-id={`preparation-${activeSectionId}`}>
         <aside className="preparation-sidebar"><PreparationNavigation activeSectionId={activeSectionId} activeStep={activeStep} completed={preparation.completed} onSectionSelect={selectSection} onStepSelect={scrollToStep} /></aside>
         <div className="preparation-content">
           <PreparationForm activeSectionId={activeSectionId} draft={preparation.draft} updateDraft={preparation.updateDraft} />

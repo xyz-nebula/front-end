@@ -1,4 +1,4 @@
-import { artifactsDir, captureScreenshot, expect, expectNoDocumentVerticalOverflow, expectNoHorizontalOverflow, test } from './helpers'
+import { artifactsDir, captureScreenshot, dismissProductTourInvitation, expect, expectNoDocumentVerticalOverflow, expectNoHorizontalOverflow, test } from './helpers'
 
 test('mock registration, voice reconnect, committed history and result survive reload', async ({ page }) => {
   test.skip(process.env.VITE_AUTH_SOURCE !== 'mock' || process.env.VITE_NEGOTIATION_SOURCE !== 'mock' || process.env.VITE_AUDIO_SOURCE !== 'mock', 'Requires full mock mode.')
@@ -15,6 +15,7 @@ test('mock registration, voice reconnect, committed history and result survive r
   await expect(page.getByRole('heading', { name: 'Аккаунт активирован' })).toBeVisible()
   await page.getByRole('link', { name: 'Перейти в приложение' }).click()
   await expect(page).toHaveURL(/\/home$/)
+  await dismissProductTourInvitation(page)
 
   await page.getByRole('button', { name: 'Начать кейс' }).click()
   const modal = page.getByRole('dialog', { name: 'Повышение зарплаты' })
@@ -28,6 +29,10 @@ test('mock registration, voice reconnect, committed history and result survive r
   await expect(page).toHaveURL(/\/arena\/[0-9a-f-]+$/)
   const arenaUrl = page.url()
   await expect(page.getByRole('button', { name: 'Начать разговор' })).toBeVisible()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await expect(page.getByRole('banner').getByRole('link', { name: 'К кейсам' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Пройти тур' })).toBeVisible()
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('heading', { name: 'Моя подготовка' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Повышение зарплаты' })).toBeVisible()
   await captureScreenshot(page, `${artifactsDir}/arena-voice-idle-desktop.png`)
@@ -83,6 +88,10 @@ test('mock registration, voice reconnect, committed history and result survive r
   await page.getByRole('dialog').getByRole('button', { name: 'Завершить' }).click()
   await expect(page).toHaveURL(/\/result\/[0-9a-f-]+$/)
   await expect(page.getByRole('heading', { name: 'Разбор поединка' })).toBeVisible()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await expect(page.getByRole('banner').getByRole('link', { name: 'К кейсам' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Пройти тур' })).toBeVisible()
+  await page.keyboard.press('Escape')
   await expectNoHorizontalOverflow(page)
   await captureScreenshot(page, `${artifactsDir}/result-voice-mobile.png`)
   await page.reload()

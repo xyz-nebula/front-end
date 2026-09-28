@@ -45,6 +45,9 @@ adapters.
   не заменяют проверку drift против канонических спецификаций сервисов.
 - Domain specs покрывают mock storage/runtime, подготовку, переговоры,
   устойчивость аудио и повтор кейса.
+- Product tour specs покрывают machine/storage, owner isolation, приглашение
+  (`Позже`/`Никогда`), ручной старт, полный голосовой путь, паузу и
+  восстановление маршрутов, потерянную сессию и timeout отсутствующего target.
 - Visual scenarios проверяют desktop/mobile состояния и horizontal overflow.
 - Bundle и performance scripts используют budgets из `scripts/`, а не значения
   из Markdown.
@@ -66,3 +69,12 @@ Playwright specs и harnesses сейчас исполняются Playwright и 
 
 Успешный Playwright-прогон не заменяет визуальный просмотр и не подтверждает
 совместимость с живыми backend/audio-engine.
+
+Для тура основной browser-сценарий находится в
+`tests/visual/product-tour-events.spec.ts`. Он сохраняет desktop/mobile кадры
+приглашения, выбора кейса и роли, голосового формата, трёх разделов подготовки,
+старта поединка, микрофона, диалога, завершения, подтверждения и
+pending/ready-разбора. Дополнительно создаются narrow landscape, collapsed,
+session recovery и target-timeout кадры. После прогона нужно открыть все PNG с
+префиксом `product-tour-` и проверить, что target не перекрыт, карточка не
+обрезана, доступные действия видимы, а horizontal overflow отсутствует.
