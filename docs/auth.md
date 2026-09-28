@@ -92,21 +92,11 @@ API использует snake_case, клиент — camelCase.
 
 ## Regression-защита
 
-Не упрощать эти механизмы без эквивалентных regression-тестов, сохраняющих
-проверку гонок, ошибок и защиты новой сессии. Проходящий happy path не заменяет
-проверки late responses. Runtime-код не требуется менять для актуализации docs.
+Обязательный browser smoke проверяет только доступность auth-экранов, гостевой
+редирект с защищённого маршрута и загрузку mock-сессии. Он не покрывает API
+payload, StrictMode, refresh/retry, TOTP, поздние ответы, конкурентные вкладки,
+storage fallback и ротацию токенов.
 
-| Область | Существующие сценарии |
-| --- | --- |
-| Реальные API-формы, payload, StrictMode, gates, refresh/retry, TOTP | [auth.spec.ts](../tests/visual/auth.spec.ts): `activates from a link only once…`, `does not replace an existing session…`, `returns to a protected route…`, `refreshes once after a protected 401…`. |
-| Валидация API-ответов | `auth.spec.ts`: сценарии `rejects malformed…` для login, activation, refresh, registration и enrollment. |
-| Поздние ответы и last-started login | [auth-resilience.spec.ts](../tests/visual/auth-resilience.spec.ts): `does not let a delayed activation…`, `keeps the result of the last-started concurrent login`, `does not restore a pending login after logout`. |
-| Optimistic logout и revoke | `auth-resilience.spec.ts`: `optimistic logout clears the UI…`, `retries remote logout after refreshing a rejected snapshot`. |
-| Временные ошибки и окончательный отказ | `auth-resilience.spec.ts`: `keeps tokens after a transient bootstrap failure…`, network/timeout варианты, `clears a session when refresh is rejected with 403`, `keeps an authenticated session when refresh fails…`; invalid refresh также проверяется в `auth.spec.ts`. |
-| Защита новой сессии от операций старой | `auth-resilience.spec.ts`: `does not retry a protected request with a replacement session`, `discards a late protected success…`, `closes an open security modal…`. |
-| Storage, memory и межвкладочная ротация | `auth-resilience.spec.ts`: `survives corrupted storage…`, `uses a one-tab memory session…`, `synchronizes login, token rotation, and logout between tabs`, `serializes simultaneous bootstrap refreshes between tabs`, `does not let a stale refresh overwrite…`. |
-| Tour owner identity и миграция auth envelope | [product-tour-storage.spec.ts](../tests/visual/product-tour-storage.spec.ts): нормализация, псевдонимность, source scope, owner isolation и fallback; auth specs сохраняют чтение прежнего envelope. |
-
-Эта карта связывает инварианты с имеющимися проверками, но не утверждает, что
-каждая внутренняя ветвь отдельно покрыта: при изменении конкретного механизма
-добавляйте regression для его ветви и конкурентного сценария.
+При изменении перечисленных механизмов добавляйте узкую проверку в рамках
+соответствующей задачи или выполняйте интеграционный smoke на стенде. Общие
+ограничения минимального набора описаны в [testing.md](testing.md).
