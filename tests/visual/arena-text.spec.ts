@@ -1,6 +1,7 @@
 import {
   artifactsDir,
   captureScreenshot,
+  dismissProductTourInvitation,
   expect,
   expectNoDocumentVerticalOverflow,
   expectNoHorizontalOverflow,
@@ -27,6 +28,7 @@ test('text arena creates, restores and finishes one atomic conversation without 
   await page.getByRole('link', { name: 'Открыть demo-ссылку активации' }).click()
   await page.getByRole('link', { name: 'Перейти в приложение' }).click()
   await page.goto('/home')
+  await dismissProductTourInvitation(page)
   await page.getByRole('button', { name: 'Начать кейс' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Повышение зарплаты' })

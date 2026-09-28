@@ -29,7 +29,7 @@ export function ResultAnalysis({ result, session, preparation, isRestarting, err
 
   return <>
     <nav className="result-breadcrumbs" aria-label="Хлебные крошки"><Link to="/home">Кейсы</Link><span>/</span><span>Результат</span></nav>
-    <section className="result-intro"><h1>Разбор поединка</h1><p>{userRole} → {opponentRole}{duration && <> <span>·</span> {duration}</>} <span>·</span> {session.mode === 'voice' ? 'Голос' : 'Текст'}</p></section>
+    <section className="result-intro" data-tour-id="result"><h1>Разбор поединка</h1><p>{userRole} → {opponentRole}{duration && <> <span>·</span> {duration}</>} <span>·</span> {session.mode === 'voice' ? 'Голос' : 'Текст'}</p></section>
     {result.source === 'mock' && <p className="result-demo-note" role="note">Это демонстрационный разбор интерфейса. Оценка и рекомендации не получены от backend или AI-сервиса.</p>}
     <ResultOutcome outcome={result.outcome} />
     <ResultJudges judges={result.judges} />

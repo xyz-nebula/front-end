@@ -25,6 +25,6 @@ test('result polling uses a long deadline and cancels stale or duplicate loops',
     error: 'Разбор готовится дольше обычного. Проверьте ещё раз.',
     processingStatus: 'processing',
   })
-  expect(result.retried).toEqual({ calls: 4, error: null, status: 'ready' })
+  expect(result.retried).toEqual({ addedCalls: 1, error: null, status: 'ready' })
   expect(result.unmountedCalls).toBe(1)
 })

@@ -25,7 +25,7 @@ export function ArenaConversation({ messages, opponent, isThinking, mode = 'text
   }, [isThinking, messages, partial.ai?.text, partial.user?.text])
 
   return (
-    <section className="arena-conversation" aria-label="Диалог переговоров" aria-live="polite">
+    <section className="arena-conversation" aria-label="Диалог переговоров" aria-live="polite" data-tour-id="dialogue">
       {messages.length === 0 && !isThinking && (
         <div className="arena-conversation__empty">
           <span>Ваш ход</span>

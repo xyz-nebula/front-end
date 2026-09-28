@@ -376,6 +376,40 @@ test('real negotiation client starts evaluation without a request body and reads
   }
 })
 
+test('real negotiation client returns failed when evaluation cannot be started', async () => {
+  const originalFetch = globalThis.fetch
+  const requests: Array<{ url: string; method: string; body: BodyInit | null | undefined }> = []
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: String(input), method: init?.method ?? 'GET', body: init?.body })
+    return new Response(JSON.stringify({
+      job_uuid: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      status: 'failed',
+    }), { status: 200 })
+  }
+
+  try {
+    const client = new BackendNegotiationClient(
+      (operation) => operation('access-token'),
+      { baseUrl: '/api', timeoutMs: 1_000 },
+    )
+
+    await expect(client.finishSession({
+      sessionId: chatFixture.uuid,
+      clientCommandId: 'stable-finish-command',
+    })).resolves.toEqual({
+      status: 'failed',
+      message: 'Не удалось запустить разбор переговоров.',
+    })
+    expect(requests).toEqual([{
+      url: `/api/v1/chats/${chatFixture.uuid}/evaluate`,
+      method: 'POST',
+      body: undefined,
+    }])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('real negotiation client recovers already-running evaluation and sanitizes endpoint errors', async () => {
   const originalFetch = globalThis.fetch
   const responses = [

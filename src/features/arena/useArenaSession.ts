@@ -170,6 +170,11 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
         clientCommandId: commandId,
       })
       if (!isCurrent(arenaContext)) return false
+      if (result.status === 'failed') {
+        setViewState('ready')
+        setError(result.message)
+        return false
+      }
       removeSessionValue(pendingFinishKey(arenaContext.sessionId))
       setSession((current) => current ? {
         ...current,

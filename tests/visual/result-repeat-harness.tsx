@@ -3,6 +3,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
 import { AuthRuntimeContext } from '@/auth/runtime'
+import { AuthContext, type AuthContextValue } from '@/auth/useAuth'
+import { ProductTourContext } from '@/features/product-tour/useProductTour'
 import { ResultPage } from '@/pages/ResultPage'
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 import { DomainServicesContext } from '@/services/domainServices'
@@ -78,6 +80,23 @@ async function mountResult(sessionId: string, negotiationClient: NegotiationClie
   const root = createRoot(host)
   let currentPath = ''
   const runAuthorized: RunAuthorized = (operation) => operation('harness-access-token')
+  const unavailableAuth = async (): Promise<never> => { throw new Error('Unexpected auth call') }
+  const authValue: AuthContextValue = {
+    status: 'authenticated', logoutRequested: false, persistence: 'memory', externalSessionVersion: 0,
+    showMemorySessionNotice: false, dismissMemorySessionNotice: () => undefined,
+    retrySession: async () => undefined, register: unavailableAuth, activate: unavailableAuth,
+    login: unavailableAuth, logout: async () => undefined, enrollTotp: unavailableAuth,
+    confirmTotp: unavailableAuth, disableTotp: unavailableAuth,
+  }
+  const tourValue = {
+    ownerKey: 'harness-tour-owner', state: null, storageAvailable: true,
+    menuLabel: 'Пройти тур' as const, invitationOpen: false,
+    startOrResume: () => undefined, beginFromInvitation: () => undefined,
+    error: null, restart: () => undefined, dismissError: () => undefined, reportTargetUnavailable: () => undefined,
+    scenarioError: null, retryScenario: () => undefined, reportScenarioError: () => undefined, clearScenarioError: () => undefined,
+    deferInvitation: () => undefined, disableInvitation: () => undefined,
+    considerInvitation: () => undefined, send: () => undefined,
+  }
 
   function LocationProbe() {
     const location = useLocation()
@@ -87,20 +106,24 @@ async function mountResult(sessionId: string, negotiationClient: NegotiationClie
 
   await act(async () => {
     root.render(
-      <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', runAuthorized }}>
-        <DomainServicesContext.Provider value={{
-          negotiationClient,
-          createAudioClient: () => { throw new Error('Audio is not used by this harness') as never },
-        }}>
-          <MemoryRouter initialEntries={[`/result/${sessionId}`]}>
-            <LocationProbe />
-            <Routes>
-              <Route path="/result/:sessionId" element={<ResultPage />} />
-              <Route path="/arena/:sessionId" element={<div>Арена</div>} />
-            </Routes>
-          </MemoryRouter>
-        </DomainServicesContext.Provider>
-      </AuthRuntimeContext.Provider>,
+      <AuthContext.Provider value={authValue}>
+        <AuthRuntimeContext.Provider value={{ mockOwnerKey: 'harness-owner', tourOwnerKey: 'harness-tour-owner', runAuthorized }}>
+          <ProductTourContext.Provider value={tourValue}>
+            <DomainServicesContext.Provider value={{
+              negotiationClient,
+              createAudioClient: () => { throw new Error('Audio is not used by this harness') as never },
+            }}>
+              <MemoryRouter initialEntries={[`/result/${sessionId}`]}>
+                <LocationProbe />
+                <Routes>
+                  <Route path="/result/:sessionId" element={<ResultPage />} />
+                  <Route path="/arena/:sessionId" element={<div>Арена</div>} />
+                </Routes>
+              </MemoryRouter>
+            </DomainServicesContext.Provider>
+          </ProductTourContext.Provider>
+        </AuthRuntimeContext.Provider>
+      </AuthContext.Provider>,
     )
   })
   await waitForButton(host)

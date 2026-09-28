@@ -64,6 +64,14 @@ async function flush(milliseconds = 0) {
   await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, milliseconds)) })
 }
 
+async function waitFor(condition: () => boolean, attempts = 30) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (condition()) return
+    await flush(5)
+  }
+  throw new Error('Timed out waiting for the polling harness state.')
+}
+
 async function mountHook(
   negotiationClient: NegotiationClient,
   policy: NegotiationResultPollingPolicy,
@@ -104,7 +112,7 @@ export async function runResultPollingResilienceScenario() {
       return Promise.resolve(pollCalls === 5 ? ready : processing)
     },
   }), fastPolicy)
-  await flush(115)
+  await waitFor(() => pollCalls === 5 && polling.snapshot().result?.status === 'ready')
   const pollingResult = { calls: pollCalls, status: polling.snapshot().result?.status }
   await act(async () => polling.root.unmount())
 
@@ -172,11 +180,12 @@ export async function runResultPollingResilienceScenario() {
     error: deadline.snapshot().error,
     processingStatus: deadline.snapshot().result?.status,
   }
+  const callsBeforeRetry = deadlineCalls
   deadlinePassed = true
   await act(async () => deadline.retry())
-  await flush()
+  await waitFor(() => deadline.snapshot().result?.status === 'ready')
   const retriedResult = {
-    calls: deadlineCalls,
+    addedCalls: deadlineCalls - callsBeforeRetry,
     error: deadline.snapshot().error,
     status: deadline.snapshot().result?.status,
   }

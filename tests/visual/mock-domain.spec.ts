@@ -298,9 +298,16 @@ test('mock audio requires fresh tickets, commits through runtime and cleans sche
     })
     const client = new MockAudioClient(runtime, { latencyMs: 2, requestMicrophone: true })
     const events: string[] = []
-    const unsubscribe = client.subscribe((event) => events.push(event.type))
+    let resolveTranscriptCompletion = () => undefined
+    const transcriptCompleted = new Promise<void>((resolve) => { resolveTranscriptCompletion = resolve })
+    const unsubscribe = client.subscribe((event) => {
+      events.push(event.type)
+      if (events.filter((eventType) => eventType === 'message_committed').length === 2) {
+        resolveTranscriptCompletion()
+      }
+    })
     await client.connect({ sessionId: session.id, ticket: firstTicket })
-    await new Promise((resolve) => setTimeout(resolve, 80))
+    await transcriptCompleted
     const committedBeforeReconnect = events.filter((event) => event === 'message_committed').length
 
     let reusedTicketRejected = false

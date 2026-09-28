@@ -1,4 +1,4 @@
-import { artifactsDir, captureScreenshot, expect, expectNoHorizontalOverflow, test } from './helpers'
+import { artifactsDir, captureScreenshot, dismissProductTourInvitation, expect, expectNoHorizontalOverflow, test } from './helpers'
 
 test('result polls processing, shows analysis and repeats case as a new session', async ({ page }) => {
   test.skip(process.env.VITE_AUTH_SOURCE !== 'mock' || process.env.VITE_NEGOTIATION_SOURCE !== 'mock', 'Requires full mock mode.')
@@ -13,6 +13,7 @@ test('result polls processing, shows analysis and repeats case as a new session'
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
   await page.getByRole('link', { name: 'Открыть demo-ссылку активации' }).click()
   await page.getByRole('link', { name: 'Перейти в приложение' }).click()
+  await dismissProductTourInvitation(page)
   await page.getByRole('button', { name: 'Начать кейс' }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('radio', { name: /Сотрудник/ }).check()
