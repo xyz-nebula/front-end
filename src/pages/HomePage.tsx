@@ -1,88 +1,70 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { CaseCard } from '@/components/home/CaseCard'
-import { CaseIcon } from '@/components/home/CaseIcon'
+import { useAuth } from '@/auth/useAuth'
+import { TotpModal } from '@/components/auth/TotpModal'
+import { CaseCatalog, HomeHeader, HomeOverview, TrainingHistory } from '@/components/home/HomeDashboardSections'
 import { TrainingModal } from '@/components/home/TrainingModal'
-import { AppButton } from '@/components/ui/AppButton'
-import { ArrowIcon } from '@/components/ui/ArrowIcon'
-import { Logo } from '@/components/ui/Logo'
-import { caseCategories, recentTrainings, trainingCases } from '@/mocks/cases'
-import type { CaseCategory, TrainingCase } from '@/types/case'
+import { useHomeDashboardData } from '@/features/home/useHomeDashboardData'
+import { useDomainServices } from '@/services/domainServices'
+import type { TrainingCase } from '@/types/case'
+import '@/styles/home.css'
 
 export function HomePage() {
-  const [category, setCategory] = useState<CaseCategory>('Все')
+  const { dismissMemorySessionNotice, externalSessionVersion, logout, showMemorySessionNotice } = useAuth()
+  const { negotiationClient } = useDomainServices()
+  const dashboard = useHomeDashboardData(negotiationClient)
   const [selectedCase, setSelectedCase] = useState<TrainingCase | null>(null)
-  const recommendedCase = trainingCases[0]
-  const visibleCases = useMemo(
-    () => category === 'Все' ? trainingCases : trainingCases.filter((item) => item.category === category),
-    [category],
-  )
+  const [securityModalVersion, setSecurityModalVersion] = useState<number | null>(null)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [showAllHistory, setShowAllHistory] = useState(false)
+  const profileRef = useRef<HTMLDivElement>(null)
+  const recommendedCase = dashboard.cases[0]
+  const activeSession = dashboard.history.find((item) => item.status === 'active')
+  const activeCase = activeSession && dashboard.cases.find((item) => item.id === activeSession.caseId)
+  const displayedCase = activeCase ?? recommendedCase
 
-  return (
-    <div className="app-home">
-      <header className="app-header">
-        <div className="app-shell app-header__inner">
-          <Logo />
-          <nav aria-label="Навигация приложения"><a className="is-active" href="#cases">Тренировки</a><a href="#progress">Мой прогресс</a></nav>
-          <div className="app-header__profile">
-            <div className="avatar">АК</div><span>Алексей</span>
-          </div>
-        </div>
-      </header>
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    await logout().catch(() => setIsLoggingOut(false))
+  }
 
-      <main className="app-shell home-main">
-        <section className="welcome-section">
-          <div><p>Доброе утро, Алексей <span>✦</span></p><h1>Какой разговор<br />потренируем сегодня?</h1></div>
-          <AppButton type="button" icon={<ArrowIcon />} onClick={() => setSelectedCase(recommendedCase)}>Начать тренировку</AppButton>
-        </section>
+  useEffect(() => {
+    if (!profileOpen) return
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (event.target instanceof Node && !profileRef.current?.contains(event.target)) setProfileOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProfileOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [profileOpen])
 
-        <section className="home-overview">
-          <article className="recommended-card">
-            <div className="recommended-card__copy">
-              <span className="recommended-card__label"><i /> Рекомендуем сегодня</span>
-              <p>{recommendedCase.category} · {recommendedCase.duration}</p>
-              <h2>{recommendedCase.title}</h2>
-              <p className="recommended-card__description">Встреча с руководителем уже близко. Потренируй аргументы и подготовься к неудобным вопросам.</p>
-              <AppButton type="button" variant="light" icon={<ArrowIcon />} onClick={() => setSelectedCase(recommendedCase)}>Начать кейс</AppButton>
-            </div>
-            <div className="recommended-card__visual">
-              <div className="recommended-card__target"><span>Ваша цель</span><strong>Договориться о пересмотре условий</strong></div>
-              <div className="recommended-card__person"><div className="avatar avatar--large">А</div><div><span>Ваш оппонент</span><strong>{recommendedCase.opponent}</strong></div></div>
-              <div className="recommended-card__orb"><CaseIcon name={recommendedCase.icon} /></div>
-            </div>
-          </article>
+  return <div className="arena-home">
+    <HomeHeader
+      externalSessionVersion={externalSessionVersion}
+      isLoggingOut={isLoggingOut}
+      profileOpen={profileOpen}
+      profileRef={profileRef}
+      onLogout={() => void handleLogout()}
+      onProfileToggle={() => setProfileOpen((value) => !value)}
+      onSecurityOpen={(version) => { setProfileOpen(false); setSecurityModalVersion(version) }}
+    />
 
-          <article className="progress-card" id="progress">
-            <div className="progress-card__head"><div><span>Ваш прогресс</span><strong>Сентябрь</strong></div><span className="trend">↗ +8%</span></div>
-            <div className="progress-ring" style={{ '--progress': '72%' } as CSSProperties}><div><strong>7</strong><span>тренировок</span></div></div>
-            <div className="progress-card__stats"><div><span>Средняя оценка</span><strong>74</strong></div><div><span>В практике</span><strong>1ч 24м</strong></div></div>
-            <div className="progress-card__focus"><span>Фокус недели</span><strong>Больше открытых вопросов</strong><div><i /></div></div>
-          </article>
-        </section>
-
-        <section className="catalog-section" id="cases">
-          <div className="catalog-section__head"><div><p className="eyebrow">Библиотека практики</p><h2>Выбери ситуацию</h2></div><p>Каждый кейс можно проходить снова — оппонент будет реагировать по-новому.</p></div>
-          <div className="category-tabs" role="tablist" aria-label="Категории кейсов">
-            {caseCategories.map((item) => <button key={item} type="button" role="tab" aria-selected={category === item} className={category === item ? 'is-active' : ''} onClick={() => setCategory(item)}>{item}</button>)}
-          </div>
-          <div className="case-grid">{visibleCases.map((item) => <CaseCard key={item.id} item={item} onSelect={setSelectedCase} />)}</div>
-        </section>
-
-        <section className="recent-section">
-          <div className="recent-section__head"><div><p className="eyebrow">История</p><h2>Последние тренировки</h2></div><span>3 сессии в этом месяце</span></div>
-          <div className="recent-table">
-            {recentTrainings.map((item) => (
-              <div className="recent-row" key={`${item.caseTitle}-${item.date}`}>
-                <div className="recent-row__icon">↗</div><div className="recent-row__name"><strong>{item.caseTitle}</strong><span>{item.date}</span></div><div className="recent-row__score"><span>Результат</span><strong>{item.score}<small>/100</small></strong></div><div className={`recent-row__change ${item.change === 0 ? 'is-neutral' : ''}`}>{item.change > 0 ? `+${item.change}` : '—'}</div>
-                <button type="button" onClick={() => setSelectedCase(trainingCases.find((trainingCase) => trainingCase.title === item.caseTitle) ?? recommendedCase)} aria-label={`Повторить «${item.caseTitle}»`}><ArrowIcon /></button>
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
-
-      <footer className="app-home__footer"><div className="app-shell"><Logo /><span>Тренируйся сегодня — говори увереннее завтра.</span><span>Прототип · 2026</span></div></footer>
-      {selectedCase && <TrainingModal item={selectedCase} onClose={() => setSelectedCase(null)} />}
-    </div>
-  )
+    <main className="arena-home__shell arena-home__main">
+      {showMemorySessionNotice && <div className="memory-session-notice" role="status"><span aria-hidden="true">!</span><p><strong>Сессия действует только в этой вкладке.</strong> После перезагрузки потребуется войти снова.</p><button type="button" onClick={dismissMemorySessionNotice} aria-label="Закрыть уведомление">×</button></div>}
+      <section className="arena-home__welcome"><h1>Добро пожаловать, Кирилл</h1><p>Продолжай тренировки и развивай переговорные навыки</p></section>
+      <HomeOverview activeSession={activeSession} casesLoading={dashboard.casesLoading} displayedCase={displayedCase} historyCount={dashboard.history.length} historyLoading={dashboard.historyLoading} recommendedCase={recommendedCase} onCaseSelect={setSelectedCase} />
+      <CaseCatalog cases={dashboard.cases} error={dashboard.casesError} loading={dashboard.casesLoading} onRetry={() => void dashboard.loadCases()} onSelect={setSelectedCase} />
+      <TrainingHistory cases={dashboard.cases} error={dashboard.historyError} history={dashboard.history} loading={dashboard.historyLoading} showAll={showAllHistory} onRetry={() => void dashboard.loadHistory()} onToggleAll={() => setShowAllHistory((value) => !value)} />
+    </main>
+    {selectedCase && <TrainingModal item={selectedCase} onClose={() => setSelectedCase(null)} />}
+    {securityModalVersion === externalSessionVersion && <TotpModal onClose={() => setSecurityModalVersion(null)} />}
+  </div>
 }

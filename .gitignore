@@ -21,6 +21,7 @@ playwright-report/
 Thumbs.db
 
 # Editors
+.claude/settings.local.json
 .idea/
 .vscode/*
 !.vscode/extensions.json

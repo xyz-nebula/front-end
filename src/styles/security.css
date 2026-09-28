@@ -1,0 +1,103 @@
+.security-backdrop {
+  position: fixed;
+  z-index: 1100;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  background: rgba(12, 27, 57, .62);
+  backdrop-filter: blur(4px);
+  animation: security-fade-in .2s ease;
+}
+
+.security-modal {
+  --security-ink: #14213a;
+  --security-muted: #687792;
+  --security-blue: #0869ec;
+  --security-line: #dce5f3;
+  position: relative;
+  width: min(100%, 600px);
+  max-height: calc(100dvh - 48px);
+  padding: 38px 40px 36px;
+  border: 1px solid var(--security-line);
+  border-radius: 23px;
+  color: var(--security-ink);
+  background: #fff;
+  box-shadow: 0 30px 90px rgba(12, 27, 57, .26);
+  overflow-y: auto;
+  animation: security-modal-in .28s cubic-bezier(.2, .8, .3, 1);
+}
+
+.security-modal__close { position: absolute; top: 18px; right: 20px; display: grid; width: 38px; height: 38px; place-items: center; padding: 0; border: 0; border-radius: 50%; color: #5c6f8e; background: #f4f7fb; cursor: pointer; font-size: 29px; font-weight: 300; line-height: 1; }
+.security-modal__close:hover { color: var(--security-blue); background: #eaf2ff; }
+.security-modal .eyebrow { margin: 0 48px 10px 0; color: var(--security-blue); font-size: 12px; font-weight: 760; letter-spacing: .1em; text-transform: uppercase; }
+.security-modal h2 { margin: 0; padding-right: 38px; font-size: clamp(32px, 4vw, 40px); line-height: 1.08; font-weight: 800; letter-spacing: -.045em; }
+.security-modal__intro { margin: 13px 0 27px; color: var(--security-muted); font-size: 15px; line-height: 1.5; }
+.security-actions { display: grid; gap: 12px; }
+.security-actions > button { display: grid; width: 100%; min-height: 86px; grid-template-columns: auto 1fr auto; align-items: center; gap: 15px; padding: 15px 17px; border: 1px solid var(--security-line); border-radius: 15px; color: var(--security-ink); text-align: left; background: #fff; cursor: pointer; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.security-actions > button:hover:not(:disabled) { border-color: #9ec5fa; box-shadow: 0 8px 22px rgba(8, 105, 236, .08); transform: translateY(-1px); }
+.security-actions > button:last-child:hover:not(:disabled) { border-color: #efb9bd; box-shadow: 0 8px 22px rgba(220, 52, 66, .07); }
+.security-actions > button:disabled { cursor: wait; opacity: .58; }
+.security-actions__icon { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 13px; color: var(--security-blue); background: #eaf2ff; font-size: 27px; line-height: 1; }
+.security-actions__icon--danger { color: #ce3440; background: #fff0f1; }
+.security-actions > button > span:nth-child(2) { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.security-actions strong { font-size: 16px; font-weight: 750; }
+.security-actions small { color: var(--security-muted); font-size: 13px; line-height: 1.35; }
+.security-actions svg { width: 20px; color: #73839d; }
+.security-modal__back { margin: 0 0 24px; padding: 0; border: 0; color: #60728f; background: transparent; cursor: pointer; font-size: 14px; font-weight: 650; }
+.security-modal__back:hover { color: var(--security-blue); }
+.totp-secret { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px 12px; padding: 17px; border: 1px solid var(--security-line); border-radius: 14px; background: #f8faff; }
+.totp-secret span { grid-column: 1 / -1; color: var(--security-muted); font-size: 11px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.totp-secret code { min-width: 0; align-self: center; color: #204d8f; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 14px; font-weight: 750; overflow-wrap: anywhere; }
+.totp-secret button { min-height: 35px; padding: 0 12px; border: 0; border-radius: 9px; color: var(--security-blue); background: #e5efff; cursor: pointer; font-size: 12px; font-weight: 700; }
+.totp-open-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 11px; padding: 14px 16px; border-radius: 12px; color: #075edc; background: #edf4ff; font-size: 13px; font-weight: 700; }
+.totp-open-link:hover { background: #e2edff; }
+.totp-open-link svg { width: 18px; }
+.security-modal__form { display: flex; flex-direction: column; gap: 18px; margin-top: 23px; }
+.security-modal .form-field { gap: 8px; }
+.security-modal .form-field__label { color: var(--security-ink); font-size: 14px; font-weight: 680; }
+.security-modal .form-field input { height: 54px; border-color: var(--security-line); color: var(--security-ink); background: #fff; font-size: 16px; }
+.security-modal .form-field input:focus { border-color: var(--security-blue); box-shadow: 0 0 0 4px rgba(8, 105, 236, .12); }
+.security-modal .form-field__hint, .security-modal .form-field__error { font-size: 12px; }
+.security-modal .form-alert { margin-bottom: 16px; border-color: #f1c8c8; color: #943737; background: #fff0f0; font-size: 13px; }
+.confirm-check { display: flex; align-items: flex-start; gap: 11px; color: #566986; cursor: pointer; font-size: 13px; line-height: 1.45; }
+.confirm-check input { width: 18px; height: 18px; flex: none; margin: 0; accent-color: var(--security-blue); }
+.security-modal .app-button { min-height: 53px; margin-top: 2px; border-radius: 12px; font-size: 15px; }
+.security-modal .app-button--primary { background: var(--security-blue); box-shadow: none; }
+.security-modal .app-button--primary:hover { background: #0759d8; box-shadow: none; }
+.security-modal .security-modal__danger { color: #b52f39; border-color: #efc2c6; background: #fff4f5; }
+.security-modal .security-modal__danger:hover { color: #fff; border-color: #c72e3a; background: #c72e3a; }
+.security-success { display: flex; min-height: 410px; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.security-success > span { display: grid; width: 92px; height: 92px; margin-bottom: 23px; place-items: center; border-radius: 50%; color: #169b63; background: #e9fbf3; font-size: 38px; }
+.security-success .eyebrow { margin-right: 0; }
+.security-success h2 { padding-right: 0; }
+.security-success p:not(.eyebrow) { max-width: 390px; margin: 16px 0 27px; color: var(--security-muted); font-size: 15px; line-height: 1.5; }
+.security-modal :is(button, a, input):focus-visible { outline: 3px solid rgba(8, 105, 236, .35); outline-offset: 3px; }
+
+@media (max-width: 600px) {
+  .security-backdrop { padding: 16px; }
+  .security-modal { width: 100%; max-height: calc(100dvh - 32px); padding: 31px 21px 25px; border-radius: 20px; }
+  .security-modal__close { top: 13px; right: 14px; }
+  .security-modal h2 { padding-right: 25px; font-size: 31px; }
+  .security-modal__intro { margin-top: 11px; font-size: 14px; }
+  .security-actions > button { min-height: 80px; gap: 12px; padding: 13px; }
+  .security-actions__icon { width: 42px; height: 42px; }
+  .security-actions strong { font-size: 15px; }
+  .security-actions small { font-size: 12px; }
+  .totp-secret { grid-template-columns: 1fr; }
+  .totp-secret button { width: max-content; }
+  .security-success { min-height: 430px; }
+  .security-modal .app-button { width: 100%; }
+}
+
+@media (max-width: 370px) {
+  .security-backdrop { padding: 10px; }
+  .security-modal { max-height: calc(100dvh - 20px); padding-inline: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .security-backdrop, .security-modal, .security-modal * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+@keyframes security-fade-in { from { opacity: 0; } }
+@keyframes security-modal-in { from { opacity: 0; transform: translateY(16px) scale(.98); } }

@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 
 import { App } from '@/App'
-import { AppThemeProvider } from '@/components/layout/AppThemeProvider'
+import { AuthProvider } from '@/auth/AuthContext'
+import { DomainServicesProvider } from '@/services/DomainServicesContext'
+import { ServiceAdaptersProvider } from '@/services/ServiceAdaptersContext'
 import '@/styles/global.css'
 
 const rootElement = document.getElementById('root')
@@ -15,9 +17,13 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <BrowserRouter>
-      <AppThemeProvider>
-        <App />
-      </AppThemeProvider>
+      <ServiceAdaptersProvider>
+        <AuthProvider>
+          <DomainServicesProvider>
+            <App />
+          </DomainServicesProvider>
+        </AuthProvider>
+      </ServiceAdaptersProvider>
     </BrowserRouter>
   </StrictMode>,
 )

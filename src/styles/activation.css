@@ -1,0 +1,237 @@
+.activation-page {
+  --activation-ink: #172238;
+  --activation-muted: #738098;
+  --activation-blue: #1668ed;
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: 105px 24px 68px;
+  color: var(--activation-ink);
+  background: radial-gradient(circle at 50% 45%, #f5f8ff 0, #fff 63%);
+}
+
+.activation-page__header {
+  position: absolute;
+  top: 28px;
+  left: clamp(24px, 3vw, 48px);
+}
+
+.activation-page__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -.035em;
+}
+
+.activation-page__brand-mark { width: 31px; height: 34px; }
+.activation-page__card {
+  display: flex;
+  width: min(100%, 640px);
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 40px 37px;
+  border: 1px solid #e0e7f2;
+  border-radius: 25px;
+  background: #fff;
+  box-shadow: 0 22px 65px rgba(31, 66, 119, .07);
+  text-align: center;
+}
+
+.activation-page__mark {
+  display: grid;
+  width: 102px;
+  height: 102px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: #0865e8;
+  background: #edf4ff;
+}
+
+.activation-page__mark svg {
+  width: 48px;
+  height: 48px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.activation-page__mark--success { color: #13ac70; background: #e9fbf3; }
+.activation-page__mark--success svg { stroke-width: 3.2; }
+.activation-page__mark--error { color: #d45757; background: #fff0f0; }
+.activation-page__mark--checking { color: var(--activation-blue); }
+.activation-page__spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #cbdcf8;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: activation-spin .8s linear infinite;
+}
+
+.activation-page__card h1 {
+  margin: 21px 0 0;
+  font-size: clamp(34px, 3vw, 40px);
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -.045em;
+}
+
+.activation-page__description {
+  max-width: 540px;
+  margin: 11px 0 0;
+  color: var(--activation-muted);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.activation-page__email {
+  max-width: 100%;
+  margin-top: 21px;
+  padding: 11px 21px;
+  border-radius: 999px;
+  color: var(--activation-blue);
+  background: #eaf2ff;
+  font-size: 17px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.activation-page__instructions {
+  max-width: 540px;
+  margin-top: 27px;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.activation-page__instructions p { margin: 0; }
+.activation-page__instructions p + p { margin-top: 9px; color: var(--activation-muted); }
+.activation-page__demo-link { margin-top: 20px; color: var(--activation-blue); font-size: 14px; font-weight: 650; }
+.activation-page__waiting-actions { width: 100%; margin-top: 32px; color: var(--activation-muted); font-size: 16px; line-height: 1.5; }
+.activation-page__waiting-actions p { margin: 0; }
+.activation-page__waiting-actions a,
+.activation-page__error-login a {
+  padding: 0;
+  border: 0;
+  color: var(--activation-blue);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+}
+
+.activation-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 40px;
+  color: #8591a6;
+  font-size: 16px;
+  font-weight: 550;
+}
+
+.activation-page__back span { font-size: 22px; line-height: 1; }
+.activation-page__message {
+  width: 100%;
+  margin-top: 34px;
+  padding: 24px 27px;
+  border-radius: 16px;
+  background: #f3f7fd;
+  text-align: left;
+  font-size: 17px;
+}
+
+.activation-page__message strong { font-size: 17px; font-weight: 750; }
+.activation-page__message p { margin: 5px 0 0; color: var(--activation-muted); line-height: 1.45; }
+.activation-page__action {
+  display: inline-flex;
+  width: 100%;
+  min-height: 66px;
+  align-items: center;
+  justify-content: center;
+  gap: 19px;
+  margin-top: 28px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 14px;
+  color: #fff;
+  background: #226cef;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  transition: background .18s ease, transform .18s ease;
+}
+
+.activation-page__action:hover { background: #0759d8; transform: translateY(-1px); }
+.activation-page__action:active { transform: translateY(0); }
+.activation-page__action span { font-size: 27px; line-height: 1; font-weight: 400; }
+.activation-page__error { width: 100%; margin-top: 31px; padding: 18px; border-radius: 14px; color: #a33f3f; background: #fff0f0; line-height: 1.5; text-align: left; }
+.activation-page__error-login { margin: 26px 0 0; color: var(--activation-muted); font-size: 16px; }
+.activation-page :is(a, button):focus-visible { outline: 3px solid rgba(8, 101, 232, .35); outline-offset: 3px; }
+.activation-page__waiting-actions a:hover,
+.activation-page__demo-link:hover,
+.activation-page__error-login a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.activation-page__back:hover { color: var(--activation-ink); }
+
+@media (max-width: 600px) {
+  .activation-page {
+    display: flex;
+    min-height: 100svh;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0 26px 34px;
+    background: #fff;
+  }
+
+  .activation-page__header { position: static; padding-top: 30px; }
+  .activation-page__brand { font-size: 18px; }
+  .activation-page__card {
+    width: 100%;
+    min-height: 0;
+    flex: 1;
+    padding: 80px 0 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .activation-page__mark { width: 98px; height: 98px; }
+  .activation-page__card h1 { margin-top: 27px; font-size: clamp(35px, 9vw, 42px); }
+  .activation-page__description { margin-top: 14px; font-size: 17px; }
+  .activation-page__email { margin-top: 24px; padding: 10px 20px; font-size: 17px; }
+  .activation-page__instructions { margin-top: 24px; font-size: 17px; }
+  .activation-page__instructions p + p { margin-top: 14px; }
+  .activation-page__demo-link { margin-top: 19px; }
+  .activation-page__waiting-actions { margin-top: 38px; padding-top: 36px; border-top: 1px solid #e2e8f2; font-size: 16px; }
+  .activation-page__back { align-self: flex-start; margin-top: auto; padding-top: 75px; }
+  .activation-page--waiting .activation-page__card { padding-top: 52px; }
+  .activation-page--waiting .activation-page__back { padding-top: 30px; }
+  .activation-page__message { margin-top: 47px; padding: 0; background: none; text-align: center; }
+  .activation-page__message strong { font-size: 18px; }
+  .activation-page__message p { margin-top: 10px; font-size: 17px; }
+  .activation-page__action { margin-top: 46px; }
+  .activation-page--success .activation-page__card { padding-top: 100px; }
+  .activation-page--success .activation-page__message { margin-top: 60px; }
+  .activation-page--success .activation-page__action { margin-top: 55px; }
+  .activation-page--error .activation-page__back { margin-top: 32px; padding-top: 0; }
+}
+
+@media (max-width: 370px) {
+  .activation-page { padding-inline: 18px; }
+  .activation-page__brand { font-size: 16px; }
+  .activation-page__card { padding-top: 62px; }
+  .activation-page__card h1 { font-size: 34px; }
+  .activation-page__description,
+  .activation-page__instructions { font-size: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activation-page__spinner { animation-duration: 2s; }
+  .activation-page__action { transition-duration: .01ms; }
+}
+
+@keyframes activation-spin { to { transform: rotate(360deg); } }
