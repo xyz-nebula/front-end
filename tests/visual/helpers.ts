@@ -6,6 +6,7 @@ export const artifactsDir = 'artifacts/visual-smoke'
 
 export interface SeededSmokeState {
   activeSessionId: string
+  expiredSessionId: string
   finishedSessionId: string
 }
 
@@ -70,13 +71,31 @@ export async function seedProtectedScreens(page: Page, seed: string): Promise<Se
     const runtime = new MockRuntime(storage)
     const activeSession = await runtime.createSession(ownerKey, {
       caseId: 'salary-review',
+      timeLimitSeconds: 15 * 60,
       mode: 'text',
       clientCommandId: `active-${seedValue}`,
     })
     const finishedSession = await runtime.createSession(ownerKey, {
       caseId: 'salary-review',
+      timeLimitSeconds: 15 * 60,
       mode: 'text',
       clientCommandId: `finished-${seedValue}`,
+    })
+    const expiredSession = await runtime.createSession(ownerKey, {
+      caseId: 'salary-review',
+      timeLimitSeconds: 15 * 60,
+      mode: 'text',
+      clientCommandId: `expired-${seedValue}`,
+    })
+    await runtime.sendTextTurn(ownerKey, {
+      sessionId: expiredSession.id,
+      text: 'Начинаем переговоры.',
+      clientTurnId: `expired-turn-${seedValue}`,
+    })
+    await storage.mutate((data) => {
+      const session = data.sessions.find((item) => item.id === expiredSession.id)
+      if (!session) throw new Error('Expired smoke session was not created.')
+      for (const message of session.messages) message.createdAt = '2026-09-28T00:00:00.000Z'
     })
     await runtime.sendTextTurn(ownerKey, {
       sessionId: finishedSession.id,
@@ -93,6 +112,7 @@ export async function seedProtectedScreens(page: Page, seed: string): Promise<Se
 
     return {
       activeSessionId: activeSession.id,
+      expiredSessionId: expiredSession.id,
       finishedSessionId: finishedSession.id,
     }
   }, { seedValue: seed })

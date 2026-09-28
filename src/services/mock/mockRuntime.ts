@@ -1,4 +1,5 @@
 import { getMockAiResponse } from '@/mocks/negotiation-scenarios'
+import { trainingCases } from '@/mocks/cases'
 import { createMockResultFixture } from '@/mocks/resultFixtures'
 import { MockStorage, type MockData, type MockSessionRecord } from '@/services/mock/mockStorage'
 import type {
@@ -30,12 +31,14 @@ function findOwnedSession(data: MockData, ownerKey: string, sessionId: string): 
 }
 
 function toSession(record: MockSessionRecord): NegotiationSession {
+  const timeLimitSeconds = trainingCases.find((item) => item.id === record.caseId)?.timeLimitSeconds ?? 15 * 60
   return {
     id: record.id,
     caseId: record.caseId,
     mode: record.mode,
     status: record.status,
     startedAt: record.startedAt,
+    timeLimitSeconds,
     ...(record.finishedAt ? { finishedAt: record.finishedAt } : {}),
     messages: clone(record.messages).sort((left, right) => left.sequence - right.sequence),
   }

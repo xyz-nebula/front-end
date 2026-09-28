@@ -42,6 +42,7 @@ export function useRepeatNegotiation(
       const previousPreparation = readSessionPreparation(ownerKey, session.id)
       const created = await negotiationClient.createSession({
         caseId: command.caseId,
+        timeLimitSeconds: session.timeLimitSeconds,
         mode: command.mode,
         clientCommandId: command.clientCommandId,
         preparations: previousPreparation ? serializePreparation(previousPreparation.draft) : '# Подготовка\n\nПользователь не заполнял карточку подготовки.',

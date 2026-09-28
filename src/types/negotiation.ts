@@ -20,6 +20,7 @@ export interface NegotiationSession {
   selectedRole?: 0 | 1
   preparations?: string
   startedAt: string
+  timeLimitSeconds: number
   finishedAt?: string
   messages: NegotiationMessage[]
 }

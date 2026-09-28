@@ -62,6 +62,8 @@ for (const viewport of viewports) {
 
     await page.goto(`/arena/${state.activeSessionId}`)
     await expect(page.locator('.duel-heading h1')).toBeVisible()
+    await expect(page.getByLabel('Оставшееся время')).toHaveText('15:00')
+    await expect(page.getByText('Таймер начнётся после первой реплики')).toBeVisible()
     await expect(page.getByLabel('Ваша реплика')).toBeVisible()
     await captureScreen(page, 'arena', viewport.name)
 
@@ -70,3 +72,16 @@ for (const viewport of viewports) {
     await captureScreen(page, 'result', viewport.name)
   })
 }
+
+test('an expired persisted session automatically starts evaluation after reload', async ({ page }) => {
+  const state = await seedProtectedScreens(page, 'expired-session')
+
+  await page.goto(`/arena/${state.expiredSessionId}`)
+  await expect(page).toHaveURL(new RegExp(`/result/${state.expiredSessionId}$`))
+  await expect.poll(() => page.evaluate(({ sessionId }) => {
+    const serialized = localStorage.getItem('arena.mock.data.v2')
+    if (!serialized) return 0
+    const data = JSON.parse(serialized) as { results?: Array<{ sessionId?: string }> }
+    return data.results?.filter((result) => result.sessionId === sessionId).length ?? 0
+  }, { sessionId: state.expiredSessionId })).toBe(1)
+})

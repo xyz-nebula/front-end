@@ -41,7 +41,7 @@ export function useStartNegotiation(negotiationClient: NegotiationClient, input:
     setIsStarting(true)
     setError(null)
     try {
-      const session = await negotiationClient.createSession({ caseId: trainingCase.id, caseName: trainingCase.title, mode, clientCommandId: command.clientCommandId, preparations, selectedRole: roleIndex })
+      const session = await negotiationClient.createSession({ caseId: trainingCase.id, caseName: trainingCase.title, timeLimitSeconds: trainingCase.timeLimitSeconds, mode, clientCommandId: command.clientCommandId, preparations, selectedRole: roleIndex })
       saveSessionPreparation(ownerKey, session.id, {
         caseId: trainingCase.id,
         caseTitle: trainingCase.title,

@@ -44,9 +44,14 @@ function mapStatus(status: ParsedChat['status']): NegotiationStatus {
 }
 
 function mapSession(chat: ParsedChatWithMessages): NegotiationSession {
+  if (!chat.case) {
+    throw new ServiceError('Сервер не вернул кейс переговоров.', {
+      reason: 'invalid-response', code: 'INVALID_SERVICE_RESPONSE',
+    })
+  }
   return {
     id: chat.id,
-    caseId: chat.case?.id ?? chat.name,
+    caseId: chat.case.id,
     name: chat.case?.name ?? chat.name,
     mode: 'voice',
     status: mapStatus(chat.status),
@@ -54,6 +59,7 @@ function mapSession(chat: ParsedChatWithMessages): NegotiationSession {
     selectedRole: chat.selectedRole,
     preparations: chat.preparations,
     startedAt: chat.createdAt,
+    timeLimitSeconds: chat.case.timeLimit,
     messages: chat.messages,
   }
 }
@@ -82,6 +88,7 @@ function mapCase(item: ReturnType<typeof parseCases>[number], index: number): Tr
     synopsis: item.synopsis,
     category: item.category,
     duration: formatTimeLimit(item.timeLimit),
+    timeLimitSeconds: item.timeLimit,
     difficulty: mapDifficulty(item.difficulty),
     opponent: item.secondRole,
     roles: [item.firstRole, item.secondRole],
@@ -110,6 +117,7 @@ function evaluationSessionStub(sessionId: string): NegotiationSession {
     mode: 'voice',
     status: 'finishing',
     startedAt: '',
+    timeLimitSeconds: 1,
     messages: [],
   }
 }
@@ -233,7 +241,19 @@ export class BackendNegotiationClient implements NegotiationClient {
         method: 'POST',
         body: toCreateChatDto(input.caseName ?? input.caseId, input.caseId, input.preparations, input.selectedRole),
       }))
-      return mapSession({ ...created, messages: [] })
+      return {
+        id: created.id,
+        caseId: input.caseId,
+        name: input.caseName ?? created.name,
+        mode: input.mode,
+        status: mapStatus(created.status),
+        backendStatus: created.status,
+        selectedRole: created.selectedRole,
+        preparations: created.preparations,
+        startedAt: created.createdAt,
+        timeLimitSeconds: input.timeLimitSeconds,
+        messages: [],
+      }
     })
   }
 

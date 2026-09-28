@@ -37,6 +37,13 @@ TOTP через `/v1/auth/*`.
 
 `BackendNegotiationClient` сейчас вызывает:
 
+`CaseResponse.time_limit` трактуется как длительность переговоров в секундах. Арена
+берёт значение из вложенного `case` ответа `GET /v1/chats/{uuid}`, запускает
+клиентский обратный отсчёт от `MessageResponse.created_at` первой сохранённой реплики и вызывает
+существующий evaluation-flow при истечении времени. Пауза, reload и фоновая вкладка
+не сдвигают дедлайн. Backend и audio-engine не обеспечивают серверный дедлайн,
+поэтому это ограничение относится только к browser UI.
+
 | Метод | Upstream path | Назначение |
 | --- | --- | --- |
 | `POST` | `/v1/chats/` | Создать чат из `name`, `case_uuid`, `preparations` |

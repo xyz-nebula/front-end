@@ -10,6 +10,7 @@ export interface TrainingCase {
   synopsis: string
   category: string
   duration: string
+  timeLimitSeconds: number
   difficulty: 'Легко' | 'Средне' | 'Сложно'
   opponent: string
   roles: [string, string]

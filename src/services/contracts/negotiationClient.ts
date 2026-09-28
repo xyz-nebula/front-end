@@ -12,6 +12,7 @@ export interface NegotiationClient {
   createSession(input: {
     caseId: string
     caseName?: string
+    timeLimitSeconds: number
     mode: NegotiationMode
     clientCommandId: string
     preparations: string
