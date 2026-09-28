@@ -44,8 +44,14 @@ export function ArenaPage() {
   const { isRealVoice } = useDomainServices()
   const arena = useArenaSession(sessionId)
   const productTour = useProductTour()
-  const { send: sendTourEvent, state: tourState } = productTour
+  const {
+    clearScenarioError,
+    reportScenarioError,
+    send: sendTourEvent,
+    state: tourState,
+  } = productTour
   const audio = useArenaAudio(sessionId, arena.session?.mode === 'voice' && arena.session.status === 'active', arena.addCommittedMessage, arena.refreshSession)
+  const connectAudio = audio.connect
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const [finishError, setFinishError] = useState<string | null>(null)
@@ -74,6 +80,16 @@ export function ArenaPage() {
       aiMessages: arena.session.messages.filter((message) => message.speaker === 'ai').length,
     })
   }, [arena.session, audio.state, sendTourEvent])
+
+  useEffect(() => {
+    if (tourState?.status !== 'active' || tourState.stepId !== 'microphone') return
+    if (audio.state !== 'error' || !audio.error) {
+      clearScenarioError()
+      return
+    }
+    const kind = /микрофон|доступ/i.test(audio.error) ? 'microphone' : 'audio'
+    reportScenarioError(kind, () => { void connectAudio() })
+  }, [audio.error, audio.state, clearScenarioError, connectAudio, reportScenarioError, tourState])
 
   useEffect(() => {
     const baseline = tourState?.dialogueBaseline

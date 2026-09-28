@@ -34,6 +34,7 @@ const testGroups = [
       'home.spec.ts',
       'product-tour-machine.spec.ts',
       'product-tour-events.spec.ts',
+      'product-tour-recovery.spec.ts',
       'preparation.spec.ts',
       'page-data-hooks.spec.ts',
       'mock-domain.spec.ts',

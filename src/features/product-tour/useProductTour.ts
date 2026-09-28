@@ -10,7 +10,15 @@ export interface ProductTourContextValue {
   menuLabel: 'Пройти тур' | 'Продолжить тур' | 'Пройти тур заново'
   invitationOpen: boolean
   resultReady?: boolean
+  error: 'session-unavailable' | 'target-unavailable' | null
+  scenarioError: 'microphone' | 'audio' | 'result' | null
+  retryScenario: () => void
+  reportScenarioError: (kind: 'microphone' | 'audio' | 'result', retry: () => void) => void
+  clearScenarioError: () => void
   startOrResume: () => void
+  restart: () => void
+  dismissError: () => void
+  reportTargetUnavailable: () => void
   beginFromInvitation: () => void
   deferInvitation: () => void
   disableInvitation: () => void

@@ -99,7 +99,6 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const startPreparation = () => {
     if (role === null) return
     const selectedMode = effectiveMode
-    if (isTourCase) sendTourEvent({ type: 'preparation-opened' })
     navigate(`/cases/${encodeURIComponent(item.id)}/preparation?role=${role}&mode=${selectedMode}&section=analysis`)
   }
 

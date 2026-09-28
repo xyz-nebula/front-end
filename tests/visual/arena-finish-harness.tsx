@@ -88,6 +88,8 @@ export async function runAudioFinishFailureScenario() {
     ownerKey: 'harness-tour-owner', state: null, storageAvailable: true,
     menuLabel: 'Пройти тур' as const, invitationOpen: false,
     startOrResume: () => undefined, beginFromInvitation: () => undefined,
+    error: null, restart: () => undefined, dismissError: () => undefined, reportTargetUnavailable: () => undefined,
+    scenarioError: null, retryScenario: () => undefined, reportScenarioError: () => undefined, clearScenarioError: () => undefined,
     deferInvitation: () => undefined, disableInvitation: () => undefined,
     considerInvitation: () => undefined, send: () => undefined,
   }

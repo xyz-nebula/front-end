@@ -20,7 +20,12 @@ export function ResultPage() {
   const { isRealVoice, negotiationClient } = useDomainServices()
   const loaded = useNegotiationResult(negotiationClient, sessionId)
   const productTour = useProductTour()
-  const { send: sendTourEvent, state: tourState } = productTour
+  const {
+    clearScenarioError,
+    reportScenarioError,
+    send: sendTourEvent,
+    state: tourState,
+  } = productTour
   const openCreatedSession = useCallback((createdSessionId: string) => navigate(`/arena/${createdSessionId}`), [navigate])
   const repeated = useRepeatNegotiation(negotiationClient, mockOwnerKey, loaded.session, openCreatedSession)
   const ready = loaded.result?.status === 'ready' ? loaded.result.result : null
@@ -31,6 +36,15 @@ export function ResultPage() {
       sendTourEvent({ type: 'result-ready' })
     }
   }, [ready, sendTourEvent, sessionId, tourState])
+
+  useEffect(() => {
+    if (tourState?.status !== 'active' || tourState.stepId !== 'result' || tourState.sessionId !== sessionId) return
+    if (loaded.error || loaded.result?.status === 'failed') {
+      reportScenarioError('result', loaded.retry)
+    } else {
+      clearScenarioError()
+    }
+  }, [clearScenarioError, loaded.error, loaded.result?.status, loaded.retry, reportScenarioError, sessionId, tourState])
 
   return <div className="result-page">
     <ResultHeader />
