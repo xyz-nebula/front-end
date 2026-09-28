@@ -116,7 +116,7 @@ export async function runResultDataHookScenario() {
   await act(async () => { root.render(<Probe />) })
   sessionId = 'new'
   await act(async () => { root.render(<Probe />) })
-  await flush(430)
+  await flush(530)
   resolveOld(session('old'))
   await flush()
   const afterStale = value as unknown as ReturnType<typeof useNegotiationResult>

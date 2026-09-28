@@ -18,7 +18,7 @@ export function ResultStatus({ result, error, onRetry }: ResultStatusProps) {
       </span>
       <p className="result-status__eyebrow">Разбор переговоров</p>
       <h1>{failed ? 'Разбор не готов' : error ? 'Не удалось получить разбор' : 'Анализируем разговор…'}</h1>
-      <p>{failed ? result.message : error ?? 'Собираем выводы по вашим репликам. Это займёт несколько секунд.'}</p>
+      <p>{failed ? result.message : error ?? 'Собираем выводы по вашим репликам. Это может занять несколько минут.'}</p>
       <div className="result-status__actions">
         {(error || failed) && <AppButton type="button" onClick={onRetry}>Проверить ещё раз</AppButton>}
         <AppButton to="/home" variant="secondary">К кейсам</AppButton>
