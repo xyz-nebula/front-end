@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { CaptureAttemptGuard } from '@/features/arena/captureAttemptGuard'
 import { useDomainServices } from '@/services/domainServices'
 import type { AudioClient } from '@/services/contracts/audioClient'
 import type { AudioCaptureMessage, AudioConnectionState, AudioEngineEvent, AudioTranscriptDrafts } from '@/types/audio'
@@ -59,6 +60,7 @@ export function useArenaAudio(
   const captureNodeRef = useRef<AudioWorkletNode | null>(null)
   const captureMuteRef = useRef<GainNode | null>(null)
   const captureWorkletContextRef = useRef<AudioContext | null>(null)
+  const captureAttemptGuardRef = useRef(new CaptureAttemptGuard())
   const sourceRefs = useRef(new Set<AudioBufferSourceNode>())
   const playbackEndRef = useRef(0)
   const playbackGenerationRef = useRef(0)
@@ -86,7 +88,7 @@ export function useArenaAudio(
 
   const getInputLevel = useCallback(() => inputLevelRef.current, [])
 
-  const stopCapture = useCallback(() => {
+  const releaseCapture = useCallback(() => {
     const node = captureNodeRef.current
     if (node) {
       node.port.onmessage = null
@@ -106,12 +108,18 @@ export function useArenaAudio(
     resetInputLevel()
   }, [resetInputLevel])
 
-  const startCapture = useCallback(async (client: AudioClient, isCurrent: () => boolean) => {
-    if (!client.acceptsAudioInput) return
+  const stopCapture = useCallback(() => {
+    captureAttemptGuardRef.current.invalidate()
+    releaseCapture()
+  }, [releaseCapture])
+
+  const startCapture = useCallback(async (client: AudioClient, isContextCurrent: () => boolean): Promise<boolean> => {
+    if (!client.acceptsAudioInput) return true
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error('Этот браузер не поддерживает захват звука.')
     }
-    stopCapture()
+    releaseCapture()
+    const attempt = captureAttemptGuardRef.current.begin(isContextCurrent)
     let stream: MediaStream
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -123,6 +131,7 @@ export function useArenaAudio(
         },
       })
     } catch (error) {
+      if (!attempt.isCurrent()) return false
       throw new Error(
         error instanceof DOMException && error.name === 'NotAllowedError'
           ? 'Разрешите доступ к микрофону и подключитесь снова.'
@@ -130,34 +139,41 @@ export function useArenaAudio(
         { cause: error },
       )
     }
-    if (!isCurrent()) {
+    const discardStaleStream = () => attempt.discardIfStale(() => {
       stream.getTracks().forEach((track) => track.stop())
-      return
-    }
-    captureStreamRef.current = stream
+    })
+    if (discardStaleStream()) return false
 
     const context = contextRef.current ?? new AudioContext()
     contextRef.current = context
-    if (captureWorkletContextRef.current !== context) {
-      await context.audioWorklet.addModule('/pcm-capture-worklet.js')
-      captureWorkletContextRef.current = context
-    }
-    if (!isCurrent()) {
+    let source: MediaStreamAudioSourceNode
+    let node: AudioWorkletNode
+    let mute: GainNode
+    try {
+      if (captureWorkletContextRef.current !== context) {
+        await context.audioWorklet.addModule('/pcm-capture-worklet.js')
+        captureWorkletContextRef.current = context
+      }
+      if (discardStaleStream()) return false
+      await context.resume()
+      if (discardStaleStream()) return false
+      source = context.createMediaStreamSource(stream)
+      node = new AudioWorkletNode(context, 'pcm-capture-processor', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [1],
+        channelCount: 1,
+      })
+      mute = context.createGain()
+      mute.gain.value = 0
+      source.connect(node).connect(mute).connect(context.destination)
+    } catch (caught) {
       stream.getTracks().forEach((track) => track.stop())
-      return
+      if (!attempt.isCurrent()) return false
+      throw caught
     }
-    const source = context.createMediaStreamSource(stream)
-    const node = new AudioWorkletNode(context, 'pcm-capture-processor', {
-      numberOfInputs: 1,
-      numberOfOutputs: 1,
-      outputChannelCount: [1],
-      channelCount: 1,
-    })
-    const mute = context.createGain()
-    mute.gain.value = 0
-    source.connect(node).connect(mute).connect(context.destination)
     node.port.onmessage = (message: MessageEvent<AudioCaptureMessage>) => {
-      if (!isCurrent()) return
+      if (!attempt.isCurrent()) return
       try {
         if (!(message.data?.buffer instanceof ArrayBuffer) || !Number.isFinite(message.data.rms)) {
           throw new Error('Получен некорректный аудиофрейм.')
@@ -173,7 +189,7 @@ export function useArenaAudio(
       }
     }
     const handleEnded = () => {
-      if (!isCurrent()) return
+      if (!attempt.isCurrent()) return
       stopCapture()
       setError('Микрофон отключён. Восстанавливаем подключение…')
       recoverCaptureRef.current()
@@ -182,8 +198,9 @@ export function useArenaAudio(
     captureSourceRef.current = source
     captureNodeRef.current = node
     captureMuteRef.current = mute
-    await context.resume()
-  }, [stopCapture])
+    captureStreamRef.current = stream
+    return true
+  }, [releaseCapture, stopCapture])
 
   const stopPlayback = useCallback(() => {
     playbackGenerationRef.current += 1
@@ -362,12 +379,14 @@ export function useArenaAudio(
       captureRecoveryInFlight = true
       captureRecoveryPendingRef.current = false
       setError('Восстанавливаем подключение к микрофону…')
-      void startCapture(client, isCurrent)
-        .then(() => {
-          if (isCurrent()) setError(null)
+      const isRecoveryCurrent = () => isCurrent() && client.getState() === 'connected'
+      void startCapture(client, isRecoveryCurrent)
+        .then((started) => {
+          if (started && isRecoveryCurrent()) setError(null)
+          else if (isCurrent() && client.getState() === 'paused') captureRecoveryPendingRef.current = true
         })
         .catch((caught) => {
-          if (!isCurrent()) return
+          if (!isRecoveryCurrent()) return
           stopCapture()
           setError(caught instanceof Error
             ? caught.message
@@ -375,6 +394,9 @@ export function useArenaAudio(
         })
         .finally(() => {
           captureRecoveryInFlight = false
+          if (captureRecoveryPendingRef.current && client.getState() === 'connected') {
+            queueMicrotask(recoverCapture)
+          }
         })
     }
     recoverCaptureRef.current = recoverCapture
@@ -496,6 +518,7 @@ export function useArenaAudio(
     const isCurrent = () => contextGenerationRef.current === contextGeneration
       && connectAttemptRef.current === attempt
       && clientRef.current === client
+    stopCapture()
     setError(null)
     try {
       const context = contextRef.current ?? new AudioContext()
@@ -524,10 +547,8 @@ export function useArenaAudio(
       if (!isCurrent()) return
       await client.connect({ sessionId, ...(ticket ? { ticket } : {}) })
       if (!isCurrent()) return
-      await startCapture(client, isCurrent)
-      captureRecoveryPendingRef.current = !captureStreamRef.current
-        ?.getAudioTracks()
-        .some((track) => track.readyState === 'live')
+      const captureStarted = await startCapture(client, isCurrent)
+      captureRecoveryPendingRef.current = client.acceptsAudioInput === true && !captureStarted
     } catch (caught) {
       if (isCurrent()) {
         stopCapture()
@@ -546,6 +567,7 @@ export function useArenaAudio(
   const stop = useCallback(async () => {
     connectAttemptRef.current += 1
     reconciliationGenerationRef.current += 1
+    captureAttemptGuardRef.current.invalidate()
     busyRef.current = false
     const client = clientRef.current
     let transportFailed = false
@@ -572,6 +594,13 @@ export function useArenaAudio(
 
   const pause = useCallback(() => {
     resetInputLevel()
+    const hasLiveInput = captureStreamRef.current
+      ?.getAudioTracks()
+      .some((track) => track.readyState === 'live')
+    if (!hasLiveInput) {
+      captureAttemptGuardRef.current.invalidate()
+      captureRecoveryPendingRef.current = true
+    }
     captureNodeRef.current?.port.postMessage('pause')
     try {
       clientRef.current?.sendControl('pause')
