@@ -1,8 +1,23 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Dialog, type Locator, type Page } from '@playwright/test'
 
 import { captureScreen, expectNoHorizontalOverflow, seedProductTourUser } from './helpers'
 
 const supportedMobileWidths = [320, 360, 390, 430] as const
+
+async function reloadExpectingBeforeUnload(page: Page) {
+  let beforeUnloadSeen = false
+  const handleDialog = (dialog: Dialog) => {
+    if (dialog.type() === 'beforeunload') beforeUnloadSeen = true
+    void dialog.accept()
+  }
+  page.on('dialog', handleDialog)
+  try {
+    await page.reload()
+    expect(beforeUnloadSeen).toBe(true)
+  } finally {
+    page.off('dialog', handleDialog)
+  }
+}
 
 async function expectTargetAbovePanel(page: Page, target: Locator) {
   await expect(target).toBeVisible()
@@ -107,8 +122,9 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await startDuel.click()
 
   await expect(page).toHaveURL(/\/arena\//)
-  await page.reload()
   const microphone = page.locator('[data-tour-id="microphone"]')
+  await expect(microphone).toBeVisible()
+  await reloadExpectingBeforeUnload(page)
   await expectTargetAbovePanel(page, microphone)
   await captureScreen(page, 'product-tour-microphone', 'mobile')
   await microphone.click()

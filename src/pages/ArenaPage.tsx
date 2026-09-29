@@ -45,6 +45,17 @@ export function ArenaPage() {
     arena.session?.messages ?? [],
     arena.session?.timeLimitSeconds ?? 0,
   )
+  const shouldWarnBeforeUnload = arena.session?.mode === 'voice' && arena.session.status === 'active'
+
+  useEffect(() => {
+    if (!shouldWarnBeforeUnload) return
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [shouldWarnBeforeUnload])
 
   useEffect(() => {
     const session = arena.session
