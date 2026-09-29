@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 
 import { ProductTourErrorDialog } from '@/components/product-tour/ProductTourErrorDialog'
 import { ProductTourTooltip } from '@/components/product-tour/ProductTourTooltip'
@@ -8,6 +8,75 @@ import { useProductTour } from '@/features/product-tour/useProductTour'
 const TARGET_WAIT_MS = 10_000
 const TOOLTIP_WIDTH = 392
 const VIEWPORT_GAP = 16
+const MOBILE_BREAKPOINT = 760
+const MOBILE_PANEL_FALLBACK_HEIGHT = 240
+const MOBILE_SAFE_GAP = 12
+
+function isMobileViewport(): boolean {
+  return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
+}
+
+function getScrollParent(element: Element): HTMLElement | null {
+  let parent = element.parentElement
+  while (parent) {
+    const { overflowY } = window.getComputedStyle(parent)
+    if (/(auto|scroll)/.test(overflowY) && parent.scrollHeight > parent.clientHeight) return parent
+    parent = parent.parentElement
+  }
+  return null
+}
+
+function getMobileVisibleBounds(target: Element, panelHeight: number) {
+  const viewport = window.visualViewport
+  const viewportTop = viewport?.offsetTop ?? 0
+  const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight)
+  let top = viewportTop + MOBILE_SAFE_GAP
+  let bottom = viewportBottom - panelHeight - MOBILE_SAFE_GAP
+
+  for (const selector of ['.arena-home__header', '.preparation-header', '.duel-header', '.result-header']) {
+    const header = document.querySelector<HTMLElement>(selector)
+    if (!header) continue
+    const rect = header.getBoundingClientRect()
+    if (rect.bottom > viewportTop && rect.top <= viewportTop + MOBILE_SAFE_GAP) {
+      top = Math.max(top, rect.bottom + MOBILE_SAFE_GAP)
+    }
+  }
+
+  for (const selector of ['.preparation-bottom', '.home-case-modal__footer']) {
+    const stickyControl = document.querySelector<HTMLElement>(selector)
+    if (!stickyControl || selector === '.home-case-modal__footer' && !target.closest('.home-case-modal')) continue
+    const rect = stickyControl.getBoundingClientRect()
+    if (rect.top < bottom && rect.bottom > top) bottom = Math.min(bottom, rect.top - MOBILE_SAFE_GAP)
+  }
+
+  const scrollParent = getScrollParent(target)
+  if (scrollParent) {
+    const rect = scrollParent.getBoundingClientRect()
+    top = Math.max(top, rect.top + MOBILE_SAFE_GAP)
+    bottom = Math.min(bottom, rect.bottom - MOBILE_SAFE_GAP)
+  }
+
+  return { top, bottom, scrollParent }
+}
+
+function scrollTargetIntoMobileView(target: Element, panelHeight: number): void {
+  const { top, bottom, scrollParent } = getMobileVisibleBounds(target, panelHeight)
+  const rect = target.getBoundingClientRect()
+  const availableHeight = Math.max(0, bottom - top)
+  let delta = 0
+
+  if (rect.height <= availableHeight) {
+    if (rect.top < top) delta = rect.top - top
+    else if (rect.bottom > bottom) delta = rect.bottom - bottom
+  } else if (rect.top < top || rect.bottom > bottom) {
+    delta = rect.top - top
+  }
+
+  if (Math.abs(delta) < 1) return
+  const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+  if (scrollParent) scrollParent.scrollBy({ top: delta, behavior })
+  else window.scrollBy({ top: delta, behavior })
+}
 
 function positionFor(target: Element, placement: ProductTourPlacement, collapsed: boolean): CSSProperties {
   const rect = target.getBoundingClientRect()
@@ -42,6 +111,9 @@ export function ProductTourLayer() {
   const [collapsed, setCollapsed] = useState(false)
   const [targetElement, setTargetElement] = useState<Element | null>(null)
   const [positionVersion, setPositionVersion] = useState(0)
+  const [mobile, setMobile] = useState(isMobileViewport)
+  const [panelHeight, setPanelHeight] = useState(MOBILE_PANEL_FALLBACK_HEIGHT)
+  const floaterRef = useRef<HTMLDivElement>(null)
   const focusTooltipAfterRestoreRef = useRef(false)
   const active = productTour.state?.status === 'active'
   const stepId = productTour.state?.stepId
@@ -68,7 +140,8 @@ export function ProductTourLayer() {
       }
       if (next && !found) {
         found = true
-        next.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center', inline: 'nearest' })
+        if (isMobileViewport()) scrollTargetIntoMobileView(next, MOBILE_PANEL_FALLBACK_HEIGHT)
+        else next.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center', inline: 'nearest' })
       }
     }
 
@@ -85,6 +158,61 @@ export function ProductTourLayer() {
       highlighted?.classList.remove('product-tour-target')
     }
   }, [active, reportTargetUnavailable, target])
+
+  useEffect(() => {
+    const media = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`)
+    const update = () => setMobile(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (!active || collapsed || !mobile) return
+    const floater = floaterRef.current
+    if (!floater) return
+    const updateHeight = () => setPanelHeight(Math.ceil(floater.getBoundingClientRect().height))
+    updateHeight()
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(floater)
+    return () => observer.disconnect()
+  }, [active, collapsed, mobile, stepId, targetElement])
+
+  useEffect(() => {
+    if (!active || collapsed || !mobile) return
+    document.documentElement.classList.add('product-tour-mobile-panel-open')
+    document.documentElement.style.setProperty('--product-tour-panel-height', `${panelHeight}px`)
+    return () => {
+      document.documentElement.classList.remove('product-tour-mobile-panel-open')
+      document.documentElement.style.removeProperty('--product-tour-panel-height')
+    }
+  }, [active, collapsed, mobile, panelHeight, targetElement])
+
+  const revealMobileTarget = useCallback(() => {
+    if (!mobile || collapsed || !targetElement) return
+    scrollTargetIntoMobileView(targetElement, panelHeight)
+  }, [collapsed, mobile, panelHeight, targetElement])
+
+  useEffect(() => {
+    if (!active || !mobile || collapsed || !targetElement) return
+    let animationFrame = window.requestAnimationFrame(revealMobileTarget)
+    const update = () => {
+      window.cancelAnimationFrame(animationFrame)
+      animationFrame = window.requestAnimationFrame(revealMobileTarget)
+    }
+    const observer = new ResizeObserver(update)
+    observer.observe(targetElement)
+    const viewport = window.visualViewport
+    viewport?.addEventListener('resize', update)
+    viewport?.addEventListener('scroll', update)
+    window.addEventListener('orientationchange', update)
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+      observer.disconnect()
+      viewport?.removeEventListener('resize', update)
+      viewport?.removeEventListener('scroll', update)
+      window.removeEventListener('orientationchange', update)
+    }
+  }, [active, collapsed, mobile, revealMobileTarget, targetElement])
 
   useEffect(() => {
     if (!active || !targetElement) return
@@ -125,9 +253,9 @@ export function ProductTourLayer() {
   if (!active || !step || !targetElement) return null
 
   void positionVersion
-  const style = positionFor(targetElement, step.placement, collapsed)
+  const style = mobile && !collapsed ? undefined : positionFor(targetElement, step.placement, collapsed)
   return (
-    <div className="product-tour-floater" style={style}>
+    <div className="product-tour-floater" ref={floaterRef} style={style}>
       {collapsed
         ? <ProductTourBeacon onRestore={() => { focusTooltipAfterRestoreRef.current = true; setCollapsed(false) }} />
         : <ProductTourTooltip step={step} onCollapse={() => setCollapsed(true)} />}

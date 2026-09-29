@@ -143,15 +143,31 @@
 .product-tour-beacon strong { font-size: 12px; font-weight: 800; }
 .react-joyride__beacon:focus-visible { outline: 3px solid #f4b942 !important; outline-offset: 3px; }
 
-@media (max-width: 520px) {
-  .product-tour-floater:has(.product-tour-tooltip) { width: min(350px, calc(100vw - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right)))); max-width: calc(100vw - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right))) !important; }
-  .product-tour-tooltip { border-radius: 17px; }
+@media (max-width: 760px) {
+  .product-tour-floater:has(.product-tour-tooltip) {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: none !important;
+    padding-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right));
+  }
+  .product-tour-tooltip { max-height: min(44dvh, 330px); border-radius: 18px 18px 0 0; box-shadow: 0 -12px 42px rgb(30 18 58 / 22%); }
   .product-tour-tooltip__heading { padding: 17px 17px 0; }
   .product-tour-tooltip h2 { font-size: 20px; }
-  .product-tour-tooltip__content { margin: 10px 17px 0; font-size: 13px; }
+  .product-tour-tooltip__content { min-height: 0; margin: 10px 17px 0; overflow-y: auto; font-size: 13px; }
   .product-tour-tooltip__footer { min-height: 60px; flex-wrap: wrap; margin-top: 13px; padding: 10px 17px max(11px, env(safe-area-inset-bottom)); }
   .product-tour-tooltip__actions { min-width: 0; flex-wrap: wrap; }
   .product-tour-tooltip__actions button { min-width: 0; white-space: normal; }
+
+  html.product-tour-mobile-panel-open { scroll-padding-bottom: calc(var(--product-tour-panel-height) + 12px); }
+  html.product-tour-mobile-panel-open .arena-home { padding-bottom: var(--product-tour-panel-height); }
+  html.product-tour-mobile-panel-open .home-case-backdrop,
+  html.product-tour-mobile-panel-open .modal-backdrop { bottom: var(--product-tour-panel-height); }
+  html.product-tour-mobile-panel-open .home-case-modal { max-height: calc(100dvh - 24px - var(--product-tour-panel-height)); }
+  html.product-tour-mobile-panel-open .preparation-main { padding-bottom: calc(94px + var(--product-tour-panel-height)); }
+  html.product-tour-mobile-panel-open .preparation-bottom { bottom: var(--product-tour-panel-height); }
+  html.product-tour-mobile-panel-open .arena-page { bottom: var(--product-tour-panel-height); height: auto; }
 }
 
 @media (max-width: 360px) {
