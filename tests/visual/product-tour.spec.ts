@@ -64,6 +64,7 @@ test('both role cards remain actionable at every supported mobile width', async 
     await radios.first().focus()
     await radios.first().press('ArrowDown')
     await expect(radios.nth(1)).toBeChecked()
+    if (width === 320) await captureScreen(page, 'product-tour-role', 'mobile-320')
     if (width === 390) await captureScreen(page, 'product-tour-role', 'mobile')
   }
 })
@@ -73,6 +74,8 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 390, height: 844 })
   await openRoleSelection(page, 'complete-mobile')
+  await page.reload()
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Выбери свою роль')
 
   const roleSelector = page.locator('[data-tour-id="role-selector"]')
   await expectTargetAbovePanel(page, roleSelector)
@@ -84,6 +87,7 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await expect(page).toHaveURL(/\/preparation\?.*section=analysis/)
   await expectTargetAbovePanel(page, page.locator('.preparation-bottom__next'))
   await captureScreen(page, 'product-tour-preparation', 'mobile')
+  await page.reload()
 
   await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Разбери ситуацию')
   await expect(page.locator('#preparation-root-conflict')).toHaveClass(/product-tour-target/)
@@ -103,6 +107,7 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await startDuel.click()
 
   await expect(page).toHaveURL(/\/arena\//)
+  await page.reload()
   const microphone = page.locator('[data-tour-id="microphone"]')
   await expectTargetAbovePanel(page, microphone)
   await captureScreen(page, 'product-tour-microphone', 'mobile')
@@ -122,6 +127,8 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Разбор готов', { timeout: 15_000 })
   await expectTargetAbovePanel(page, page.locator('[data-tour-id="result"]'))
   await captureScreen(page, 'product-tour-result', 'mobile')
+  await page.reload()
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Разбор готов', { timeout: 15_000 })
   await page.locator('.product-tour-tooltip').getByRole('button', { name: 'Готово' }).click()
   await expect(page.locator('[data-product-tour-tooltip]')).toHaveCount(0)
 })
