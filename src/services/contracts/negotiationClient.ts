@@ -24,6 +24,7 @@ export interface NegotiationClient {
   listCases(): Promise<TrainingCase[]>
 
   getSession(sessionId: string): Promise<NegotiationSession>
+  getActiveSession(): Promise<NegotiationSessionSummary | null>
   activateSession(sessionId: string): Promise<void>
 
   sendTextTurn(input: {

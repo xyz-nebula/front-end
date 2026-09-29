@@ -70,7 +70,8 @@ export interface ParsedCase {
   firstRole: string
   secondRole: string
 }
-export interface ParsedChatWithMessages extends ParsedChat { case?: ParsedCase; messages: NegotiationMessage[] }
+export interface ParsedChatWithCase extends ParsedChat { case: ParsedCase }
+export interface ParsedChatWithMessages extends ParsedChatWithCase { messages: NegotiationMessage[] }
 
 export interface AudioFormatDto {
   codec: 'pcm_s16le'
@@ -377,9 +378,16 @@ export function parseChatWithMessages(value: unknown): ParsedChatWithMessages {
   const messages = dto.messages.map((message, index) => parseMessage(message, `chat.messages[${index}]`))
   const uniqueMessages = [...new Map(messages.map((message) => [message.id, message])).values()]
   return {
-    ...parseChatBase(dto, 'chat'),
-    ...(dto.case === undefined ? {} : { case: parseCase(dto.case, 'chat.case') }),
+    ...parseChatWithCase(dto),
     messages: uniqueMessages.sort((left, right) => left.sequence - right.sequence),
+  }
+}
+
+export function parseChatWithCase(value: unknown): ParsedChatWithCase {
+  const dto = record(value, 'chat')
+  return {
+    ...parseChatBase(dto, 'chat'),
+    case: parseCase(dto.case, 'chat.case'),
   }
 }
 

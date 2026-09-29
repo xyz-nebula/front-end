@@ -20,7 +20,7 @@ export function HomePage() {
   const [selectedCase, setSelectedCase] = useState<TrainingCase | null>(null)
   const [showAllHistory, setShowAllHistory] = useState(false)
   const recommendedCase = dashboard.cases[0]
-  const activeSession = dashboard.history.find((item) => item.status === 'active')
+  const activeSession = dashboard.activeSession ?? undefined
   const activeCase = activeSession && dashboard.cases.find((item) => item.id === activeSession.caseId)
   const displayedCase = activeCase ?? recommendedCase
 

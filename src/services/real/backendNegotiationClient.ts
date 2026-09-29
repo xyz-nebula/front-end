@@ -6,12 +6,14 @@ import {
   parseCases,
   parseChat,
   parseChatList,
+  parseChatWithCase,
   parseChatWithMessages,
   parseEvaluateTrigger,
   parseEvaluationResult,
   toActivateChatDto,
   toCreateChatDto,
   type ParsedChat,
+  type ParsedChatWithCase,
   type ParsedChatWithMessages,
 } from '@/services/real/targetContract'
 import { featureUnavailable, isServiceError, ServiceError } from '@/types/api'
@@ -44,11 +46,6 @@ function mapStatus(status: ParsedChat['status']): NegotiationStatus {
 }
 
 function mapSession(chat: ParsedChatWithMessages): NegotiationSession {
-  if (!chat.case) {
-    throw new ServiceError('Сервер не вернул кейс переговоров.', {
-      reason: 'invalid-response', code: 'INVALID_SERVICE_RESPONSE',
-    })
-  }
   return {
     id: chat.id,
     caseId: chat.case.id,
@@ -92,11 +89,11 @@ function mapCase(item: ReturnType<typeof parseCases>[number]): TrainingCase {
   }
 }
 
-function mapSummary(chat: ParsedChat): NegotiationSessionSummary {
+function mapSummary(chat: ParsedChatWithCase): NegotiationSessionSummary {
   return {
     id: chat.id,
-    caseId: chat.name,
-    name: chat.name,
+    caseId: chat.case.id,
+    name: chat.case.name,
     mode: 'voice',
     status: mapStatus(chat.status),
     backendStatus: chat.status,
@@ -277,6 +274,17 @@ export class BackendNegotiationClient implements NegotiationClient {
         method: 'PUT',
         body: toActivateChatDto(sessionId),
       })
+    })
+  }
+
+  getActiveSession(): Promise<NegotiationSessionSummary | null> {
+    return this.authorized(async (accessToken) => {
+      try {
+        return mapSummary(parseChatWithCase(await this.request(accessToken, '/v1/chats/active')))
+      } catch (error) {
+        if (isServiceError(error) && error.status === 404 && error.code === 'no_active_chat') return null
+        throw error
+      }
     })
   }
 
