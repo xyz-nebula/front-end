@@ -30,6 +30,8 @@ for (const viewport of viewports) {
     await page.goto('/login')
     await expect(page.locator('#login-title')).toBeVisible()
     await expect(page.getByText('Забыли пароль?', { exact: true })).toHaveCount(0)
+    await expect(page.locator('.login-form__totp-toggle')).toHaveCount(0)
+    await expect(page.locator('#login-totp-token')).toHaveCount(0)
     await captureScreen(page, 'login', viewport.name)
 
     await page.goto('/register')
@@ -306,6 +308,7 @@ test('active voice arena guards browser history, tour actions, and logout', asyn
   const state = await seedActiveVoiceArena(page, 'leave-actions')
   await page.goto('/home')
   await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await expect(page.locator('.product-header-menu').getByRole('button').filter({ hasText: '2FA' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Пройти тур', exact: true }).click()
   await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Выбери кейс')
   await page.locator(`a[href="/arena/${state.activeVoiceSessionId}"]`).click()

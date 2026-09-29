@@ -9,7 +9,6 @@ import '@/styles/login.css'
 interface LoginFields {
   email: string
   password: string
-  totp_token: string
 }
 
 function getReturnPath(state: unknown) {
@@ -23,23 +22,16 @@ export function LoginPage() {
   const homePath = useAuthHomePath()
   const navigate = useNavigate()
   const location = useLocation()
-  const [fields, setFields] = useState<LoginFields>({ email: '', password: '', totp_token: '' })
+  const [fields, setFields] = useState<LoginFields>({ email: '', password: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
-  const [isTotpVisible, setIsTotpVisible] = useState(false)
 
   const updateField = (name: keyof LoginFields, value: string) => {
-    const nextValue = name === 'totp_token' ? value.replace(/\D/g, '').slice(0, 6) : value
-    setFields((current) => ({ ...current, [name]: nextValue }))
+    setFields((current) => ({ ...current, [name]: value }))
     setErrors((current) => ({ ...current, [name]: '' }))
     setFormError('')
-  }
-
-  const toggleTotp = () => {
-    if (isTotpVisible) updateField('totp_token', '')
-    setIsTotpVisible((current) => !current)
   }
 
   const validate = () => {
@@ -48,7 +40,6 @@ export function LoginPage() {
     else if (fields.email.length > 254 || !/^\S+@\S+\.\S+$/.test(fields.email)) nextErrors.email = 'Введите корректный email.'
     if (fields.password.length < 8) nextErrors.password = 'Пароль должен содержать не менее 8 символов.'
     else if (fields.password.length > 128) nextErrors.password = 'Пароль не должен быть длиннее 128 символов.'
-    if (isTotpVisible && fields.totp_token && !/^\d{6}$/.test(fields.totp_token)) nextErrors.totp_token = 'Введите шестизначный код.'
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -63,12 +54,10 @@ export function LoginPage() {
       await login({
         email: fields.email.trim(),
         password: fields.password,
-        ...(isTotpVisible && fields.totp_token ? { totp_token: fields.totp_token } : {}),
       })
       navigate(getReturnPath(location.state), { replace: true })
     } catch (error) {
       const fieldErrors = getFieldErrors(error)
-      if (fieldErrors.totp_token) setIsTotpVisible(true)
       setErrors(fieldErrors)
       setFormError(getErrorMessage(error, 'Не удалось войти. Попробуйте ещё раз.'))
     } finally {
@@ -109,15 +98,6 @@ export function LoginPage() {
               </button>
             </div>
             {errors.password && <span className="login-field__error" id="login-password-error">{errors.password}</span>}
-          </div>
-
-          <div className="login-form__totp">
-            <button className="login-form__totp-toggle" type="button" aria-expanded={isTotpVisible} aria-controls="login-totp" onClick={toggleTotp}>{isTotpVisible ? 'Скрыть код 2FA' : 'У меня подключён 2FA'}</button>
-            {isTotpVisible && <div className="login-field" id="login-totp">
-              <label htmlFor="login-totp-token">Код 2FA — если подключён</label>
-              <input id="login-totp-token" name="totp_token" type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="000000" value={fields.totp_token} aria-invalid={Boolean(errors.totp_token)} aria-describedby={errors.totp_token ? 'login-totp-error' : 'login-totp-hint'} maxLength={6} onChange={(event) => updateField('totp_token', event.target.value)} />
-              {errors.totp_token ? <span className="login-field__error" id="login-totp-error">{errors.totp_token}</span> : <span className="login-field__hint" id="login-totp-hint">Шесть цифр из приложения-аутентификатора</span>}
-            </div>}
           </div>
 
           <button className="login-form__submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Входим…' : 'Войти'}</button>
