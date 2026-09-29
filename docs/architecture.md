@@ -7,6 +7,10 @@
 `DomainServicesProvider` связывает их с auth runtime и предоставляет страницам
 доменные сервисы.
 
+Composition root создаёт suite атомарно: real suite состоит только из backend и
+audio-engine clients, mock suite — из единого `MockStorage`, `MockRuntime` и трёх
+mock clients. Mock runtime в real-ветке не создаётся.
+
 Направление зависимостей:
 
 ```text
@@ -55,6 +59,8 @@ wire DTO. Новая интеграция сначала оформляется 
   фокус на исходный контрол.
 - Источники сервисов выбираются только composition root. UI работает через
   contracts и не переключает реализацию локально.
+- Real adapters, pages и features не импортируют `src/mocks`; граница закреплена
+  ESLint `no-restricted-imports`.
 - Styling foundation и правила изоляции зафиксированы в
   [ADR 0001](decisions/0001-plain-css-foundation.md) и
   [styling.md](styling.md).
@@ -83,9 +89,14 @@ in-memory fallback, а `Позже` живёт в `sessionStorage`, поэтом
 
 Auth tokens хранятся auth runtime. Mock-кейсы, прогресс, сообщения и результаты
 принадлежат mock runtime. Подготовка пользователя остаётся owner-scoped и
-хранится локально отдельно от wire session.
+хранится локально отдельно от wire session. В real Arena отображается только
+локальный snapshot; отсутствие snapshot не включает server или mock fallback.
 
-В real-профиле backend является источником истории чата, состояния evaluation и
+Backend задаёт UUID, title, description, goal, роли, сложность и лимит времени
+real-кейса. Frontend добавляет только presentation metadata из отдельного
+registry; неизвестный backend-кейс получает стабильное generic-оформление.
+
+В real-режиме backend является источником истории чата, состояния evaluation и
 результата переговоров. Real adapter запускает оценку и преобразует wire DTO в
 доменную модель только после runtime-валидации; UI и feature hooks не знают о
 форме ответа AI. Частичный сбой outcome, отдельного судьи или Trainer остаётся
