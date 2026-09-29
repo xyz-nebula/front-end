@@ -27,20 +27,17 @@ pages/components → feature hooks → service contracts ← mock/real adapters
 wire DTO. Новая интеграция сначала оформляется как contract, затем подключается
 в composition root.
 
-## Поддерживаемые профили
+## Поддерживаемые режимы
 
-| Auth / negotiation / audio | Каталог и сессии | Режимы тренировки | Результат |
+| Режим | Каталог и сессии | Режимы тренировки | Результат |
 | --- | --- | --- | --- |
-| `mock/mock/mock` | Локальный mock runtime | Text и voice demo | Локальный mock-анализ |
-| `real/mock/mock` | Auth реальный, продуктовые данные локальные | Text и voice demo | Локальный mock-анализ |
-| `real/real/real` | Backend HTTP | Только voice | Серверный evaluation через backend |
+| `mock` | Локальный mock runtime | Text и voice demo | Локальный mock-анализ |
+| `real` | Backend HTTP | Только voice | Серверный evaluation через backend |
 
-Произвольные гибриды не поддерживаются: текущий UI сводит negotiation/audio к
-единому признаку real voice и не выражает независимые capabilities. Например,
-real negotiation adapter не реализует текстовый ход, а mock/real сочетание не
-является проверенным пользовательским сценарием.
+Режим выбирается обязательной переменной `VITE_SERVICE_MODE=real|mock` для всех
+трёх интеграций одновременно. Гибридные конфигурации не поддерживаются.
 
-`real/real/real` означает готовность frontend-части: реализованы загрузка кейсов
+`real` означает готовность frontend-части: реализованы загрузка кейсов
 и истории, создание/активация чата, WebSocket, захват PCM с микрофона и
 воспроизведение входящих кадров. Завершение запускает backend evaluation, а
 страница результата опрашивает backend и принимает только строго проверенный

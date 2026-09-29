@@ -58,7 +58,7 @@ function isDefinitiveAuthError(error: unknown) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { authClient, config } = useServiceAdapters()
-  const [initialSession] = useState(() => readStoredSession(config.authSource))
+  const [initialSession] = useState(() => readStoredSession(config.mode))
   const [status, setStatus] = useState<AuthStatus>(initialSession.session ? 'booting' : 'unauthenticated')
   const [logoutRequested, setLogoutRequested] = useState(false)
   const [persistence, setPersistence] = useState<SessionPersistence>(
@@ -164,8 +164,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (sessionCreationGenerationRef.current !== generation) {
       throw new StaleSessionCreationError()
     }
-    saveSession(createStoredSession(tokens, config.authSource, ownerKey))
-  }, [config.authSource, saveSession])
+    saveSession(createStoredSession(tokens, config.mode, ownerKey))
+  }, [config.mode, saveSession])
 
   const refreshSession = useCallback((): Promise<AuthTokens> => {
     const version = sessionVersionRef.current
@@ -186,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!ownerKey) throw new AuthClientError(401, 'Сессия уже завершена.')
         saveSession({
           tokens,
-          source: config.authSource,
+          source: config.mode,
           mockOwnerKey: ownerKey,
           ...(tourOwnerKeyRef.current ? { tourOwnerKey: tourOwnerKeyRef.current } : {}),
         }, false)
@@ -201,10 +201,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isDefinitiveAuthError(error)) {
           const removalResult = removeStoredSessionIfRefreshTokenMatches(
             refreshToken,
-            config.authSource,
+            config.mode,
           )
           if (removalResult === 'changed') {
-            const externalSession = readStoredSession(config.authSource)
+            const externalSession = readStoredSession(config.mode)
             if (externalSession.session) {
               adoptExternalSession(externalSession.session)
               return externalSession.session.tokens
@@ -228,7 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw new AuthClientError(401, 'Сессия уже завершена.')
         }
 
-        const storedSession = readStoredSession(config.authSource)
+        const storedSession = readStoredSession(config.mode)
         if (!storedSession.storageAvailable) {
           persistenceRef.current = 'memory'
           setPersistence('memory')
@@ -257,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const operation: RefreshOperation = { version, promise }
     refreshOperationRef.current = operation
     return promise
-  }, [adoptExternalSession, authClient, clearSession, config.authSource, saveSession])
+  }, [adoptExternalSession, authClient, clearSession, config.mode, saveSession])
 
   const restoreSession = useCallback(async () => {
     if (!tokensRef.current) {
@@ -327,13 +327,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const externalSession = parseStoredSession(event.newValue, config.authSource)
+      const externalSession = parseStoredSession(event.newValue, config.mode)
       if (externalSession) adoptExternalSession(externalSession)
     }
 
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
-  }, [adoptExternalSession, clearSession, config.authSource])
+  }, [adoptExternalSession, clearSession, config.mode])
 
   const value = useMemo<AuthContextValue>(() => ({
     status,
@@ -345,7 +345,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retrySession: restoreSession,
     register: async (payload) => {
       const response = await authClient.register(payload)
-      storePendingTourOwnerKey(await createTourOwnerKey(config.authSource, payload.email))
+      storePendingTourOwnerKey(await createTourOwnerKey(config.mode, payload.email))
       return response
     },
     activate: (code) => createSession(
@@ -354,7 +354,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ),
     login: (payload) => createSession(
       () => authClient.login(payload),
-      () => createTourOwnerKey(config.authSource, payload.email),
+      () => createTourOwnerKey(config.mode, payload.email),
     ),
     logout: () => {
       const tokens = tokensRef.current
@@ -375,7 +375,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authClient,
     clearSession,
     createSession,
-    config.authSource,
+    config.mode,
     externalSessionVersion,
     logoutRequested,
     persistence,

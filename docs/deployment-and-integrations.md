@@ -51,9 +51,7 @@ production-сервером. Все `VITE_*` переменные встраив
 Основной профиль разработки:
 
 ```dotenv
-VITE_AUTH_SOURCE=real
-VITE_NEGOTIATION_SOURCE=mock
-VITE_AUDIO_SOURCE=mock
+VITE_SERVICE_MODE=real
 VITE_API_BASE_URL=/api
 VITE_AUDIO_WS_URL=/audio/v1/audio-stream
 ```

@@ -1,4 +1,4 @@
-import type { ServiceSource } from '@/services/config'
+import type { ServiceMode } from '@/services/config'
 
 const OWNER_SALT_STORAGE_KEY = 'arena.product-tour.owner-salt.v1'
 const PENDING_OWNER_SESSION_KEY = 'arena.product-tour.pending-owner.v1'
@@ -30,7 +30,7 @@ export function normalizeTourOwnerEmail(email: string): string {
   return email.trim().toLocaleLowerCase('ru-RU')
 }
 
-export async function createTourOwnerKey(source: ServiceSource, email: string): Promise<string> {
+export async function createTourOwnerKey(source: ServiceMode, email: string): Promise<string> {
   const identity = `${source}:${normalizeTourOwnerEmail(email)}:${getOwnerSalt()}`
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(identity))
   return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('')

@@ -7,6 +7,7 @@ export interface DomainServices {
   negotiationClient: NegotiationClient
   createAudioClient: () => AudioClient
   isRealVoice: boolean
+  supportsTextNegotiation: boolean
 }
 
 export const DomainServicesContext = createContext<DomainServices | null>(null)

@@ -86,9 +86,7 @@ async function run() {
     await mkdir(artifactsDir, { recursive: true })
 
     process.env.API_PROXY_TARGET = ''
-    process.env.VITE_AUTH_SOURCE = 'mock'
-    process.env.VITE_NEGOTIATION_SOURCE = 'mock'
-    process.env.VITE_AUDIO_SOURCE = 'mock'
+    process.env.VITE_SERVICE_MODE = 'mock'
     process.env.VITE_API_TIMEOUT_MS = '600'
 
     const port = await getAvailablePort()

@@ -17,9 +17,7 @@ import {
 export function ServiceAdaptersProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ServiceAdapters>(() => {
     const config = parseServiceConfig({
-      VITE_AUTH_SOURCE: import.meta.env.VITE_AUTH_SOURCE,
-      VITE_NEGOTIATION_SOURCE: import.meta.env.VITE_NEGOTIATION_SOURCE,
-      VITE_AUDIO_SOURCE: import.meta.env.VITE_AUDIO_SOURCE,
+      VITE_SERVICE_MODE: import.meta.env.VITE_SERVICE_MODE,
       VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
       VITE_API_TIMEOUT_MS: import.meta.env.VITE_API_TIMEOUT_MS,
       VITE_MOCK_LATENCY_MS: import.meta.env.VITE_MOCK_LATENCY_MS,
@@ -27,22 +25,23 @@ export function ServiceAdaptersProvider({ children }: { children: ReactNode }) {
     })
     const mockStorage = new MockStorage()
     const mockRuntime = new MockRuntime(mockStorage)
-    const authClient = config.authSource === 'real'
+    const authClient = config.mode === 'real'
       ? new BackendAuthClient({ baseUrl: config.apiBaseUrl, timeoutMs: config.apiTimeoutMs })
       : new MockAuthClient(mockStorage, config.mockLatencyMs)
 
     return {
       config,
+      capabilities: { supportsTextNegotiation: config.mode === 'mock' },
       authClient,
       createNegotiationClient: (context) => {
-        return config.negotiationSource === 'real'
+        return config.mode === 'real'
           ? new BackendNegotiationClient(context.runAuthorized, {
               baseUrl: config.apiBaseUrl,
               timeoutMs: config.apiTimeoutMs,
             })
           : new MockNegotiationClient(mockRuntime, context.mockOwnerKey, config.mockLatencyMs)
       },
-      createAudioClient: (context) => config.audioSource === 'real'
+      createAudioClient: (context) => config.mode === 'real'
         ? new AudioEngineClient({
             wsPath: config.audioWsUrl,
             runAuthorized: context.runAuthorized,
