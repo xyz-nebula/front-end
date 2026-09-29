@@ -22,7 +22,7 @@ export function ArenaPage() {
   const { mockOwnerKey } = useAuthRuntime()
   if (!mockOwnerKey) throw new Error('ArenaPage requires an authenticated owner.')
   const navigate = useNavigate()
-  const { isRealVoice } = useDomainServices()
+  const { isRealVoice, supportsTextNegotiation } = useDomainServices()
   const arena = useArenaSession(sessionId)
   const productTour = useProductTour()
   const {
@@ -178,6 +178,18 @@ export function ArenaPage() {
   const closeFinishDialog = () => {
     sendTourEvent({ type: 'finish-cancelled' })
     setShowFinishDialog(false)
+  }
+
+  if (arena.session.mode === 'text' && !supportsTextNegotiation) {
+    return (
+      <main className="arena-state">
+        <span className="arena-state__mark" aria-hidden="true">!</span>
+        <p className="eyebrow">Арена переговоров</p>
+        <h1>Текстовые переговоры недоступны</h1>
+        <p>В основном режиме поддерживаются только голосовые тренировки.</p>
+        <AppButton to="/home">К кейсам</AppButton>
+      </main>
+    )
   }
 
   const retryTimeoutFinish = () => {

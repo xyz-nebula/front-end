@@ -23,6 +23,7 @@ interface StartNegotiationInput {
   ownerKey: string
   roleIndex: 0 | 1 | null
   trainingCase?: TrainingCase
+  supportsTextNegotiation: boolean
 }
 
 export function useStartNegotiation(negotiationClient: NegotiationClient, input: StartNegotiationInput, onCreated: (sessionId: string) => void) {
@@ -31,8 +32,12 @@ export function useStartNegotiation(negotiationClient: NegotiationClient, input:
   const pendingRef = useRef<PendingSessionCreate | null>(null)
 
   const start = useCallback(async () => {
-    const { draft, mode, ownerKey, roleIndex, trainingCase } = input
+    const { draft, mode, ownerKey, roleIndex, supportsTextNegotiation, trainingCase } = input
     if (!trainingCase || roleIndex === null || mode === null || isStarting) return
+    if (mode === 'text' && !supportsTextNegotiation) {
+      setError('Текстовые переговоры доступны только в демонстрационном режиме.')
+      return
+    }
     const preparations = serializePreparation(draft)
     const sourceContext = `preparation:${trainingCase.id}:${roleIndex}:${mode}:${preparationFingerprint(preparations)}`
     const storageKey = `arena.pending-create.${trainingCase.id}.${roleIndex}.${mode}`
