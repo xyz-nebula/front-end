@@ -14,6 +14,39 @@ import {
   type ServiceAdapters,
 } from '@/services/serviceAdapters'
 
+function createRealAdapters(config: ServiceAdapters['config']): ServiceAdapters {
+  return {
+    config,
+    capabilities: { supportsTextNegotiation: false },
+    authClient: new BackendAuthClient({ baseUrl: config.apiBaseUrl, timeoutMs: config.apiTimeoutMs }),
+    createNegotiationClient: ({ runAuthorized }) => new BackendNegotiationClient(runAuthorized, {
+      baseUrl: config.apiBaseUrl,
+      timeoutMs: config.apiTimeoutMs,
+    }),
+    createAudioClient: ({ runAuthorized }) => new AudioEngineClient({
+      wsPath: config.audioWsUrl,
+      runAuthorized,
+    }),
+  }
+}
+
+function createMockAdapters(config: ServiceAdapters['config']): ServiceAdapters {
+  const storage = new MockStorage()
+  const runtime = new MockRuntime(storage)
+
+  return {
+    config,
+    capabilities: { supportsTextNegotiation: true },
+    authClient: new MockAuthClient(storage, config.mockLatencyMs),
+    createNegotiationClient: ({ mockOwnerKey }) => new MockNegotiationClient(
+      runtime,
+      mockOwnerKey,
+      config.mockLatencyMs,
+    ),
+    createAudioClient: () => new MockAudioClient(runtime, { latencyMs: config.mockLatencyMs }),
+  }
+}
+
 export function ServiceAdaptersProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ServiceAdapters>(() => {
     const config = parseServiceConfig({
@@ -23,31 +56,7 @@ export function ServiceAdaptersProvider({ children }: { children: ReactNode }) {
       VITE_MOCK_LATENCY_MS: import.meta.env.VITE_MOCK_LATENCY_MS,
       VITE_AUDIO_WS_URL: import.meta.env.VITE_AUDIO_WS_URL,
     })
-    const mockStorage = new MockStorage()
-    const mockRuntime = new MockRuntime(mockStorage)
-    const authClient = config.mode === 'real'
-      ? new BackendAuthClient({ baseUrl: config.apiBaseUrl, timeoutMs: config.apiTimeoutMs })
-      : new MockAuthClient(mockStorage, config.mockLatencyMs)
-
-    return {
-      config,
-      capabilities: { supportsTextNegotiation: config.mode === 'mock' },
-      authClient,
-      createNegotiationClient: (context) => {
-        return config.mode === 'real'
-          ? new BackendNegotiationClient(context.runAuthorized, {
-              baseUrl: config.apiBaseUrl,
-              timeoutMs: config.apiTimeoutMs,
-            })
-          : new MockNegotiationClient(mockRuntime, context.mockOwnerKey, config.mockLatencyMs)
-      },
-      createAudioClient: (context) => config.mode === 'real'
-        ? new AudioEngineClient({
-            wsPath: config.audioWsUrl,
-            runAuthorized: context.runAuthorized,
-          })
-        : new MockAudioClient(mockRuntime, { latencyMs: config.mockLatencyMs }),
-    }
+    return config.mode === 'real' ? createRealAdapters(config) : createMockAdapters(config)
   }, [])
 
   return (
