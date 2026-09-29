@@ -110,7 +110,6 @@
 .arena-page .voice-controls__status strong { color: var(--duel-ink); font-size: 22px; }
 .arena-page .voice-controls__status > span { width: auto; height: auto; border-radius: 0; background: transparent; box-shadow: none; font-size: 14px; }
 .arena-page .voice-controls__status small { font-size: 12px; }
-.arena-page .voice-controls__stop { margin-top: 9px; padding: 6px 12px; border: 0; color: #466793; background: transparent; cursor: pointer; text-decoration: underline; }
 .arena-page .voice-controls__error { max-width: 620px; margin: 0 auto 12px; }
 .arena-page .arena-composer { padding: 0; border: 0; background: transparent; }
 .arena-page .arena-composer > label { color: #405b85; font-size: 13px; }
@@ -188,7 +187,6 @@
   .arena-page .voice-controls__status strong { font-size: 17px; }
   .arena-page .voice-controls__status > span { font-size: 11px; }
   .arena-page .voice-controls__status small { display: none; }
-  .arena-page .voice-controls__stop { margin-top: 2px; padding-block: 3px; font-size: 11px; }
   .arena-page .arena-composer > label { font-size: 11px; }
   .arena-page .arena-composer textarea { max-height: 58px; font-size: 13px; }
   .arena-page .arena-composer > small { display: none; }
