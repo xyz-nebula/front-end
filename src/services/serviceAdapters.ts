@@ -14,6 +14,9 @@ export interface DomainAdapterContext {
 
 export interface ServiceAdapters {
   config: ServiceConfig
+  capabilities: {
+    supportsTextNegotiation: boolean
+  }
   authClient: AuthClient
   createNegotiationClient: (context: DomainAdapterContext) => NegotiationClient
   createAudioClient: (context: DomainAdapterContext) => AudioClient

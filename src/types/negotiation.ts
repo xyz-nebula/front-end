@@ -10,15 +10,25 @@ export interface NegotiationMessage {
   createdAt: string
 }
 
+export interface NegotiationCaseSnapshot {
+  id: string
+  title: string
+  description: string
+  goal: string
+  timeLimitSeconds: number
+  roles: [string, string]
+}
+
 export interface NegotiationSession {
   id: string
   caseId: string
+  caseSnapshot: NegotiationCaseSnapshot
   name?: string
   mode: NegotiationMode
   status: NegotiationStatus
   backendStatus?: 'ongoing' | 'evaluating' | 'evaluated' | 'victory' | 'defeat'
   selectedRole?: 0 | 1
-  preparations?: string
+  preparationOverview?: import('@/types/preparation').PreparationOverview
   startedAt: string
   timeLimitSeconds: number
   finishedAt?: string

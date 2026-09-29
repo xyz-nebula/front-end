@@ -1,6 +1,7 @@
 import type {
   AudioTicket,
   NegotiationMode,
+  NegotiationCaseSnapshot,
   NegotiationResultState,
   NegotiationSession,
   NegotiationSessionSummary,
@@ -12,6 +13,7 @@ export interface NegotiationClient {
   createSession(input: {
     caseId: string
     caseName?: string
+    caseSnapshot: NegotiationCaseSnapshot
     timeLimitSeconds: number
     mode: NegotiationMode
     clientCommandId: string
@@ -22,6 +24,7 @@ export interface NegotiationClient {
   listCases(): Promise<TrainingCase[]>
 
   getSession(sessionId: string): Promise<NegotiationSession>
+  getActiveSession(): Promise<NegotiationSessionSummary | null>
   activateSession(sessionId: string): Promise<void>
 
   sendTextTurn(input: {

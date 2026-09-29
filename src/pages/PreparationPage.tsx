@@ -30,7 +30,7 @@ export function PreparationPage() {
   const activeSectionId = parsePreparationSection(searchParams.get('section'))
   const activeSection = preparationSections.find((section) => section.id === activeSectionId) ?? preparationSections[0]
   const navigate = useNavigate()
-  const { negotiationClient } = useDomainServices()
+  const { negotiationClient, supportsTextNegotiation } = useDomainServices()
   const productTour = useProductTour()
   const { send: sendTourEvent, state: tourState } = productTour
   const loadedCase = usePreparationCase(negotiationClient, caseId)
@@ -47,6 +47,7 @@ export function PreparationPage() {
     mode,
     ownerKey: mockOwnerKey,
     roleIndex,
+    supportsTextNegotiation,
     trainingCase: loadedCase.trainingCase,
   }, openArena)
 
@@ -97,6 +98,7 @@ export function PreparationPage() {
   const closeCaseDrawer = useCallback(() => setCaseDrawerOpen(false), [])
 
   if (roleIndex === null || mode === null) return <main className="arena-state"><span className="arena-state__mark">!</span><h1>Не выбран формат подготовки</h1><p>Вернитесь к кейсам и выберите свою роль и формат тренировки.</p><AppButton to="/home">К кейсам</AppButton></main>
+  if (mode === 'text' && !supportsTextNegotiation) return <main className="arena-state"><span className="arena-state__mark">!</span><h1>Текстовые переговоры недоступны</h1><p>В основном режиме тренировки проходят только голосом. Выберите голосовой формат в каталоге кейсов.</p><AppButton to="/home">К кейсам</AppButton></main>
   if (loadedCase.loading) return <main className="arena-state" aria-live="polite"><span className="arena-state__spinner" /><h1>Загружаем подготовку…</h1></main>
   if (loadedCase.error || !loadedCase.trainingCase) return <main className="arena-state"><span className="arena-state__mark">!</span><h1>Не удалось открыть кейс</h1><p>{loadedCase.error ?? 'Кейс не найден.'}</p><div><AppButton type="button" onClick={() => void loadedCase.load()}>Повторить</AppButton><AppButton to="/home" variant="secondary">К кейсам</AppButton></div></main>
 

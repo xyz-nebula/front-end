@@ -7,6 +7,10 @@
 `DomainServicesProvider` связывает их с auth runtime и предоставляет страницам
 доменные сервисы.
 
+Composition root создаёт suite атомарно: real suite состоит только из backend и
+audio-engine clients, mock suite — из единого `MockStorage`, `MockRuntime` и трёх
+mock clients. Mock runtime в real-ветке не создаётся.
+
 Направление зависимостей:
 
 ```text
@@ -27,20 +31,17 @@ pages/components → feature hooks → service contracts ← mock/real adapters
 wire DTO. Новая интеграция сначала оформляется как contract, затем подключается
 в composition root.
 
-## Поддерживаемые профили
+## Поддерживаемые режимы
 
-| Auth / negotiation / audio | Каталог и сессии | Режимы тренировки | Результат |
+| Режим | Каталог и сессии | Режимы тренировки | Результат |
 | --- | --- | --- | --- |
-| `mock/mock/mock` | Локальный mock runtime | Text и voice demo | Локальный mock-анализ |
-| `real/mock/mock` | Auth реальный, продуктовые данные локальные | Text и voice demo | Локальный mock-анализ |
-| `real/real/real` | Backend HTTP | Только voice | Серверный evaluation через backend |
+| `mock` | Локальный mock runtime | Text и voice demo | Локальный mock-анализ |
+| `real` | Backend HTTP | Только voice | Серверный evaluation через backend |
 
-Произвольные гибриды не поддерживаются: текущий UI сводит negotiation/audio к
-единому признаку real voice и не выражает независимые capabilities. Например,
-real negotiation adapter не реализует текстовый ход, а mock/real сочетание не
-является проверенным пользовательским сценарием.
+Режим выбирается обязательной переменной `VITE_SERVICE_MODE=real|mock` для всех
+трёх интеграций одновременно. Гибридные конфигурации не поддерживаются.
 
-`real/real/real` означает готовность frontend-части: реализованы загрузка кейсов
+`real` означает готовность frontend-части: реализованы загрузка кейсов
 и истории, создание/активация чата, WebSocket, захват PCM с микрофона и
 воспроизведение входящих кадров. Завершение запускает backend evaluation, а
 страница результата опрашивает backend и принимает только строго проверенный
@@ -58,6 +59,8 @@ real negotiation adapter не реализует текстовый ход, а m
   фокус на исходный контрол.
 - Источники сервисов выбираются только composition root. UI работает через
   contracts и не переключает реализацию локально.
+- Real adapters, pages и features не импортируют `src/mocks`; граница закреплена
+  ESLint `no-restricted-imports`.
 - Styling foundation и правила изоляции зафиксированы в
   [ADR 0001](decisions/0001-plain-css-foundation.md) и
   [styling.md](styling.md).
@@ -86,9 +89,14 @@ in-memory fallback, а `Позже` живёт в `sessionStorage`, поэтом
 
 Auth tokens хранятся auth runtime. Mock-кейсы, прогресс, сообщения и результаты
 принадлежат mock runtime. Подготовка пользователя остаётся owner-scoped и
-хранится локально отдельно от wire session.
+хранится локально отдельно от wire session. В real Arena отображается только
+локальный snapshot; отсутствие snapshot не включает server или mock fallback.
 
-В real-профиле backend является источником истории чата, состояния evaluation и
+Backend задаёт UUID, title, description, goal, роли, сложность и лимит времени
+real-кейса. Frontend добавляет только presentation metadata из отдельного
+registry; неизвестный backend-кейс получает стабильное generic-оформление.
+
+В real-режиме backend является источником истории чата, состояния evaluation и
 результата переговоров. Real adapter запускает оценку и преобразует wire DTO в
 доменную модель только после runtime-валидации; UI и feature hooks не знают о
 форме ответа AI. Частичный сбой outcome, отдельного судьи или Trainer остаётся

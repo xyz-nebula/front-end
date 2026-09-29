@@ -8,7 +8,6 @@ import { ResultStatus } from '@/components/result/ResultStatus'
 import { useNegotiationResult } from '@/features/result/useNegotiationResult'
 import { useRepeatNegotiation } from '@/features/result/useRepeatNegotiation'
 import { useProductTour } from '@/features/product-tour/useProductTour'
-import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { useDomainServices } from '@/services/domainServices'
 import '@/styles/result.css'
 
@@ -29,7 +28,6 @@ export function ResultPage() {
   const openCreatedSession = useCallback((createdSessionId: string) => navigate(`/arena/${createdSessionId}`), [navigate])
   const repeated = useRepeatNegotiation(negotiationClient, mockOwnerKey, loaded.session, openCreatedSession)
   const ready = loaded.result?.status === 'ready' ? loaded.result.result : null
-  const preparation = ready?.source === 'mock' ? getDuelPreparation(loaded.session?.caseId ?? '') : null
 
   useEffect(() => {
     if (tourState?.status === 'active' && ready && tourState.sessionId === sessionId) {
@@ -52,7 +50,6 @@ export function ResultPage() {
       {ready && loaded.session ? <ResultAnalysis
         result={ready}
         session={loaded.session}
-        preparation={preparation}
         isRestarting={repeated.isRestarting}
         error={repeated.error}
         onRepeat={() => void repeated.repeat()}

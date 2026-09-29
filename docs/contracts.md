@@ -49,6 +49,7 @@ TOTP через `/v1/auth/*`.
 | `POST` | `/v1/chats/` | Создать чат из `name`, `case_uuid`, `preparations` |
 | `GET` | `/v1/chats/cases` | Загрузить каталог кейсов |
 | `GET` | `/v1/chats/` | Получить идентификаторы чатов |
+| `GET` | `/v1/chats/active` | Получить активный чат и его case UUID |
 | `GET` | `/v1/chats/{uuid}` | Загрузить статус, кейс и сообщения |
 | `PUT` | `/v1/chats/active` | Сделать чат активным перед voice-подключением |
 | `POST` | `/v1/chats/{uuid}/evaluate` | Запустить серверную оценку без request body |
@@ -76,10 +77,13 @@ same-origin backend `/api/v1/*`: токен AI-сервиса и заголов�
 
 Статусы чата `ongoing`, `evaluating`, `evaluated`, а также legacy `victory` и
 `defeat` преобразуются соответственно в frontend-состояния `active`,
-`finishing` и `finished`. `selected_role` и `preparations` разбираются как часть
-публичного chat response; скрытая подготовка ролей из case response в UI не
-попадает. При создании чата frontend инвертирует выбранный
+`finishing` и `finished`. `selected_role` преобразуется обратно в выбранную
+пользователем роль. `preparations`, `first_role_preparations` и
+`second_role_preparations` не переносятся в UI/domain model. При создании чата frontend инвертирует выбранный
 пользователем индекс и передаёт в `selected_role` индекс роли AI-оппонента.
+
+Case UUID является identity во всех real-сценариях. Название используется только
+для отображения и не связывает каталог, активную сессию или историю.
 
 `AudioEngineClient` открывает `/v1/audio-stream?token=...`, отправляет control и
 base64 PCM `audio` messages, принимает `audio_frame`, `transcript`, `error` и

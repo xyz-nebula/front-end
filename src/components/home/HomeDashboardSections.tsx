@@ -3,12 +3,15 @@ import { Link } from 'react-router-dom'
 import heroArtwork from '@/assets/home/hero-negotiation.webp'
 import profileArtwork from '@/assets/home/profile.webp'
 import { CaseCard } from '@/components/home/CaseCard'
-import { caseArtwork } from '@/mocks/caseArtwork'
 import type { TrainingCase } from '@/types/case'
 import type { NegotiationSessionSummary } from '@/types/negotiation'
 
 function trainingTitle(item: NegotiationSessionSummary, cases: TrainingCase[]) {
   return cases.find((trainingCase) => trainingCase.id === item.caseId || trainingCase.title === item.name)?.title ?? item.name ?? 'Переговоры с AI'
+}
+
+function trainingArtwork(item: NegotiationSessionSummary, cases: TrainingCase[]): string {
+  return cases.find((trainingCase) => trainingCase.id === item.caseId)?.presentation.artwork ?? heroArtwork
 }
 
 function trainingStatus(item: NegotiationSessionSummary) {
@@ -44,7 +47,7 @@ export function HomeOverview({ activeSession, casesLoading, displayedCase, histo
       {historyLoading ? <div className="arena-home__continue-skeleton" role="status" aria-label="Загружаем тренировку"><span className="arena-home__skeleton-title" /><div><span className="arena-home__skeleton-image" /><span className="arena-home__skeleton-copy" /></div></div> : <>
         <div className="arena-home__continue-head"><h2 id="continue-title">{activeSession ? 'Продолжить тренировку' : 'Начать тренировку'}</h2><span>▣ &nbsp;{activeSession ? 'В процессе' : 'Рекомендуем'}</span></div>
         <div className="arena-home__continue-body">
-          <img src={activeSession && displayedCase ? caseArtwork[displayedCase.id] ?? heroArtwork : heroArtwork} alt="" decoding="async" />
+          <img src={activeSession && displayedCase ? displayedCase.presentation.artwork ?? heroArtwork : heroArtwork} alt="" decoding="async" />
           <div className="arena-home__continue-info">
             <h3>{displayedCase?.title ?? (casesLoading ? 'Загружаем кейс…' : 'Выберите кейс')}</h3>
             <p>{displayedCase ? `${displayedCase.category} · ${displayedCase.duration}` : 'Подготовьтесь и проведите переговоры с AI'}</p>
@@ -86,7 +89,7 @@ export function TrainingHistory({ cases, error, history, loading, showAll, onRet
       {!loading && !error && visibleHistory.map((item) => {
         const title = trainingTitle(item, cases)
         return <div className="arena-home__history-row" key={item.id}>
-          <img src={caseArtwork[item.caseId] ?? heroArtwork} alt="" loading="lazy" decoding="async" />
+          <img src={trainingArtwork(item, cases)} alt="" loading="lazy" decoding="async" />
           <div className="arena-home__history-title"><strong>{title}</strong><span>{item.mode === 'voice' ? 'Голос' : 'Текст'}</span></div>
           <span className={`arena-home__history-status ${item.status === 'active' ? 'is-active' : item.backendStatus === 'victory' ? 'is-success' : item.backendStatus === 'defeat' ? 'is-failure' : 'is-neutral'}`}>{trainingStatus(item)}</span>
           <time dateTime={item.startedAt}>{new Date(item.startedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</time>

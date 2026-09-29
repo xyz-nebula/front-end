@@ -7,8 +7,8 @@
 | `npm run typecheck` | Проверить TypeScript-проекты без сборки приложения |
 | `npm run lint` | Проверить исходники и тестовую инфраструктуру ESLint |
 | `npm run build` | Выполнить TypeScript build и собрать production bundle |
-| `npm run test:unit` | Проверить чистую логику сверки сообщений и транскриптов |
-| `npm test` | Запустить короткий Playwright smoke в mock-профиле |
+| `npm run test:unit` | Проверить чистую логику и owner isolation подготовки |
+| `npm test` | Запустить короткий Playwright smoke в mock-режиме |
 | `npm run test:e2e` | Та же browser-проверка |
 | `npm run visual:smoke` | Та же browser-проверка с диагностическими PNG |
 | `npm run check` | Последовательно выполнить lint, build, unit-тесты и browser smoke |
@@ -28,11 +28,19 @@ npm test -- --grep desktop
 ## Покрытие smoke-набора
 
 В `tests/visual/smoke.spec.ts` находятся ровно два сценария: desktop
-`1440×900` и mobile `390×844`. Каждый сценарий открывает landing, login,
+`1440×900` и mobile `390×844`. Runner принудительно задаёт
+`VITE_SERVICE_MODE=mock` и очищает API proxy, поэтому проверка не зависит от
+backend/audio-engine. Каждый сценарий открывает landing, login,
 register, activation, 404, home, окно выбора роли до и после выбора,
 preparation, текстовую arena и готовый result.
 Для каждого экрана проверяются основной UI и отсутствие горизонтального
 overflow, затем сохраняется PNG.
+
+После изменений UI вручную откройте относящиеся к задаче desktop/mobile PNG из
+`artifacts/visual-smoke/`. Real smoke остаётся живой ручной проверкой стенда:
+auth → cases → preparation → create → activate → voice → transcript → finish →
+evaluation → result. Text mode в real должен завершаться экраном недоступности
+до создания чата.
 
 Защищённые экраны получают валидные owner-scoped данные через существующие
 `MockAuthClient`, `MockStorage` и `MockRuntime`. Это позволяет проверять маршруты

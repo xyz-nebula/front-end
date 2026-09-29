@@ -7,9 +7,9 @@ Auth доступен как в реальном, так и в mock-режиме
 и `src/components/auth/RouteGate.tsx`.
 Документ фиксирует поведение; он не разрешает новые API-интеграции.
 
-`VITE_AUTH_SOURCE=real` использует backend через `/api` для регистрации,
-активации, login/refresh/logout и TOTP. `VITE_AUTH_SOURCE=mock` выполняет те же
-frontend-сценарии локально. Auth storage содержит `source`, поэтому credentials
+`VITE_SERVICE_MODE=real` использует backend через `/api` для регистрации,
+активации, login/refresh/logout и TOTP. `VITE_SERVICE_MODE=mock` выполняет те же
+frontend-сценарии локально. Auth storage содержит режим, поэтому credentials
 одного режима не восстанавливаются в другом.
 
 ## Состояния

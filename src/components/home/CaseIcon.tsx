@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import type { TrainingCase } from '@/types/case'
 
-export function CaseIcon({ name }: { name: TrainingCase['icon'] }) {
-  const paths: Record<TrainingCase['icon'], ReactNode> = {
+export function CaseIcon({ name }: { name: TrainingCase['presentation']['icon'] }) {
+  const paths: Record<TrainingCase['presentation']['icon'], ReactNode> = {
     wallet: <><path d="M5 7.5V6a2 2 0 0 1 2-2h9.5A1.5 1.5 0 0 1 18 5.5V8" /><path d="M5 7.5h13.5A1.5 1.5 0 0 1 20 9v8.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-9A1 1 0 0 1 5 7.5Z" /><path d="M16 12h4v3h-4a1.5 1.5 0 0 1 0-3Z" /></>,
     people: <><circle cx="9" cy="8" r="3" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5.8M17 14a5 5 0 0 1 3.5 5" /></>,
     clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3 2" /></>,

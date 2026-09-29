@@ -13,7 +13,7 @@
 | `/activate` | ActivationRoute | Ожидание письма, активация по query code, success/error |
 | `/home` | ProtectedRoute + ProtectedProductShell | Каталог, история, прогресс, приглашение/старт тура, logout и управление TOTP |
 | `/cases/:caseId/preparation` | ProtectedRoute + ProtectedProductShell | Выбор стратегии и подготовка к выбранному кейсу; тур синхронизирует раздел через `section` |
-| `/arena/:sessionId` | ProtectedRoute + ProtectedProductShell | Text/voice mock flow либо real voice flow согласно профилю; голосовые шаги тура |
+| `/arena/:sessionId` | ProtectedRoute + ProtectedProductShell | Text/voice mock flow либо voice-only real flow согласно режиму; голосовые шаги тура |
 | `/result/:sessionId` | ProtectedRoute + ProtectedProductShell | Polling и отображение mock- либо server-разбора, финальный шаг тура и повтор кейса |
 | `*` | Публичный | Страница 404 |
 
@@ -35,9 +35,12 @@ Landing CTA ведут на `/home`: гость проходит через logi
 сессией сразу открывает приложение. ActivationRoute не заменяет уже
 подтверждённую сессию кодом из письма и не отправляет невалидный UUID backend.
 
-Источник negotiation/audio выбирается composition root, а не маршрутом. Три
-поддерживаемых профиля и ограничения real voice описаны в
+Единый режим auth/negotiation/audio выбирается composition root, а не маршрутом.
+Два поддерживаемых режима и ограничения real voice описаны в
 [architecture.md](architecture.md).
+
+Прямой `?mode=text` в real показывает состояние недоступности и не создаёт чат.
+Ранее созданная text-сессия также не показывает рабочий composer.
 
 `/result/:sessionId` загружает чат и читает результат через negotiation contract.
 Для server evaluation маршрут показывает `pending`/`processing`, затем один из

@@ -37,3 +37,10 @@ export interface SessionPreparationSnapshot {
   selectedRole: 0 | 1
   draft: PreparationDraft
 }
+
+export interface PreparationOverview {
+  goal: string
+  limits: [string, string, string]
+  batna: string
+  steps: string[]
+}

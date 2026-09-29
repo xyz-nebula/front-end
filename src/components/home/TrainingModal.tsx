@@ -12,6 +12,16 @@ interface TrainingModalProps {
 }
 
 const SWIPE_CLOSE_THRESHOLD = 90
+const DEFAULT_USER_ROLE_SUMMARY = 'Ваша роль в этом переговорном кейсе.'
+const DEFAULT_OPPONENT_ROLE_SUMMARY = 'Роль AI-оппонента в этом кейсе.'
+
+function getRoleSummary(item: TrainingCase, index: number, selectedRole: 0 | 1): string {
+  const usesDefaultRoleSummaries = item.presentation.roleSummaries[0] === DEFAULT_USER_ROLE_SUMMARY
+    && item.presentation.roleSummaries[1] === DEFAULT_OPPONENT_ROLE_SUMMARY
+
+  if (!usesDefaultRoleSummaries) return item.presentation.roleSummaries[index]
+  return selectedRole === index ? DEFAULT_USER_ROLE_SUMMARY : DEFAULT_OPPONENT_ROLE_SUMMARY
+}
 
 export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const navigate = useNavigate()
@@ -161,7 +171,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
                   sendTourEvent({ type: 'role-selected', roleIndex })
                 }} />
                 {role !== null && <img src={role === index ? profileArtwork : opponentArtwork} alt="" width={400} height={400} loading="lazy" decoding="async" />}
-                <span className="home-case-modal__role-copy">{role !== null && <span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span>}<strong>{title}</strong><small>{item.roleSummaries[index]}</small></span>
+                <span className="home-case-modal__role-copy">{role !== null && <span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span>}<strong>{title}</strong>{role !== null && <small>{getRoleSummary(item, index, role)}</small>}</span>
                 <span className="home-case-modal__radio-mark" aria-hidden="true">{role === index ? '✓' : ''}</span>
               </label>)}
             </div>

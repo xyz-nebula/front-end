@@ -1,16 +1,19 @@
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
+import { getCasePresentation } from '@/features/cases/casePresentation'
 import type { RunAuthorized } from '@/services/serviceAdapters'
 import {
   parseBackendError,
   parseCases,
   parseChat,
   parseChatList,
+  parseChatWithCase,
   parseChatWithMessages,
   parseEvaluateTrigger,
   parseEvaluationResult,
   toActivateChatDto,
   toCreateChatDto,
   type ParsedChat,
+  type ParsedChatWithCase,
   type ParsedChatWithMessages,
 } from '@/services/real/targetContract'
 import { featureUnavailable, isServiceError, ServiceError } from '@/types/api'
@@ -19,8 +22,7 @@ import type {
   NegotiationSessionSummary,
   NegotiationStatus,
 } from '@/types/negotiation'
-import type { CaseAccent, CaseIcon, TrainingCase } from '@/types/case'
-import { trainingCases } from '@/mocks/cases'
+import type { TrainingCase } from '@/types/case'
 
 interface BackendNegotiationClientOptions {
   baseUrl: string
@@ -44,41 +46,38 @@ function mapStatus(status: ParsedChat['status']): NegotiationStatus {
 }
 
 function mapSession(chat: ParsedChatWithMessages): NegotiationSession {
-  if (!chat.case) {
-    throw new ServiceError('Сервер не вернул кейс переговоров.', {
-      reason: 'invalid-response', code: 'INVALID_SERVICE_RESPONSE',
-    })
-  }
   return {
     id: chat.id,
     caseId: chat.case.id,
+    caseSnapshot: {
+      id: chat.case.id,
+      title: chat.case.name,
+      description: chat.case.description,
+      goal: chat.case.goal,
+      timeLimitSeconds: chat.case.timeLimit,
+      roles: [chat.case.firstRole, chat.case.secondRole],
+    },
     name: chat.case?.name ?? chat.name,
     mode: 'voice',
     status: mapStatus(chat.status),
     backendStatus: chat.status,
-    selectedRole: chat.selectedRole,
-    preparations: chat.preparations,
+    selectedRole: chat.selectedRole === 0 ? 1 : 0,
     startedAt: chat.createdAt,
     timeLimitSeconds: chat.case.timeLimit,
     messages: chat.messages,
   }
 }
 
-const accents: CaseAccent[] = ['violet', 'lime', 'orange', 'blue', 'pink', 'mint']
-const icons: CaseIcon[] = ['wallet', 'people', 'clock', 'receipt', 'tag', 'dialogue']
-
-function normalizedTitle(value: string): string { return value.trim().toLocaleLowerCase('ru-RU') }
-
 function formatTimeLimit(seconds: number): string {
   return `${Math.ceil(seconds / 60)} мин`
 }
 
-function mapCase(item: ReturnType<typeof parseCases>[number], index: number): TrainingCase {
-  const known = trainingCases.find((candidate) => normalizedTitle(candidate.title) === normalizedTitle(item.name))
+function mapCase(item: ReturnType<typeof parseCases>[number]): TrainingCase {
   return {
     id: item.id,
     title: item.name,
     description: item.description,
+    goal: item.goal,
     synopsis: item.synopsis,
     category: item.category,
     duration: formatTimeLimit(item.timeLimit),
@@ -86,17 +85,15 @@ function mapCase(item: ReturnType<typeof parseCases>[number], index: number): Tr
     difficulty: item.difficulty,
     opponent: item.secondRole,
     roles: [item.firstRole, item.secondRole],
-    roleSummaries: known?.roleSummaries ?? ['Ваша роль в этом переговорном кейсе.', 'Роль AI-оппонента в этом кейсе.'],
-    accent: known?.accent ?? accents[index % accents.length],
-    icon: known?.icon ?? icons[index % icons.length],
+    presentation: getCasePresentation({ id: item.id, title: item.name }),
   }
 }
 
-function mapSummary(chat: ParsedChat): NegotiationSessionSummary {
+function mapSummary(chat: ParsedChatWithCase): NegotiationSessionSummary {
   return {
     id: chat.id,
-    caseId: chat.name,
-    name: chat.name,
+    caseId: chat.case.id,
+    name: chat.case.name,
     mode: 'voice',
     status: mapStatus(chat.status),
     backendStatus: chat.status,
@@ -108,6 +105,14 @@ function evaluationSessionStub(sessionId: string): NegotiationSession {
   return {
     id: sessionId,
     caseId: '',
+    caseSnapshot: {
+      id: '',
+      title: '',
+      description: '',
+      goal: '',
+      timeLimitSeconds: 1,
+      roles: ['', ''],
+    },
     mode: 'voice',
     status: 'finishing',
     startedAt: '',
@@ -238,12 +243,12 @@ export class BackendNegotiationClient implements NegotiationClient {
       return {
         id: created.id,
         caseId: input.caseId,
+        caseSnapshot: input.caseSnapshot,
         name: input.caseName ?? created.name,
         mode: input.mode,
         status: mapStatus(created.status),
         backendStatus: created.status,
-        selectedRole: created.selectedRole,
-        preparations: created.preparations,
+        selectedRole: created.selectedRole === 0 ? 1 : 0,
         startedAt: created.createdAt,
         timeLimitSeconds: input.timeLimitSeconds,
         messages: [],
@@ -269,6 +274,17 @@ export class BackendNegotiationClient implements NegotiationClient {
         method: 'PUT',
         body: toActivateChatDto(sessionId),
       })
+    })
+  }
+
+  getActiveSession(): Promise<NegotiationSessionSummary | null> {
+    return this.authorized(async (accessToken) => {
+      try {
+        return mapSummary(parseChatWithCase(await this.request(accessToken, '/v1/chats/active')))
+      } catch (error) {
+        if (isServiceError(error) && error.status === 404 && error.code === 'no_active_chat') return null
+        throw error
+      }
     })
   }
 

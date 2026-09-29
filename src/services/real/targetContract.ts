@@ -57,7 +57,6 @@ export interface ParsedChat extends ParsedChatListItem {
   status: ChatStatusDto
   createdAt: string
   selectedRole: 0 | 1
-  preparations: string
 }
 export interface ParsedCase {
   id: string
@@ -67,10 +66,12 @@ export interface ParsedCase {
   difficulty: CaseDifficulty
   timeLimit: number
   synopsis: string
+  goal: string
   firstRole: string
   secondRole: string
 }
-export interface ParsedChatWithMessages extends ParsedChat { case?: ParsedCase; messages: NegotiationMessage[] }
+export interface ParsedChatWithCase extends ParsedChat { case: ParsedCase }
+export interface ParsedChatWithMessages extends ParsedChatWithCase { messages: NegotiationMessage[] }
 
 export interface AudioFormatDto {
   codec: 'pcm_s16le'
@@ -355,7 +356,6 @@ function parseChatBase(value: unknown, path: string): ParsedChat {
     selectedRole: dto.selected_role === 0 || dto.selected_role === 1
       ? dto.selected_role
       : invalidResponse(`${path}.selected_role`),
-    preparations: stringValue(dto.preparations, `${path}.preparations`),
   }
 }
 
@@ -378,18 +378,21 @@ export function parseChatWithMessages(value: unknown): ParsedChatWithMessages {
   const messages = dto.messages.map((message, index) => parseMessage(message, `chat.messages[${index}]`))
   const uniqueMessages = [...new Map(messages.map((message) => [message.id, message])).values()]
   return {
-    ...parseChatBase(dto, 'chat'),
-    ...(dto.case === undefined ? {} : { case: parseCase(dto.case, 'chat.case') }),
+    ...parseChatWithCase(dto),
     messages: uniqueMessages.sort((left, right) => left.sequence - right.sequence),
+  }
+}
+
+export function parseChatWithCase(value: unknown): ParsedChatWithCase {
+  const dto = record(value, 'chat')
+  return {
+    ...parseChatBase(dto, 'chat'),
+    case: parseCase(dto.case, 'chat.case'),
   }
 }
 
 function parseCase(value: unknown, path: string): ParsedCase {
   const dto = record(value, path)
-  // Role preparations are deliberately validated but not exposed: they contain
-  // hidden scenario context intended for the corresponding negotiation role.
-  stringValue(dto.first_role_preparations, `${path}.first_role_preparations`)
-  stringValue(dto.second_role_preparations, `${path}.second_role_preparations`)
   return {
     id: uuid(dto.uuid, `${path}.uuid`),
     name: nonEmptyString(dto.name, `${path}.name`),
@@ -398,6 +401,7 @@ function parseCase(value: unknown, path: string): ParsedCase {
     difficulty: oneOf(dto.difficulty, ['easy', 'moderate', 'hard', 'insane'], `${path}.difficulty`),
     timeLimit: positiveInteger(dto.time_limit, `${path}.time_limit`),
     synopsis: stringValue(dto.synopsis, `${path}.synopsis`),
+    goal: stringValue(dto.goal, `${path}.goal`),
     firstRole: nonEmptyString(dto.first_role, `${path}.first_role`),
     secondRole: nonEmptyString(dto.second_role, `${path}.second_role`),
   }

@@ -24,6 +24,7 @@ export interface MockSessionRecord {
   id: string
   ownerKey: string
   caseId: string
+  selectedRole?: 0 | 1
   mode: NegotiationMode
   status: NegotiationStatus
   startedAt: string
@@ -220,6 +221,7 @@ function isSession(value: unknown): value is MockSessionRecord {
   return isRecord(value)
     && ['id', 'ownerKey', 'caseId', 'startedAt', 'createCommandId'].every((key) => isString(value[key]))
     && (value.mode === 'text' || value.mode === 'voice')
+    && (value.selectedRole === undefined || value.selectedRole === 0 || value.selectedRole === 1)
     && (value.status === 'active' || value.status === 'finishing' || value.status === 'finished')
     && (value.finishedAt === undefined || isString(value.finishedAt))
     && Array.isArray(value.messages)
