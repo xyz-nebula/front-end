@@ -35,7 +35,7 @@ export function ProductTourTooltip({ onCollapse, step }: ProductTourTooltipProps
         <div className="product-tour-tooltip__controls">
           <button className="product-tour-tooltip__menu-toggle" type="button" aria-label="Меню тура" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>•••</button>
           <button className="product-tour-tooltip__close" type="button" aria-label="Свернуть подсказку" onClick={onCollapse}>−</button>
-          {menuOpen && <div className="product-tour-tooltip__menu"><button type="button" onClick={() => productTour.send({ type: 'pause' })}>Приостановить тур</button><small>Продолжить можно из меню профиля.</small></div>}
+          {menuOpen && <div className="product-tour-tooltip__menu"><button type="button" onClick={productTour.dismissTour}>Завершить тур</button><small>Следующий запуск начнётся с первого шага.</small></div>}
         </div>
       </div>
       <p id={contentId} className="product-tour-tooltip__content">{errorCopy?.content ?? step.content}</p>
@@ -43,7 +43,7 @@ export function ProductTourTooltip({ onCollapse, step }: ProductTourTooltipProps
         <span className="product-tour-tooltip__progress" role="status" aria-label={`Этап ${progress.stage} из 4. ${progress.label}, ${progress.local}`}>{progress.label} · {progress.local}</span>
         <div className="product-tour-tooltip__actions">
           {scenarioError === 'microphone' || scenarioError === 'audio'
-            ? <><button className="is-primary" type="button" onClick={productTour.retryScenario}>Попробовать снова</button><button type="button" onClick={() => productTour.send({ type: 'pause' })}>Закрыть тур</button></>
+            ? <><button className="is-primary" type="button" onClick={productTour.retryScenario}>Попробовать снова</button><button type="button" onClick={productTour.dismissTour}>Закрыть тур</button></>
             : <>
               {!waitingForResult && definition.back && <button type="button" onClick={() => productTour.send({ type: 'back' })}>Назад</button>}
               {!waitingForResult && definition.next && <button className="is-primary" type="button" onClick={() => productTour.send({ type: 'next' })}>Далее</button>}

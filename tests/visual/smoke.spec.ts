@@ -292,7 +292,7 @@ for (const viewport of viewports) {
 
     await page.getByRole('link', { name: 'Арена — на главную' }).click()
     await leaveDialog.getByRole('button', { name: 'Завершить и покинуть' }).click()
-    await expect(page).toHaveURL(/\/$/)
+    await expect(page).toHaveURL(/\/home$/)
     await expect.poll(() => page.evaluate(({ sessionId }) => {
       const serialized = localStorage.getItem('arena.mock.data.v2')
       if (!serialized) return null
@@ -305,6 +305,9 @@ for (const viewport of viewports) {
 test('active voice arena guards browser history, tour actions, and logout', async ({ page }) => {
   const state = await seedActiveVoiceArena(page, 'leave-actions')
   await page.goto('/home')
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Пройти тур', exact: true }).click()
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Выбери кейс')
   await page.locator(`a[href="/arena/${state.activeVoiceSessionId}"]`).click()
   await expect(page).toHaveURL(new RegExp(`/arena/${state.activeVoiceSessionId}$`))
   await expect(page.locator('.duel-heading h1')).toBeVisible()
@@ -317,9 +320,20 @@ test('active voice arena guards browser history, tour actions, and logout', asyn
 
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: /тур/i }).click()
-  await expect(leaveDialog).toBeVisible()
+  const restartDialog = page.locator('[data-tour-id="tour-restart-dialog"]')
+  await expect(restartDialog).toBeVisible()
+  await expect(restartDialog).toContainText('Текущий прогресс тура будет сброшен')
   await expect(page.locator('[data-product-tour-tooltip]')).toHaveCount(0)
-  await leaveDialog.getByRole('button', { name: 'Остаться' }).click()
+  await restartDialog.getByRole('button', { name: 'Остаться' }).click()
+
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: /тур/i }).click()
+  await restartDialog.getByRole('button', { name: 'Завершить и начать заново' }).click()
+  await expect(page).toHaveURL(/\/home$/)
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Выбери кейс')
+
+  const nextState = await seedActiveVoiceArena(page, 'leave-actions-logout')
+  await page.goto(`/arena/${nextState.activeVoiceSessionId}`)
 
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
@@ -333,7 +347,7 @@ test('text arena navigation is not guarded', async ({ page }) => {
   const state = await seedProtectedScreens(page, 'leave-text')
   await page.goto(`/arena/${state.activeSessionId}`)
   await page.getByRole('link', { name: 'Арена — на главную' }).click()
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/home$/)
   await expect(page.locator('[data-tour-id="leave-dialog"]')).toHaveCount(0)
 })
 
@@ -354,7 +368,7 @@ test('failed session finish does not trap an explicitly departing user', async (
 
   await page.getByRole('link', { name: 'Арена — на главную' }).click()
   await page.locator('[data-tour-id="leave-dialog"]').getByRole('button', { name: 'Завершить и покинуть' }).click()
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/home$/)
 })
 
 test('finished session routes remain unguarded', async ({ page }) => {
@@ -362,6 +376,6 @@ test('finished session routes remain unguarded', async ({ page }) => {
   await page.goto(`/result/${state.finishedSessionId}`)
   await expect(page.locator('.result-intro h1')).toHaveText('Разбор поединка')
   await page.getByRole('link', { name: 'Арена — на главную' }).click()
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/home$/)
   await expect(page.locator('[data-tour-id="leave-dialog"]')).toHaveCount(0)
 })

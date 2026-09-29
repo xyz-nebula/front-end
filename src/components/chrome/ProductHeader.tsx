@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useAuthHomePath } from '@/auth/useAuth'
-import { ProfileMenu } from '@/components/chrome/ProfileMenu'
+import { ProfileMenu, type DepartureRequest } from '@/components/chrome/ProfileMenu'
 import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import '@/styles/product-header.css'
 
@@ -53,7 +53,7 @@ const variantClasses: Record<ProductHeaderVariant, VariantClasses> = {
   },
 }
 
-export function ProductHeader({ actions, onDepartureRequest, variant }: { actions?: ReactNode; onDepartureRequest?: (action: () => void | Promise<void>) => void; variant: ProductHeaderVariant }) {
+export function ProductHeader({ actions, onDepartureRequest, variant }: { actions?: ReactNode; onDepartureRequest?: DepartureRequest; variant: ProductHeaderVariant }) {
   const classes = variantClasses[variant]
   const homePath = useAuthHomePath()
   return (

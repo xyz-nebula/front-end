@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import opponentArtwork from '@/assets/home/opponent.webp'
 import profileArtwork from '@/assets/home/profile.webp'
 import { ProductHeader } from '@/components/chrome/ProductHeader'
+import type { DepartureRequest } from '@/components/chrome/ProfileMenu'
 import type { AudioConnectionState } from '@/types/audio'
 import type { NegotiationMode } from '@/types/negotiation'
 import { formatRemainingTime } from '@/features/arena/sessionTimer'
@@ -20,7 +21,7 @@ interface ArenaHeaderProps {
   isSending: boolean
   finishDisabled: boolean
   onFinish: () => void
-  onDepartureRequest: (action: () => void | Promise<void>) => void
+  onDepartureRequest: DepartureRequest
   finishButtonRef?: RefObject<HTMLButtonElement | null>
 }
 

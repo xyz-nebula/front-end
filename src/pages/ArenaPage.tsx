@@ -9,6 +9,7 @@ import { FinishDialog } from '@/components/arena/FinishDialog'
 import { TextComposer } from '@/components/arena/TextComposer'
 import { VoiceControls } from '@/components/arena/VoiceControls'
 import { AppButton } from '@/components/ui/AppButton'
+import type { DepartureReason } from '@/components/chrome/ProfileMenu'
 import { useArenaSession } from '@/features/arena/useArenaSession'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
 import { useSessionTimer } from '@/features/arena/useSessionTimer'
@@ -37,6 +38,7 @@ export function ArenaPage() {
   const [isFinishing, setIsFinishing] = useState(false)
   const [isDeparting, setIsDeparting] = useState(false)
   const [departureAction, setDepartureAction] = useState<(() => void | Promise<void>) | null>(null)
+  const [departureReason, setDepartureReason] = useState<DepartureReason>('default')
   const [finishError, setFinishError] = useState<string | null>(null)
   const [timeoutFinishFailed, setTimeoutFinishFailed] = useState(false)
   const finishButtonRef = useRef<HTMLButtonElement>(null)
@@ -199,17 +201,19 @@ export function ArenaPage() {
     setShowFinishDialog(false)
   }
 
-  const requestDeparture = (action: () => void | Promise<void>) => {
+  const requestDeparture = (action: () => void | Promise<void>, reason: DepartureReason = 'default') => {
     if (!shouldWarnBeforeUnload) {
       void action()
       return
     }
+    setDepartureReason(reason)
     setDepartureAction(() => action)
   }
 
   const cancelDeparture = () => {
     if (isDeparting) return
     setDepartureAction(null)
+    setDepartureReason('default')
     if (navigationBlocker.state === 'blocked') navigationBlocker.reset()
   }
 
@@ -232,6 +236,7 @@ export function ArenaPage() {
     } finally {
       allowDepartureRef.current = true
       setDepartureAction(null)
+      setDepartureReason('default')
       if (navigationBlocker.state === 'blocked') navigationBlocker.proceed()
       else await requestedAction?.()
     }
@@ -305,7 +310,7 @@ export function ArenaPage() {
         busy={isDeparting}
         onCancel={cancelDeparture}
         onConfirm={() => { void confirmDeparture() }}
-        variant="leave"
+        variant={departureReason === 'tour-restart' ? 'tour-restart' : departureReason === 'tour-start' ? 'tour-start' : 'leave'}
       />}
     </div>
   )

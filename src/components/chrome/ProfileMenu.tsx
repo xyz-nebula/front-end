@@ -5,21 +5,26 @@ import { Link, useLocation } from 'react-router-dom'
 import profileArtwork from '@/assets/home/profile.webp'
 import { useAuth } from '@/auth/useAuth'
 import { TotpModal } from '@/components/auth/TotpModal'
+import { ProductTourRestartDialog } from '@/components/product-tour/ProductTourRestartDialog'
 import { useProductTour } from '@/features/product-tour/useProductTour'
+
+export type DepartureReason = 'default' | 'tour-start' | 'tour-restart'
+export type DepartureRequest = (action: () => void | Promise<void>, reason?: DepartureReason) => void
 
 interface ProfileMenuProps {
   className?: string
   menuClassName?: string
-  onDepartureRequest?: (action: () => void | Promise<void>) => void
+  onDepartureRequest?: DepartureRequest
   toggleClassName?: string
 }
 
 export function ProfileMenu({ className = '', menuClassName = '', onDepartureRequest, toggleClassName = '' }: ProfileMenuProps) {
   const { externalSessionVersion, logout } = useAuth()
-  const { menuLabel, ownerKey, startOrResume } = useProductTour()
+  const { menuLabel, ownerKey, startTour, state: tourState } = useProductTour()
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
   const [securityModalVersion, setSecurityModalVersion] = useState<number | null>(null)
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -68,9 +73,24 @@ export function ProfileMenu({ className = '', menuClassName = '', onDepartureReq
 
   const openTour = () => {
     closeMenu()
-    if (onDepartureRequest) onDepartureRequest(startOrResume)
-    else startOrResume()
+    const restarting = tourState?.status === 'active' || tourState?.status === 'paused'
+    if (onDepartureRequest) {
+      onDepartureRequest(startTour, restarting ? 'tour-restart' : 'tour-start')
+      return
+    }
+    if (restarting) {
+      setRestartDialogOpen(true)
+      return
+    }
+    startTour()
   }
+
+  const confirmRestart = () => {
+    setRestartDialogOpen(false)
+    startTour()
+  }
+
+  const cancelRestart = useCallback(() => setRestartDialogOpen(false), [])
 
   return (
     <div className={`product-header-profile ${className}`.trim()} ref={containerRef}>
@@ -97,6 +117,11 @@ export function ProfileMenu({ className = '', menuClassName = '', onDepartureReq
         <TotpModal onClose={closeSecurity} />,
         document.body,
       )}
+      {restartDialogOpen && <ProductTourRestartDialog
+        onCancel={cancelRestart}
+        onConfirm={confirmRestart}
+        returnFocusRef={triggerRef}
+      />}
     </div>
   )
 }

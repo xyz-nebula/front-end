@@ -13,8 +13,6 @@ import {
   type ProductTourState,
 } from '@/features/product-tour/productTourStorage'
 import { transitionProductTour, type ProductTourEvent } from '@/features/product-tour/productTourMachine'
-import { useDomainServices } from '@/services/domainServices'
-
 function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode; ownerKey: string }) {
   const [snapshot, setSnapshot] = useState(() => readProductTourState(ownerKey))
   const [invitationOpen, setInvitationOpen] = useState(false)
@@ -25,10 +23,9 @@ function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode
   const invitationConsideredRef = useRef(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const { negotiationClient } = useDomainServices()
 
   useEffect(() => subscribeToProductTourStorage(ownerKey, (state) => {
-    setSnapshot((current) => ({ ...current, state }))
+    setSnapshot((current) => current.state?.status === 'active' ? current : { ...current, state })
   }), [ownerKey])
 
   const persist = useCallback((next: ProductTourState) => {
@@ -43,71 +40,34 @@ function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode
     setSnapshot((current) => {
       const next = transitionProductTour(current.state, event)
       if (!next || next === current.state) return current
+      if (next.status === 'active') return { ...current, state: next }
       return { state: next, storageAvailable: writeProductTourState(ownerKey, next) }
     })
   }, [ownerKey])
 
-  const startOrResume = useCallback(() => {
+  const startTour = useCallback(() => {
     const current = snapshot.state
-    const shouldResume = current?.status === 'paused' || current?.status === 'active'
-    const next = transitionProductTour(current, { type: shouldResume ? 'resume' : 'start' })
+    const closed = transitionProductTour(current, { type: 'dismiss' })
+    const next = transitionProductTour(current, { type: 'start' })
     if (!next) return
     setInvitationOpen(false)
     setError(null)
-
-    if (!shouldResume || next.stepId === 'case') {
-      persist(next)
-      navigate('/home')
-      return
-    }
-    if (next.stepId === 'role' || next.stepId === 'voice-format') {
-      const canRestore = Boolean(next.caseId) && (next.stepId === 'role' || next.roleIndex !== undefined)
-      if (!canRestore) {
-        const restarted = transitionProductTour(next, { type: 'start' })
-        if (restarted) persist(restarted)
-        navigate('/home')
-        return
-      }
-      persist(next)
-      navigate('/home')
-      return
-    }
-    if (next.stepId === 'analysis' || next.stepId === 'strategy' || next.stepId === 'tactics' || next.stepId === 'start-duel') {
-      if (!next.caseId || next.roleIndex === undefined) {
-        const restarted = transitionProductTour(next, { type: 'start' })
-        if (restarted) persist(restarted)
-        navigate('/home')
-        return
-      }
-      persist(next)
-      const section = next.stepId === 'analysis' ? 'analysis' : next.stepId === 'strategy' ? 'strategy' : 'tactics'
-      navigate(`/cases/${encodeURIComponent(next.caseId)}/preparation?role=${next.roleIndex}&mode=voice&section=${section}`)
-      return
-    }
-    if (!next.sessionId) {
-      setError('session-unavailable')
-      return
-    }
-    const sessionId = next.sessionId
-    void negotiationClient.getSession(sessionId).then(() => {
-      persist(next)
-      navigate(next.stepId === 'result'
-        ? `/result/${encodeURIComponent(sessionId)}`
-        : `/arena/${encodeURIComponent(sessionId)}`)
-    }).catch(() => setError('session-unavailable'))
-  }, [navigate, negotiationClient, persist, snapshot.state])
-
-  const restart = useCallback(() => {
-    const next = transitionProductTour(snapshot.state, { type: 'start' })
-    if (next) persist(next)
-    setError(null)
+    setResultReady(false)
+    setScenarioError(null)
+    const storageAvailable = closed ? writeProductTourState(ownerKey, closed) : snapshot.storageAvailable
+    setSnapshot({ state: next, storageAvailable })
     navigate('/home')
-  }, [navigate, persist, snapshot.state])
+  }, [navigate, ownerKey, snapshot.state, snapshot.storageAvailable])
+
+  const dismissTour = useCallback(() => {
+    send({ type: 'dismiss' })
+    setError(null)
+    setScenarioError(null)
+  }, [send])
 
   const dismissError = useCallback(() => {
-    send({ type: 'pause' })
-    setError(null)
-  }, [send])
+    dismissTour()
+  }, [dismissTour])
 
   const reportTargetUnavailable = useCallback(() => {
     setError('target-unavailable')
@@ -129,7 +89,7 @@ function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode
     if (state?.status !== 'active' || error) return
     const isHomeStep = state.stepId === 'case' || state.stepId === 'role' || state.stepId === 'voice-format'
     if (location.pathname !== '/home' || isHomeStep) return
-    const timer = window.setTimeout(() => send({ type: 'pause' }), 100)
+    const timer = window.setTimeout(() => send({ type: 'dismiss' }), 100)
     return () => window.clearTimeout(timer)
   }, [error, location.pathname, send, snapshot.state])
 
@@ -140,10 +100,8 @@ function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode
   }, [ownerKey, snapshot.state])
 
   const beginFromInvitation = useCallback(() => {
-    const next = transitionProductTour(snapshot.state, { type: 'start' })
-    if (next) persist(next)
-    setInvitationOpen(false)
-  }, [persist, snapshot.state])
+    startTour()
+  }, [startTour])
 
   const deferInvitation = useCallback(() => {
     deferProductTourPrompt(ownerKey)
@@ -151,16 +109,16 @@ function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode
   }, [ownerKey])
 
   const disableInvitation = useCallback(() => {
-    const next = transitionProductTour(snapshot.state, { type: 'never' })
+    const next = transitionProductTour(snapshot.state, { type: 'dismiss' })
     if (next) persist(next)
     setInvitationOpen(false)
   }, [persist, snapshot.state])
 
-  const menuLabel = snapshot.state?.status === 'completed'
+  const menuLabel = snapshot.state?.status === 'active'
+    || snapshot.state?.status === 'paused'
+    || snapshot.state?.status === 'completed'
     ? 'Пройти тур заново'
-    : snapshot.state?.status === 'paused' || snapshot.state?.status === 'active'
-      ? 'Продолжить тур'
-      : 'Пройти тур'
+    : 'Пройти тур'
 
   const value = useMemo<ProductTourContextValue>(() => ({
     ownerKey,
@@ -174,8 +132,8 @@ function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode
     retryScenario,
     reportScenarioError,
     clearScenarioError,
-    startOrResume,
-    restart,
+    startTour,
+    dismissTour,
     dismissError,
     reportTargetUnavailable,
     beginFromInvitation,
@@ -183,7 +141,7 @@ function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode
     disableInvitation,
     considerInvitation,
     send,
-  }), [beginFromInvitation, clearScenarioError, considerInvitation, deferInvitation, dismissError, disableInvitation, error, invitationOpen, menuLabel, ownerKey, reportScenarioError, reportTargetUnavailable, restart, resultReady, retryScenario, scenarioError, send, snapshot, startOrResume])
+  }), [beginFromInvitation, clearScenarioError, considerInvitation, deferInvitation, dismissError, dismissTour, disableInvitation, error, invitationOpen, menuLabel, ownerKey, reportScenarioError, reportTargetUnavailable, resultReady, retryScenario, scenarioError, send, snapshot, startTour])
 
   return <ProductTourContext.Provider value={value}>{children}<ProductTourLayer /></ProductTourContext.Provider>
 }
@@ -204,8 +162,8 @@ export function ProductTourProvider({ children }: { children: ReactNode }) {
         retryScenario: () => undefined,
         reportScenarioError: () => undefined,
         clearScenarioError: () => undefined,
-        startOrResume: () => undefined,
-        restart: () => undefined,
+        startTour: () => undefined,
+        dismissTour: () => undefined,
         dismissError: () => undefined,
         reportTargetUnavailable: () => undefined,
         beginFromInvitation: () => undefined,

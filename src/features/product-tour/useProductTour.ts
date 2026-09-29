@@ -7,16 +7,16 @@ export interface ProductTourContextValue {
   ownerKey: string | null
   state: ProductTourState | null
   storageAvailable: boolean
-  menuLabel: 'Пройти тур' | 'Продолжить тур' | 'Пройти тур заново'
+  menuLabel: 'Пройти тур' | 'Пройти тур заново'
   invitationOpen: boolean
   resultReady?: boolean
-  error: 'session-unavailable' | 'target-unavailable' | null
+  error: 'target-unavailable' | null
   scenarioError: 'microphone' | 'audio' | 'result' | null
   retryScenario: () => void
   reportScenarioError: (kind: 'microphone' | 'audio' | 'result', retry: () => void) => void
   clearScenarioError: () => void
-  startOrResume: () => void
-  restart: () => void
+  startTour: () => void
+  dismissTour: () => void
   dismissError: () => void
   reportTargetUnavailable: () => void
   beginFromInvitation: () => void

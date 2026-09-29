@@ -8,7 +8,7 @@ interface FinishDialogProps {
   busy?: boolean
   error?: string | null
   returnFocusRef?: RefObject<HTMLElement | null>
-  variant?: 'finish' | 'leave'
+  variant?: 'finish' | 'leave' | 'tour-start' | 'tour-restart'
 }
 
 export function FinishDialog({ onCancel, onConfirm, busy = false, error = null, returnFocusRef, variant = 'finish' }: FinishDialogProps) {
@@ -76,19 +76,26 @@ export function FinishDialog({ onCancel, onConfirm, busy = false, error = null, 
   }, [returnFocusRef])
 
   const leaving = variant === 'leave'
+  const startingTour = variant === 'tour-start'
+  const restartingTour = variant === 'tour-restart'
+  const changingToTour = startingTour || restartingTour
 
   return (
     <div className="modal-backdrop" ref={backdropRef} role="presentation" onMouseDown={(event) => event.target === event.currentTarget && !busy && onCancel()}>
-      <section className="finish-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="finish-dialog-title" data-tour-id={leaving ? 'leave-dialog' : 'finish-dialog'}>
-        <p className="eyebrow">{leaving ? 'Выход из тренировки' : 'Завершение тренировки'}</p>
-        <h2 id="finish-dialog-title">{leaving ? 'Покинуть переговоры?' : 'Закончить переговоры?'}</h2>
-        <p>{leaving
+      <section className="finish-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="finish-dialog-title" data-tour-id={changingToTour ? 'tour-restart-dialog' : leaving ? 'leave-dialog' : 'finish-dialog'}>
+        <p className="eyebrow">{changingToTour ? 'Тур по продукту' : leaving ? 'Выход из тренировки' : 'Завершение тренировки'}</p>
+        <h2 id="finish-dialog-title">{restartingTour ? 'Начать тур заново?' : startingTour ? 'Начать тур?' : leaving ? 'Покинуть переговоры?' : 'Закончить переговоры?'}</h2>
+        <p>{restartingTour
+          ? 'Текущий прогресс тура будет сброшен. Перед переходом мы завершим переговоры: новые реплики добавить не получится, а сохранённые ответы попадут в разбор.'
+          : startingTour
+            ? 'Перед переходом мы завершим переговоры: новые реплики добавить не получится, а сохранённые ответы попадут в разбор.'
+          : leaving
           ? 'Перед переходом мы завершим переговоры. Новые реплики добавить не получится, а сохранённые ответы попадут в разбор.'
           : 'После завершения новые реплики добавить не получится. Ответы уже сохранены и попадут в разбор.'}</p>
         {error && <p className="finish-dialog__error" role="alert">{error}</p>}
         <div>
-          <AppButton type="button" variant="secondary" onClick={onCancel} disabled={busy}>{leaving ? 'Остаться' : 'Продолжить диалог'}</AppButton>
-          <AppButton type="button" onClick={onConfirm} disabled={busy}>{busy ? 'Завершаем…' : leaving ? 'Завершить и покинуть' : 'Завершить'}</AppButton>
+          <AppButton type="button" variant="secondary" onClick={onCancel} disabled={busy}>{leaving || changingToTour ? 'Остаться' : 'Продолжить диалог'}</AppButton>
+          <AppButton type="button" onClick={onConfirm} disabled={busy}>{busy ? 'Завершаем…' : restartingTour ? 'Завершить и начать заново' : startingTour ? 'Завершить и начать тур' : leaving ? 'Завершить и покинуть' : 'Завершить'}</AppButton>
         </div>
       </section>
     </div>
