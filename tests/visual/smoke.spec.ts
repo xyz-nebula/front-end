@@ -27,6 +27,7 @@ for (const viewport of viewports) {
 
     await page.goto('/login')
     await expect(page.locator('#login-title')).toBeVisible()
+    await expect(page.getByText('Забыли пароль?', { exact: true })).toHaveCount(0)
     await captureScreen(page, 'login', viewport.name)
 
     await page.goto('/register')

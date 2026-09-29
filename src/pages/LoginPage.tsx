@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { getErrorMessage, getFieldErrors } from '@/auth/errors'
@@ -28,21 +28,6 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [isTotpVisible, setIsTotpVisible] = useState(false)
-  const [isForgotOpen, setIsForgotOpen] = useState(false)
-  const forgotDialogRef = useRef<HTMLDialogElement>(null)
-  const forgotTriggerRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    const dialog = forgotDialogRef.current
-    if (!dialog) return
-    if (isForgotOpen && !dialog.open) dialog.showModal()
-    if (!isForgotOpen && dialog.open) dialog.close()
-  }, [isForgotOpen])
-
-  const closeForgotDialog = () => {
-    setIsForgotOpen(false)
-    forgotTriggerRef.current?.focus()
-  }
 
   const updateField = (name: keyof LoginFields, value: string) => {
     const nextValue = name === 'totp_token' ? value.replace(/\D/g, '').slice(0, 6) : value
@@ -115,10 +100,7 @@ export function LoginPage() {
           </div>
 
           <div className="login-field">
-            <div className="login-field__label-row">
-              <label htmlFor="login-password">Пароль</label>
-              <button ref={forgotTriggerRef} className="login-form__text-button" type="button" onClick={() => setIsForgotOpen(true)}>Забыли пароль?</button>
-            </div>
+            <label htmlFor="login-password">Пароль</label>
             <div className="login-field__input-wrap">
               <input id="login-password" name="password" type={isPasswordVisible ? 'text' : 'password'} aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? 'login-password-error' : undefined} autoComplete="current-password" placeholder="Введите пароль" value={fields.password} minLength={8} maxLength={128} onChange={(event) => updateField('password', event.target.value)} />
               <button className="login-field__visibility" type="button" aria-label={isPasswordVisible ? 'Скрыть символы' : 'Показать символы'} aria-pressed={isPasswordVisible} onClick={() => setIsPasswordVisible((current) => !current)}>
@@ -142,12 +124,6 @@ export function LoginPage() {
 
         <p className="login-card__register">Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></p>
       </section>
-
-      <dialog ref={forgotDialogRef} className="login-dialog" aria-labelledby="login-dialog-title" onClose={closeForgotDialog}>
-        <h2 id="login-dialog-title">Восстановление пароля</h2>
-        <p>Восстановление пароля пока недоступно. Если вы забыли пароль, попробуйте обратиться к команде проекта.</p>
-        <button type="button" onClick={() => forgotDialogRef.current?.close()}>Понятно</button>
-      </dialog>
     </main>
   )
 }
