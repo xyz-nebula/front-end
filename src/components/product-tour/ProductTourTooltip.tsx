@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { PRODUCT_TOUR_STEP_ORDER, getProductTourStepDefinition, type ProductTourStepDefinition } from '@/features/product-tour/productTourSteps'
+import { PRODUCT_TOUR_STAGE_PROGRESS, getProductTourStepDefinition, type ProductTourStepDefinition } from '@/features/product-tour/productTourSteps'
 import { useProductTour } from '@/features/product-tour/useProductTour'
 
 interface ProductTourTooltipProps {
@@ -15,7 +15,7 @@ export function ProductTourTooltip({ onCollapse, step }: ProductTourTooltipProps
   if (!state || state.status !== 'active') return null
 
   const definition = getProductTourStepDefinition(state.stepId)
-  const currentIndex = PRODUCT_TOUR_STEP_ORDER.indexOf(state.stepId)
+  const progress = PRODUCT_TOUR_STAGE_PROGRESS[state.stepId]
   const waitingForResult = state.stepId === 'result' && !productTour.resultReady
   const scenarioError = productTour.scenarioError
   const errorCopy = scenarioError === 'microphone'
@@ -40,7 +40,7 @@ export function ProductTourTooltip({ onCollapse, step }: ProductTourTooltipProps
       </div>
       <p id={contentId} className="product-tour-tooltip__content">{errorCopy?.content ?? step.content}</p>
       <div className="product-tour-tooltip__footer">
-        <span className="product-tour-tooltip__progress" role="status" aria-label={`Шаг ${currentIndex + 1} из ${PRODUCT_TOUR_STEP_ORDER.length}`}>{currentIndex + 1} из {PRODUCT_TOUR_STEP_ORDER.length}</span>
+        <span className="product-tour-tooltip__progress" role="status" aria-label={`Этап ${progress.stage} из 4. ${progress.label}, ${progress.local}`}>{progress.label} · {progress.local}</span>
         <div className="product-tour-tooltip__actions">
           {scenarioError === 'microphone' || scenarioError === 'audio'
             ? <><button className="is-primary" type="button" onClick={productTour.retryScenario}>Попробовать снова</button><button type="button" onClick={() => productTour.send({ type: 'pause' })}>Закрыть тур</button></>

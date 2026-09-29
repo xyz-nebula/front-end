@@ -22,7 +22,12 @@ async function expectTargetAbovePanel(page: Page, target: Locator) {
 async function openRoleSelection(page: Page, seed: string) {
   await seedProductTourUser(page, seed)
   await page.goto('/home')
+  await expect(page.locator('#product-tour-invitation-description')).toContainText('5–10 минут')
+  await expect(page.locator('#product-tour-invitation-description')).toContainText('Понадобится микрофон')
+  await expect(page.getByRole('button', { name: 'Больше не показывать' })).toBeVisible()
+  if (page.viewportSize()?.width === 390) await captureScreen(page, 'product-tour-invitation', 'mobile')
   await page.getByRole('button', { name: 'Начать тур' }).click()
+  await expect(page.locator('.product-tour-tooltip__progress')).toHaveText('Кейс · 1 из 2')
   const caseCard = page.locator('[data-tour-id="case-card"]')
   await expectTargetAbovePanel(page, caseCard)
   await caseCard.click()
@@ -119,7 +124,8 @@ test('paused role selection resumes with the selected case and role', async ({ p
   await page.getByRole('button', { name: 'Меню профиля' }).click()
   await page.getByRole('button', { name: 'Продолжить тур' }).click()
 
-  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Подготовься к голосовому разговору')
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Перейди к подготовке')
+  await expect(page.locator('.product-tour-tooltip__progress')).toHaveText('Подготовка · старт')
   const restoredRoles = page.locator('[data-tour-id="role-selector"]').getByRole('radio')
   await expect(restoredRoles.nth(1)).toBeChecked()
   await expect(page.getByRole('button', { name: 'Начать подготовку' })).toBeEnabled()
