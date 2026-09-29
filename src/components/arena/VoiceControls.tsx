@@ -13,7 +13,6 @@ interface VoiceControlsProps {
   onConnect: () => void
   onPause: () => void
   onResume: () => void
-  onStop: () => void
 }
 
 const BAR_WEIGHTS = [0.42, 0.66, 0.86, 1, 0.74, 0.92, 0.62, 0.78, 0.48]
@@ -49,7 +48,7 @@ const stateLabels: Record<AudioConnectionState, string> = {
   reconnecting: 'Переподключаемся…', error: 'Связь прервалась',
 }
 
-export function VoiceControls({ state, error, isPlaying, disabled, isDemo = true, isUserSpeaking, getInputLevel, onConnect, onPause, onResume, onStop }: VoiceControlsProps) {
+export function VoiceControls({ state, error, isPlaying, disabled, isDemo = true, isUserSpeaking, getInputLevel, onConnect, onPause, onResume }: VoiceControlsProps) {
   const visualizationRef = useRef<HTMLDivElement>(null)
   const connecting = state === 'connecting' || state === 'reconnecting'
   const active = state === 'connected' || state === 'paused'
@@ -109,7 +108,6 @@ export function VoiceControls({ state, error, isPlaying, disabled, isDemo = true
         </span>
       </div>
       <div className="voice-controls__status" role="status"><strong>{isPlaying ? 'Оппонент отвечает' : stateLabels[state]}</strong><span>{state === 'connected' ? isDemo ? 'Демо-разговор активен' : 'Микрофон включён' : state === 'paused' ? 'Микрофон на паузе' : connecting ? 'Ожидайте подключения' : 'Нажмите на микрофон'}</span><small>{state === 'connected' ? isDemo ? 'Реплики появятся автоматически' : 'Реплика завершится автоматически после паузы' : 'Реплики появятся в диалоге после сохранения'}</small></div>
-      {active && <button className="voice-controls__stop" type="button" onClick={onStop}>Остановить</button>}
     </div>
   )
 }

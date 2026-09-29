@@ -8,7 +8,7 @@ import { PreparationForm } from '@/components/preparation/PreparationForm'
 import { PreparationNavigation } from '@/components/preparation/PreparationNavigation'
 import { AppButton } from '@/components/ui/AppButton'
 import { parsePreparationSection, preparationSections, type PreparationSectionId } from '@/features/preparation/metadata'
-import type { PreparationStepId } from '@/features/preparation/preparation'
+import { saveRecentPreparation, type PreparationStepId } from '@/features/preparation/preparation'
 import { usePreparationCase } from '@/features/preparation/usePreparationCase'
 import { usePreparationDraft } from '@/features/preparation/usePreparationDraft'
 import { useStartNegotiation } from '@/features/preparation/useStartNegotiation'
@@ -22,8 +22,8 @@ function parseMode(value: string | null): NegotiationMode | null { return value 
 
 export function PreparationPage() {
   const { caseId = '' } = useParams()
-  const { mockOwnerKey } = useAuthRuntime()
-  if (!mockOwnerKey) throw new Error('PreparationPage requires an authenticated owner.')
+  const { preparationOwnerKey } = useAuthRuntime()
+  if (!preparationOwnerKey) throw new Error('PreparationPage requires an authenticated owner.')
   const [searchParams, setSearchParams] = useSearchParams()
   const roleIndex = parseRole(searchParams.get('role'))
   const mode = parseMode(searchParams.get('mode'))
@@ -34,7 +34,7 @@ export function PreparationPage() {
   const productTour = useProductTour()
   const { send: sendTourEvent, state: tourState } = productTour
   const loadedCase = usePreparationCase(negotiationClient, caseId)
-  const preparation = usePreparationDraft(mockOwnerKey, caseId, roleIndex)
+  const preparation = usePreparationDraft(preparationOwnerKey, caseId, roleIndex)
   const [activeStep, setActiveStep] = useState<PreparationStepId>(activeSection.steps[0])
   const [caseDrawerOpen, setCaseDrawerOpen] = useState(false)
   const caseButtonRef = useRef<HTMLButtonElement>(null)
@@ -45,7 +45,7 @@ export function PreparationPage() {
   const starter = useStartNegotiation(negotiationClient, {
     draft: preparation.draft,
     mode,
-    ownerKey: mockOwnerKey,
+    ownerKey: preparationOwnerKey,
     roleIndex,
     supportsTextNegotiation,
     trainingCase: loadedCase.trainingCase,
@@ -57,6 +57,17 @@ export function PreparationPage() {
     nextParams.set('section', activeSectionId)
     setSearchParams(nextParams, { replace: true })
   }, [activeSectionId, searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (!loadedCase.trainingCase || roleIndex === null || mode === null || preparation.saveState !== 'saved') return
+    saveRecentPreparation(preparationOwnerKey, {
+      caseId: loadedCase.trainingCase.id,
+      roleIndex,
+      mode,
+      sectionId: activeSectionId,
+      updatedAt: new Date().toISOString(),
+    })
+  }, [activeSectionId, loadedCase.trainingCase, mode, preparation.saveState, preparationOwnerKey, roleIndex])
 
   useEffect(() => {
     if (

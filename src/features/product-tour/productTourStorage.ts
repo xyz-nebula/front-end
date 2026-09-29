@@ -2,7 +2,7 @@ import {
   clearTourPromptDeferral,
   hasMemoryTourPromptDeferral,
   rememberTourPromptDeferral,
-} from '@/auth/tourOwnerIdentity'
+} from '../../auth/tourOwnerIdentity.ts'
 
 export const PRODUCT_TOUR_VERSION = 'product-tour-v1' as const
 
@@ -51,6 +51,16 @@ const steps: readonly ProductTourStepId[] = [
   'case', 'role', 'voice-format', 'analysis', 'strategy', 'tactics', 'start-duel',
   'microphone', 'dialogue', 'finish', 'confirm-finish', 'result',
 ]
+
+function closedInterruptedState(): ProductTourState {
+  return {
+    schemaVersion: 1,
+    tourVersion: PRODUCT_TOUR_VERSION,
+    status: 'never',
+    stepId: 'case',
+    updatedAt: new Date().toISOString(),
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -107,9 +117,27 @@ export function readProductTourState(ownerKey: string): ProductTourStorageResult
   try {
     serialized = window.localStorage.getItem(key)
   } catch {
-    return { state: memoryStates.get(key) ?? null, storageAvailable: false }
+    const memoryState = memoryStates.get(key) ?? null
+    const state = memoryState?.status === 'active' || memoryState?.status === 'paused'
+      ? closedInterruptedState()
+      : memoryState
+    if (state) memoryStates.set(key, state)
+    return {
+      state,
+      storageAvailable: false,
+    }
   }
-  if (!serialized) return { state: memoryStates.get(key) ?? null, storageAvailable: true }
+  if (!serialized) {
+    const memoryState = memoryStates.get(key) ?? null
+    const state = memoryState?.status === 'active' || memoryState?.status === 'paused'
+      ? closedInterruptedState()
+      : memoryState
+    if (state) memoryStates.set(key, state)
+    return {
+      state,
+      storageAvailable: true,
+    }
+  }
 
   let parsed: unknown
   try {
@@ -118,7 +146,17 @@ export function readProductTourState(ownerKey: string): ProductTourStorageResult
     parsed = null
   }
   const state = parseProductTourState(parsed)
-  if (state) return { state, storageAvailable: true }
+  if (state) {
+    if (state.status !== 'active' && state.status !== 'paused') return { state, storageAvailable: true }
+    const closed = closedInterruptedState()
+    memoryStates.set(key, closed)
+    try {
+      window.localStorage.setItem(key, JSON.stringify(closed))
+      return { state: closed, storageAvailable: true }
+    } catch {
+      return { state: closed, storageAvailable: false }
+    }
+  }
   try {
     window.localStorage.removeItem(key)
   } catch {
@@ -198,7 +236,8 @@ export function subscribeToProductTourStorage(
       return
     }
     try {
-      listener(parseProductTourState(JSON.parse(event.newValue) as unknown))
+      const state = parseProductTourState(JSON.parse(event.newValue) as unknown)
+      listener(state?.status === 'active' || state?.status === 'paused' ? closedInterruptedState() : state)
     } catch {
       listener(null)
     }

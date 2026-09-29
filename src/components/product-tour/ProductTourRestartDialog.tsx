@@ -1,17 +1,19 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 
-interface ProductTourErrorDialogProps {
-  onClose: () => void
-  onRestart: () => void
+interface ProductTourRestartDialogProps {
+  onCancel: () => void
+  onConfirm: () => void
+  returnFocusRef?: RefObject<HTMLElement | null>
 }
 
-export function ProductTourErrorDialog({ onClose, onRestart }: ProductTourErrorDialogProps) {
+export function ProductTourRestartDialog({ onCancel, onConfirm, returnFocusRef }: ProductTourRestartDialogProps) {
   const dialogRef = useRef<HTMLElement>(null)
-  const primaryButtonRef = useRef<HTMLButtonElement>(null)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const trigger = returnFocusRef?.current
+      ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
     const portal = dialogRef.current?.parentElement
     const background = [...document.body.children]
       .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== portal)
@@ -20,7 +22,7 @@ export function ProductTourErrorDialog({ onClose, onRestart }: ProductTourErrorD
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        onCancel()
         return
       }
       if (event.key !== 'Tab') return
@@ -37,12 +39,12 @@ export function ProductTourErrorDialog({ onClose, onRestart }: ProductTourErrorD
       }
     }
     const handleFocusIn = (event: FocusEvent) => {
-      if (event.target instanceof Node && !dialogRef.current?.contains(event.target)) primaryButtonRef.current?.focus()
+      if (event.target instanceof Node && !dialogRef.current?.contains(event.target)) cancelButtonRef.current?.focus()
     }
     const overflow = document.body.style.overflow
     background.forEach(({ element }) => { element.inert = true })
     document.body.style.overflow = 'hidden'
-    primaryButtonRef.current?.focus()
+    cancelButtonRef.current?.focus()
     document.addEventListener('keydown', handleKeyDown)
     document.addEventListener('focusin', handleFocusIn)
     return () => {
@@ -52,17 +54,17 @@ export function ProductTourErrorDialog({ onClose, onRestart }: ProductTourErrorD
       background.forEach(({ element, inert }) => { element.inert = inert })
       window.requestAnimationFrame(() => trigger?.isConnected && trigger.focus())
     }
-  }, [onClose])
+  }, [onCancel, returnFocusRef])
 
   return createPortal(
     <div className="product-tour-error-backdrop" role="presentation">
-      <section ref={dialogRef} className="product-tour-error" role="dialog" aria-modal="true" aria-labelledby="product-tour-error-title" aria-describedby="product-tour-error-description">
+      <section ref={dialogRef} className="product-tour-error" role="dialog" aria-modal="true" aria-labelledby="product-tour-restart-title" aria-describedby="product-tour-restart-description">
         <span className="product-tour-error__eyebrow">Тур по продукту</span>
-        <h2 id="product-tour-error-title">Не удалось продолжить тур</h2>
-        <p id="product-tour-error-description">Нужный элемент не появился на странице. Начни тур заново или закрой его и вернись позже.</p>
+        <h2 id="product-tour-restart-title">Начать тур заново?</h2>
+        <p id="product-tour-restart-description">Текущий прогресс тура будет сброшен. Продолжить с этого шага не получится.</p>
         <div className="product-tour-error__actions">
-          <button ref={primaryButtonRef} className="is-primary" type="button" onClick={onRestart}>Начать заново</button>
-          <button type="button" onClick={onClose}>Закрыть тур</button>
+          <button ref={cancelButtonRef} type="button" onClick={onCancel}>Остаться</button>
+          <button className="is-primary" type="button" onClick={onConfirm}>Начать заново</button>
         </div>
       </section>
     </div>,

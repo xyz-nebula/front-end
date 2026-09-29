@@ -1,24 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { Link, useLocation } from 'react-router-dom'
 
 import profileArtwork from '@/assets/home/profile.webp'
 import { useAuth } from '@/auth/useAuth'
-import { TotpModal } from '@/components/auth/TotpModal'
+import { ProductTourRestartDialog } from '@/components/product-tour/ProductTourRestartDialog'
 import { useProductTour } from '@/features/product-tour/useProductTour'
+
+export type DepartureReason = 'default' | 'tour-start' | 'tour-restart'
+export type DepartureRequest = (action: () => void | Promise<void>, reason?: DepartureReason) => void
 
 interface ProfileMenuProps {
   className?: string
   menuClassName?: string
+  onDepartureRequest?: DepartureRequest
   toggleClassName?: string
 }
 
-export function ProfileMenu({ className = '', menuClassName = '', toggleClassName = '' }: ProfileMenuProps) {
-  const { externalSessionVersion, logout } = useAuth()
-  const { menuLabel, ownerKey, startOrResume } = useProductTour()
+export function ProfileMenu({ className = '', menuClassName = '', onDepartureRequest, toggleClassName = '' }: ProfileMenuProps) {
+  const { logout } = useAuth()
+  const { menuLabel, ownerKey, startTour, state: tourState } = useProductTour()
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
-  const [securityModalVersion, setSecurityModalVersion] = useState<number | null>(null)
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -26,11 +29,6 @@ export function ProfileMenu({ className = '', menuClassName = '', toggleClassNam
   const closeMenu = useCallback((restoreFocus = false) => {
     setOpen(false)
     if (restoreFocus) window.requestAnimationFrame(() => triggerRef.current?.focus())
-  }, [])
-
-  const closeSecurity = useCallback(() => {
-    setSecurityModalVersion(null)
-    window.requestAnimationFrame(() => triggerRef.current?.focus())
   }, [])
 
   useEffect(() => {
@@ -51,19 +49,35 @@ export function ProfileMenu({ className = '', menuClassName = '', toggleClassNam
 
   const handleLogout = async () => {
     if (isLoggingOut) return
+    if (onDepartureRequest) {
+      closeMenu()
+      onDepartureRequest(logout)
+      return
+    }
     setIsLoggingOut(true)
     await logout().catch(() => setIsLoggingOut(false))
   }
 
-  const openSecurity = () => {
-    closeMenu()
-    setSecurityModalVersion(externalSessionVersion)
-  }
-
   const openTour = () => {
     closeMenu()
-    startOrResume()
+    const restarting = tourState?.status === 'active' || tourState?.status === 'paused'
+    if (onDepartureRequest) {
+      onDepartureRequest(startTour, restarting ? 'tour-restart' : 'tour-start')
+      return
+    }
+    if (restarting) {
+      setRestartDialogOpen(true)
+      return
+    }
+    startTour()
   }
+
+  const confirmRestart = () => {
+    setRestartDialogOpen(false)
+    startTour()
+  }
+
+  const cancelRestart = useCallback(() => setRestartDialogOpen(false), [])
 
   return (
     <div className={`product-header-profile ${className}`.trim()} ref={containerRef}>
@@ -82,14 +96,14 @@ export function ProfileMenu({ className = '', menuClassName = '', toggleClassNam
           <span className="product-header-menu__identity">Демо-профиль</span>
           {pathname !== '/home' && <Link to="/home" onClick={() => closeMenu()}>К кейсам</Link>}
           <button type="button" disabled={!ownerKey} onClick={openTour}>{menuLabel}</button>
-          <button type="button" onClick={openSecurity}>Настроить 2FA</button>
           <button type="button" disabled={isLoggingOut} onClick={() => void handleLogout()}>{isLoggingOut ? 'Выходим…' : 'Выйти'}</button>
         </div>
       )}
-      {securityModalVersion === externalSessionVersion && createPortal(
-        <TotpModal onClose={closeSecurity} />,
-        document.body,
-      )}
+      {restartDialogOpen && <ProductTourRestartDialog
+        onCancel={cancelRestart}
+        onConfirm={confirmRestart}
+        returnFocusRef={triggerRef}
+      />}
     </div>
   )
 }

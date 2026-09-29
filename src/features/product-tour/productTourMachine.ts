@@ -2,13 +2,11 @@ import {
   PRODUCT_TOUR_VERSION,
   type ProductTourState,
   type ProductTourStepId,
-} from '@/features/product-tour/productTourStorage'
+} from './productTourStorage.ts'
 
 export type ProductTourEvent =
   | { type: 'start' }
-  | { type: 'resume' }
-  | { type: 'pause' }
-  | { type: 'never' }
+  | { type: 'dismiss' }
   | { type: 'case-opened'; caseId: string; caseIndex: number }
   | { type: 'role-selected'; roleIndex: 0 | 1 }
   | { type: 'preparation-opened' }
@@ -60,18 +58,15 @@ export function transitionProductTour(
   now = new Date().toISOString(),
 ): ProductTourState | null {
   if (event.type === 'start') return initialState(now)
-  if (!state) return event.type === 'never'
+  if (!state) return event.type === 'dismiss'
     ? { ...initialState(now), status: 'never' }
     : null
 
-  if (event.type === 'resume') {
-    return state.status === 'paused' || state.status === 'active'
-      ? update(state, now, { status: 'active' })
-      : initialState(now)
-  }
-  if (event.type === 'never') return update(state, now, { status: 'never' })
-  if (event.type === 'pause') {
-    return state.status === 'active' ? update(state, now, { status: 'paused' }) : state
+  if (event.type === 'dismiss') {
+    return {
+      ...initialState(now),
+      status: 'never',
+    }
   }
   if (state.status !== 'active') return state
 

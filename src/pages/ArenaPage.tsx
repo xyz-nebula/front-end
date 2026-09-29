@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 
 import { useAuthRuntime } from '@/auth/runtime'
 import { ArenaConversation } from '@/components/arena/ArenaConversation'
@@ -9,6 +9,7 @@ import { FinishDialog } from '@/components/arena/FinishDialog'
 import { TextComposer } from '@/components/arena/TextComposer'
 import { VoiceControls } from '@/components/arena/VoiceControls'
 import { AppButton } from '@/components/ui/AppButton'
+import type { DepartureReason } from '@/components/chrome/ProfileMenu'
 import { useArenaSession } from '@/features/arena/useArenaSession'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
 import { useSessionTimer } from '@/features/arena/useSessionTimer'
@@ -19,8 +20,8 @@ import '@/styles/duel.css'
 
 export function ArenaPage() {
   const { sessionId = '' } = useParams()
-  const { mockOwnerKey } = useAuthRuntime()
-  if (!mockOwnerKey) throw new Error('ArenaPage requires an authenticated owner.')
+  const { preparationOwnerKey } = useAuthRuntime()
+  if (!preparationOwnerKey) throw new Error('ArenaPage requires an authenticated owner.')
   const navigate = useNavigate()
   const { isRealVoice, supportsTextNegotiation } = useDomainServices()
   const arena = useArenaSession(sessionId)
@@ -35,16 +36,36 @@ export function ArenaPage() {
   const connectAudio = audio.connect
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
+  const [isDeparting, setIsDeparting] = useState(false)
+  const [departureAction, setDepartureAction] = useState<(() => void | Promise<void>) | null>(null)
+  const [departureReason, setDepartureReason] = useState<DepartureReason>('default')
   const [finishError, setFinishError] = useState<string | null>(null)
   const [timeoutFinishFailed, setTimeoutFinishFailed] = useState(false)
   const finishButtonRef = useRef<HTMLButtonElement>(null)
   const timeoutFinishInFlightRef = useRef(false)
+  const departureInFlightRef = useRef(false)
+  const allowDepartureRef = useRef(false)
   const trainingCase = arena.session?.caseSnapshot
-  const sessionPreparation = arena.session ? readSessionPreparation(mockOwnerKey, arena.session.id) : null
+  const sessionPreparation = arena.session ? readSessionPreparation(preparationOwnerKey, arena.session.id) : null
   const sessionTimer = useSessionTimer(
     arena.session?.messages ?? [],
     arena.session?.timeLimitSeconds ?? 0,
   )
+  const shouldWarnBeforeUnload = arena.session?.mode === 'voice' && arena.session.status === 'active'
+  const navigationBlocker = useBlocker(useCallback(() => (
+    shouldWarnBeforeUnload && !allowDepartureRef.current
+  ), [shouldWarnBeforeUnload]))
+  const departureDialogOpen = navigationBlocker.state === 'blocked' || departureAction !== null
+
+  useEffect(() => {
+    if (!shouldWarnBeforeUnload) return
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [shouldWarnBeforeUnload])
 
   useEffect(() => {
     const session = arena.session
@@ -90,7 +111,7 @@ export function ArenaPage() {
   }, [arena.session?.messages, sendTourEvent, tourState])
 
   useEffect(() => {
-    if (arena.viewState === 'finished') navigate(`/result/${sessionId}`, { replace: true })
+    if (arena.viewState === 'finished' && !departureInFlightRef.current) navigate(`/result/${sessionId}`, { replace: true })
   }, [arena.viewState, navigate, sessionId])
 
   useEffect(() => {
@@ -180,6 +201,47 @@ export function ArenaPage() {
     setShowFinishDialog(false)
   }
 
+  const requestDeparture = (action: () => void | Promise<void>, reason: DepartureReason = 'default') => {
+    if (!shouldWarnBeforeUnload) {
+      void action()
+      return
+    }
+    setDepartureReason(reason)
+    setDepartureAction(() => action)
+  }
+
+  const cancelDeparture = () => {
+    if (isDeparting) return
+    setDepartureAction(null)
+    setDepartureReason('default')
+    if (navigationBlocker.state === 'blocked') navigationBlocker.reset()
+  }
+
+  const confirmDeparture = async () => {
+    if (isDeparting || departureInFlightRef.current) return
+    const requestedAction = departureAction
+    departureInFlightRef.current = true
+    setIsDeparting(true)
+    try {
+      try {
+        await audio.stop()
+      } catch {
+        // Leaving remains available even when local audio cleanup reports a failure.
+      }
+      try {
+        await arena.finishSession()
+      } catch {
+        // The user explicitly chose to leave even if the backend cannot finish the session.
+      }
+    } finally {
+      allowDepartureRef.current = true
+      setDepartureAction(null)
+      setDepartureReason('default')
+      if (navigationBlocker.state === 'blocked') navigationBlocker.proceed()
+      else await requestedAction?.()
+    }
+  }
+
   if (arena.session.mode === 'text' && !supportsTextNegotiation) {
     return (
       <main className="arena-state">
@@ -211,6 +273,7 @@ export function ArenaPage() {
         isSending={isSending}
         finishDisabled={isSending || interactionDisabled || isConnecting}
         onFinish={openFinishDialog}
+        onDepartureRequest={requestDeparture}
         finishButtonRef={finishButtonRef}
       />
       <main className="duel-shell arena-layout">
@@ -224,7 +287,7 @@ export function ArenaPage() {
           {isFinished ? (
             <div className="arena-finished" role="status"><div><strong>Переговоры завершены</strong><span>Открываем разбор…</span></div><Link to={`/result/${sessionId}`}>Посмотреть результат →</Link></div>
           ) : arena.session.mode === 'voice' ? (
-            <VoiceControls state={audio.state} error={audio.error} isPlaying={audio.isPlaying} disabled={arena.viewState !== 'ready' || interactionDisabled} isDemo={!isRealVoice} isUserSpeaking={Boolean(audio.partial.user)} getInputLevel={audio.getInputLevel} onConnect={() => void audio.connect()} onPause={audio.pause} onResume={audio.resume} onStop={() => void audio.stop()} />
+            <VoiceControls state={audio.state} error={audio.error} isPlaying={audio.isPlaying} disabled={arena.viewState !== 'ready' || interactionDisabled} isDemo={!isRealVoice} isUserSpeaking={Boolean(audio.partial.user)} getInputLevel={audio.getInputLevel} onConnect={() => void audio.connect()} onPause={audio.pause} onResume={audio.resume} />
           ) : (
             <TextComposer
               value={arena.draft}
@@ -242,6 +305,12 @@ export function ArenaPage() {
         onCancel={closeFinishDialog}
         onConfirm={() => { void confirmFinish() }}
         returnFocusRef={finishButtonRef}
+      />}
+      {departureDialogOpen && <FinishDialog
+        busy={isDeparting}
+        onCancel={cancelDeparture}
+        onConfirm={() => { void confirmDeparture() }}
+        variant={departureReason === 'tour-restart' ? 'tour-restart' : departureReason === 'tour-start' ? 'tour-start' : 'leave'}
       />}
     </div>
   )

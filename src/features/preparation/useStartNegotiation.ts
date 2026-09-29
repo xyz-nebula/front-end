@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 
 import { clearPendingSessionCreate, getOrCreatePendingSessionCreate, type PendingSessionCreate } from '@/features/arena/pendingSessionCreate'
-import { saveSessionPreparation, serializePreparation } from '@/features/preparation/preparation'
+import { clearRecentPreparation, saveSessionPreparation, serializePreparation } from '@/features/preparation/preparation'
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 import { isServiceError } from '@/types/api'
 import type { TrainingCase } from '@/types/case'
@@ -71,6 +71,7 @@ export function useStartNegotiation(negotiationClient: NegotiationClient, input:
         selectedRole: roleIndex,
         draft,
       })
+      clearRecentPreparation(ownerKey, { caseId: trainingCase.id, roleIndex, mode })
       clearPendingSessionCreate(storageKey)
       onCreated(session.id)
     } catch (caught) {

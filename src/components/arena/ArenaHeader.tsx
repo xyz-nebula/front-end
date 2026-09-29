@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import opponentArtwork from '@/assets/home/opponent.webp'
 import profileArtwork from '@/assets/home/profile.webp'
 import { ProductHeader } from '@/components/chrome/ProductHeader'
+import type { DepartureRequest } from '@/components/chrome/ProfileMenu'
 import type { AudioConnectionState } from '@/types/audio'
 import type { NegotiationMode } from '@/types/negotiation'
 import { formatRemainingTime } from '@/features/arena/sessionTimer'
@@ -20,10 +21,11 @@ interface ArenaHeaderProps {
   isSending: boolean
   finishDisabled: boolean
   onFinish: () => void
+  onDepartureRequest: DepartureRequest
   finishButtonRef?: RefObject<HTMLButtonElement | null>
 }
 
-export function ArenaHeader({ title, userRole, opponentRole, remainingSeconds, timerStarted, timerExpired, mode, audioState, isDemoVoice, isSending, finishDisabled, onFinish, finishButtonRef }: ArenaHeaderProps) {
+export function ArenaHeader({ title, userRole, opponentRole, remainingSeconds, timerStarted, timerExpired, mode, audioState, isDemoVoice, isSending, finishDisabled, onFinish, onDepartureRequest, finishButtonRef }: ArenaHeaderProps) {
   const status = timerExpired ? 'Время вышло'
     : mode === 'text'
     ? isSending ? 'Оппонент отвечает' : 'Ваш ход'
@@ -34,7 +36,7 @@ export function ArenaHeader({ title, userRole, opponentRole, remainingSeconds, t
 
   return (
     <>
-      <ProductHeader variant="arena" actions={<span className="duel-header__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span> Серия: <strong>4 дня</strong></span>} />
+      <ProductHeader variant="arena" onDepartureRequest={onDepartureRequest} actions={<span className="duel-header__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span> Серия: <strong>4 дня</strong></span>} />
       <div className="duel-shell duel-heading">
         <div><h1>{title}</h1><span>· Поединок</span></div>
         <button ref={finishButtonRef} type="button" onClick={onFinish} disabled={finishDisabled} aria-label="Завершить" data-tour-id="finish"><span className="duel-heading__finish-full">Завершить переговоры</span><span className="duel-heading__finish-short">Завершить</span></button>

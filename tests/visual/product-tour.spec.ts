@@ -74,8 +74,6 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 390, height: 844 })
   await openRoleSelection(page, 'complete-mobile')
-  await page.reload()
-  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Выбери свою роль')
 
   const roleSelector = page.locator('[data-tour-id="role-selector"]')
   await expectTargetAbovePanel(page, roleSelector)
@@ -87,9 +85,6 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await expect(page).toHaveURL(/\/preparation\?.*section=analysis/)
   await expectTargetAbovePanel(page, page.locator('.preparation-bottom__next'))
   await captureScreen(page, 'product-tour-preparation', 'mobile')
-  await page.reload()
-
-  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Разбери ситуацию')
   await expect(page.locator('#preparation-root-conflict')).toHaveClass(/product-tour-target/)
   await page.locator('.preparation-bottom__next').click()
   await expect(page).toHaveURL(/section=strategy/)
@@ -107,8 +102,8 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await startDuel.click()
 
   await expect(page).toHaveURL(/\/arena\//)
-  await page.reload()
   const microphone = page.locator('[data-tour-id="microphone"]')
+  await expect(microphone).toBeVisible()
   await expectTargetAbovePanel(page, microphone)
   await captureScreen(page, 'product-tour-microphone', 'mobile')
   await microphone.click()
@@ -127,13 +122,11 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Разбор готов', { timeout: 15_000 })
   await expectTargetAbovePanel(page, page.locator('[data-tour-id="result"]'))
   await captureScreen(page, 'product-tour-result', 'mobile')
-  await page.reload()
-  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Разбор готов', { timeout: 15_000 })
   await page.locator('.product-tour-tooltip').getByRole('button', { name: 'Готово' }).click()
   await expect(page.locator('[data-product-tour-tooltip]')).toHaveCount(0)
 })
 
-test('paused role selection resumes with the selected case and role', async ({ page }) => {
+test('closing a tour discards progress and the next run starts from the first step', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 390, height: 844 })
   await openRoleSelection(page, 'resume-role')
@@ -141,19 +134,58 @@ test('paused role selection resumes with the selected case and role', async ({ p
   const secondRole = page.locator('[data-tour-id="role-selector"]').getByRole('radio').nth(1)
   await secondRole.click()
   await page.getByRole('button', { name: 'Меню тура' }).click()
-  await expect(page.getByText('Продолжить можно из меню профиля.')).toBeVisible()
-  await page.getByRole('button', { name: 'Приостановить тур' }).click()
+  await expect(page.getByText('Следующий запуск начнётся с первого шага.')).toBeVisible()
+  await page.getByRole('button', { name: 'Завершить тур' }).click()
   await expect(page.locator('[data-product-tour-tooltip]')).toHaveCount(0)
 
   await page.reload()
   await page.getByRole('button', { name: 'Меню профиля' }).click()
-  await page.getByRole('button', { name: 'Продолжить тур' }).click()
+  await page.getByRole('button', { name: 'Пройти тур', exact: true }).click()
 
-  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Перейди к подготовке')
-  await expect(page.locator('.product-tour-tooltip__progress')).toHaveText('Подготовка · старт')
-  const restoredRoles = page.locator('[data-tour-id="role-selector"]').getByRole('radio')
-  await expect(restoredRoles.nth(1)).toBeChecked()
-  await expect(page.getByRole('button', { name: 'Начать подготовку' })).toBeEnabled()
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Выбери кейс')
+  await expect(page.locator('.product-tour-tooltip__progress')).toHaveText('Кейс · 1 из 2')
+  await expect(page.locator('[data-tour-id="role-selector"]')).toHaveCount(0)
+})
+
+test('restarting an active tour requires confirmation outside the arena', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await openRoleSelection(page, 'restart-confirmation')
+  await page.locator('[data-tour-id="role-selector"]').getByRole('radio').first().check()
+  await page.getByRole('button', { name: 'Начать подготовку' }).click()
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Разбери ситуацию')
+
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Пройти тур заново' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Начать тур заново?' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Остаться' }).click()
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Разбери ситуацию')
+
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Пройти тур заново' }).click()
+  await dialog.getByRole('button', { name: 'Начать заново' }).click()
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Выбери кейс')
+})
+
+test('reloading an active arena closes the tour without restoring its session step', async ({ page }) => {
+  test.setTimeout(45_000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await openRoleSelection(page, 'reload-arena')
+  await page.locator('[data-tour-id="role-selector"]').getByRole('radio').first().check()
+  await page.getByRole('button', { name: 'Начать подготовку' }).click()
+  await page.locator('.preparation-bottom__next').click()
+  await page.locator('.preparation-bottom__next').click()
+  await page.locator('.preparation-bottom__next').click()
+  await page.locator('.preparation-bottom__next').click()
+  await expect(page).toHaveURL(/\/arena\//)
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Включи микрофон')
+
+  await page.reload()
+  await expect(page.locator('[data-product-tour-tooltip]')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await expect(page.getByRole('button', { name: 'Пройти тур', exact: true })).toBeVisible()
 })
 
 test('desktop product tour can be completed with precise highlights and pointers', async ({ page }) => {

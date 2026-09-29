@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-import { ProfileMenu } from '@/components/chrome/ProfileMenu'
+import { useAuthHomePath } from '@/auth/useAuth'
+import { ProfileMenu, type DepartureRequest } from '@/components/chrome/ProfileMenu'
 import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import '@/styles/product-header.css'
 
@@ -52,12 +53,13 @@ const variantClasses: Record<ProductHeaderVariant, VariantClasses> = {
   },
 }
 
-export function ProductHeader({ actions, variant }: { actions?: ReactNode; variant: ProductHeaderVariant }) {
+export function ProductHeader({ actions, onDepartureRequest, variant }: { actions?: ReactNode; onDepartureRequest?: DepartureRequest; variant: ProductHeaderVariant }) {
   const classes = variantClasses[variant]
+  const homePath = useAuthHomePath()
   return (
     <header className={classes.root}>
       <div className={classes.inner}>
-        <Link className={classes.brand} to="/" aria-label="Арена — на главную">
+        <Link className={classes.brand} to={homePath} aria-label="Арена — на главную">
           <ArenaCubeMark />
           <span>АРЕНА</span>
         </Link>
@@ -66,6 +68,7 @@ export function ProductHeader({ actions, variant }: { actions?: ReactNode; varia
           <ProfileMenu
             className={classes.profile}
             menuClassName={classes.profileMenu}
+            onDepartureRequest={onDepartureRequest}
             toggleClassName={classes.profileToggle}
           />
         </div>

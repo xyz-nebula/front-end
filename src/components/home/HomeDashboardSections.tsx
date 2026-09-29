@@ -32,27 +32,27 @@ function trainingCountLabel(count: number) {
 }
 
 interface HomeOverviewProps {
-  activeSession?: NegotiationSessionSummary
   casesLoading: boolean
   displayedCase?: TrainingCase
   historyCount: number
   historyLoading: boolean
+  preparationResume?: { href: string; progress: number }
   recommendedCase?: TrainingCase
   onCaseSelect: (item: TrainingCase) => void
 }
 
-export function HomeOverview({ activeSession, casesLoading, displayedCase, historyCount, historyLoading, recommendedCase, onCaseSelect }: HomeOverviewProps) {
+export function HomeOverview({ casesLoading, displayedCase, historyCount, historyLoading, preparationResume, recommendedCase, onCaseSelect }: HomeOverviewProps) {
   return <div className="arena-home__overview">
-    <section className="arena-home__continue" aria-labelledby={historyLoading ? undefined : 'continue-title'} aria-label={historyLoading ? 'Тренировка' : undefined}>
-      {historyLoading ? <div className="arena-home__continue-skeleton" role="status" aria-label="Загружаем тренировку"><span className="arena-home__skeleton-title" /><div><span className="arena-home__skeleton-image" /><span className="arena-home__skeleton-copy" /></div></div> : <>
-        <div className="arena-home__continue-head"><h2 id="continue-title">{activeSession ? 'Продолжить тренировку' : 'Начать тренировку'}</h2><span>▣ &nbsp;{activeSession ? 'В процессе' : 'Рекомендуем'}</span></div>
+    <section className="arena-home__continue" aria-labelledby={casesLoading ? undefined : 'continue-title'} aria-label={casesLoading ? 'Тренировка' : undefined}>
+      {casesLoading ? <div className="arena-home__continue-skeleton" role="status" aria-label="Загружаем тренировку"><span className="arena-home__skeleton-title" /><div><span className="arena-home__skeleton-image" /><span className="arena-home__skeleton-copy" /></div></div> : <>
+        <div className="arena-home__continue-head"><h2 id="continue-title">{preparationResume ? 'Продолжить подготовку' : 'Начать тренировку'}</h2><span>▣ &nbsp;{preparationResume ? 'Черновик' : 'Рекомендуем'}</span></div>
         <div className="arena-home__continue-body">
-          <img src={activeSession && displayedCase ? displayedCase.presentation.artwork ?? heroArtwork : heroArtwork} alt="" decoding="async" />
+          <img src={preparationResume && displayedCase ? displayedCase.presentation.artwork ?? heroArtwork : heroArtwork} alt="" decoding="async" />
           <div className="arena-home__continue-info">
             <h3>{displayedCase?.title ?? (casesLoading ? 'Загружаем кейс…' : 'Выберите кейс')}</h3>
             <p>{displayedCase ? `${displayedCase.category} · ${displayedCase.duration}` : 'Подготовьтесь и проведите переговоры с AI'}</p>
-            <div className="arena-home__preparation"><span>Подготовка: <strong>65%</strong></span><div role="meter" aria-label="Демо: прогресс подготовки" aria-valuenow={65} aria-valuemin={0} aria-valuemax={100}><i /></div></div>
-            {activeSession ? <Link className="arena-home__primary-button" to={`/arena/${activeSession.id}`}>Продолжить <span aria-hidden="true">→</span></Link> : <button className="arena-home__primary-button" type="button" disabled={!recommendedCase} onClick={() => recommendedCase && onCaseSelect(recommendedCase)}>Начать кейс <span aria-hidden="true">→</span></button>}
+            {preparationResume && <div className="arena-home__preparation"><span>Подготовка: <strong>{preparationResume.progress}%</strong></span><div role="meter" aria-label="Прогресс подготовки" aria-valuenow={preparationResume.progress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${preparationResume.progress}%` }} /></div></div>}
+            {preparationResume ? <Link className="arena-home__primary-button" to={preparationResume.href}>Продолжить <span aria-hidden="true">→</span></Link> : <button className="arena-home__primary-button" type="button" disabled={!recommendedCase} onClick={() => recommendedCase && onCaseSelect(recommendedCase)}>Начать кейс <span aria-hidden="true">→</span></button>}
           </div>
         </div>
       </>}

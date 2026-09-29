@@ -288,7 +288,7 @@ export function ProductTourLayer() {
   }, [active, collapsed, targetElement])
 
   if (productTour.error) {
-    return <ProductTourErrorDialog kind={productTour.error} onClose={productTour.dismissError} onRestart={productTour.restart} />
+    return <ProductTourErrorDialog onClose={productTour.dismissError} onRestart={productTour.startTour} />
   }
   if (!active || !step || !targetElement) return null
 
