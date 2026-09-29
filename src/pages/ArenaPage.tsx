@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 
 import { useAuthRuntime } from '@/auth/runtime'
 import { ArenaConversation } from '@/components/arena/ArenaConversation'
@@ -35,10 +35,14 @@ export function ArenaPage() {
   const connectAudio = audio.connect
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
+  const [isDeparting, setIsDeparting] = useState(false)
+  const [departureAction, setDepartureAction] = useState<(() => void | Promise<void>) | null>(null)
   const [finishError, setFinishError] = useState<string | null>(null)
   const [timeoutFinishFailed, setTimeoutFinishFailed] = useState(false)
   const finishButtonRef = useRef<HTMLButtonElement>(null)
   const timeoutFinishInFlightRef = useRef(false)
+  const departureInFlightRef = useRef(false)
+  const allowDepartureRef = useRef(false)
   const trainingCase = arena.session?.caseSnapshot
   const sessionPreparation = arena.session ? readSessionPreparation(preparationOwnerKey, arena.session.id) : null
   const sessionTimer = useSessionTimer(
@@ -46,6 +50,10 @@ export function ArenaPage() {
     arena.session?.timeLimitSeconds ?? 0,
   )
   const shouldWarnBeforeUnload = arena.session?.mode === 'voice' && arena.session.status === 'active'
+  const navigationBlocker = useBlocker(useCallback(() => (
+    shouldWarnBeforeUnload && !allowDepartureRef.current
+  ), [shouldWarnBeforeUnload]))
+  const departureDialogOpen = navigationBlocker.state === 'blocked' || departureAction !== null
 
   useEffect(() => {
     if (!shouldWarnBeforeUnload) return
@@ -101,7 +109,7 @@ export function ArenaPage() {
   }, [arena.session?.messages, sendTourEvent, tourState])
 
   useEffect(() => {
-    if (arena.viewState === 'finished') navigate(`/result/${sessionId}`, { replace: true })
+    if (arena.viewState === 'finished' && !departureInFlightRef.current) navigate(`/result/${sessionId}`, { replace: true })
   }, [arena.viewState, navigate, sessionId])
 
   useEffect(() => {
@@ -191,6 +199,44 @@ export function ArenaPage() {
     setShowFinishDialog(false)
   }
 
+  const requestDeparture = (action: () => void | Promise<void>) => {
+    if (!shouldWarnBeforeUnload) {
+      void action()
+      return
+    }
+    setDepartureAction(() => action)
+  }
+
+  const cancelDeparture = () => {
+    if (isDeparting) return
+    setDepartureAction(null)
+    if (navigationBlocker.state === 'blocked') navigationBlocker.reset()
+  }
+
+  const confirmDeparture = async () => {
+    if (isDeparting || departureInFlightRef.current) return
+    const requestedAction = departureAction
+    departureInFlightRef.current = true
+    setIsDeparting(true)
+    try {
+      try {
+        await audio.stop()
+      } catch {
+        // Leaving remains available even when local audio cleanup reports a failure.
+      }
+      try {
+        await arena.finishSession()
+      } catch {
+        // The user explicitly chose to leave even if the backend cannot finish the session.
+      }
+    } finally {
+      allowDepartureRef.current = true
+      setDepartureAction(null)
+      if (navigationBlocker.state === 'blocked') navigationBlocker.proceed()
+      else await requestedAction?.()
+    }
+  }
+
   if (arena.session.mode === 'text' && !supportsTextNegotiation) {
     return (
       <main className="arena-state">
@@ -222,6 +268,7 @@ export function ArenaPage() {
         isSending={isSending}
         finishDisabled={isSending || interactionDisabled || isConnecting}
         onFinish={openFinishDialog}
+        onDepartureRequest={requestDeparture}
         finishButtonRef={finishButtonRef}
       />
       <main className="duel-shell arena-layout">
@@ -253,6 +300,12 @@ export function ArenaPage() {
         onCancel={closeFinishDialog}
         onConfirm={() => { void confirmFinish() }}
         returnFocusRef={finishButtonRef}
+      />}
+      {departureDialogOpen && <FinishDialog
+        busy={isDeparting}
+        onCancel={cancelDeparture}
+        onConfirm={() => { void confirmDeparture() }}
+        variant="leave"
       />}
     </div>
   )

@@ -10,6 +10,10 @@ export interface SeededSmokeState {
   finishedSessionId: string
 }
 
+export interface SeededVoiceArenaState extends SeededSmokeState {
+  activeVoiceSessionId: string
+}
+
 export async function ensureArtifactsDirectory() {
   await mkdir(artifactsDir, { recursive: true })
 }
@@ -183,4 +187,39 @@ export async function seedProtectedScreens(page: Page, seed: string): Promise<Se
       finishedSessionId: finishedSession.id,
     }
   }, { seedValue: seed })
+}
+
+export async function seedActiveVoiceArena(page: Page, seed: string): Promise<SeededVoiceArenaState> {
+  const state = await seedProtectedScreens(page, seed)
+  const activeVoiceSessionId = await page.evaluate(async ({ seedValue }) => {
+    const [
+      { createEmptyPreparation, saveSessionPreparation },
+      { MockRuntime },
+      { MockStorage },
+    ] = await Promise.all([
+      import('/src/features/preparation/preparation.ts'),
+      import('/src/services/mock/mockRuntime.ts'),
+      import('/src/services/mock/mockStorage.ts'),
+    ])
+    const ownerKey = `smoke-owner-${seedValue}`
+    const storage = new MockStorage(localStorage)
+    const runtime = new MockRuntime(storage)
+    const session = await runtime.createSession(ownerKey, {
+      caseId: 'salary-review',
+      timeLimitSeconds: 15 * 60,
+      mode: 'voice',
+      clientCommandId: `active-voice-${seedValue}`,
+    })
+    saveSessionPreparation(ownerKey, session.id, {
+      caseId: 'salary-review',
+      caseTitle: 'Пересмотр зарплаты',
+      userRole: 'Сотрудник',
+      opponentRole: 'Руководитель',
+      selectedRole: 0,
+      draft: createEmptyPreparation(),
+    })
+    storage.dispose()
+    return session.id
+  }, { seedValue: seed })
+  return { ...state, activeVoiceSessionId }
 }

@@ -10,10 +10,11 @@ import { useProductTour } from '@/features/product-tour/useProductTour'
 interface ProfileMenuProps {
   className?: string
   menuClassName?: string
+  onDepartureRequest?: (action: () => void | Promise<void>) => void
   toggleClassName?: string
 }
 
-export function ProfileMenu({ className = '', menuClassName = '', toggleClassName = '' }: ProfileMenuProps) {
+export function ProfileMenu({ className = '', menuClassName = '', onDepartureRequest, toggleClassName = '' }: ProfileMenuProps) {
   const { externalSessionVersion, logout } = useAuth()
   const { menuLabel, ownerKey, startOrResume } = useProductTour()
   const { pathname } = useLocation()
@@ -51,6 +52,11 @@ export function ProfileMenu({ className = '', menuClassName = '', toggleClassNam
 
   const handleLogout = async () => {
     if (isLoggingOut) return
+    if (onDepartureRequest) {
+      closeMenu()
+      onDepartureRequest(logout)
+      return
+    }
     setIsLoggingOut(true)
     await logout().catch(() => setIsLoggingOut(false))
   }
@@ -62,7 +68,8 @@ export function ProfileMenu({ className = '', menuClassName = '', toggleClassNam
 
   const openTour = () => {
     closeMenu()
-    startOrResume()
+    if (onDepartureRequest) onDepartureRequest(startOrResume)
+    else startOrResume()
   }
 
   return (

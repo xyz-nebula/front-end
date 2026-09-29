@@ -8,9 +8,10 @@ interface FinishDialogProps {
   busy?: boolean
   error?: string | null
   returnFocusRef?: RefObject<HTMLElement | null>
+  variant?: 'finish' | 'leave'
 }
 
-export function FinishDialog({ onCancel, onConfirm, busy = false, error = null, returnFocusRef }: FinishDialogProps) {
+export function FinishDialog({ onCancel, onConfirm, busy = false, error = null, returnFocusRef, variant = 'finish' }: FinishDialogProps) {
   const backdropRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLElement>(null)
   const onCancelRef = useRef(onCancel)
@@ -74,16 +75,20 @@ export function FinishDialog({ onCancel, onConfirm, busy = false, error = null, 
     }
   }, [returnFocusRef])
 
+  const leaving = variant === 'leave'
+
   return (
     <div className="modal-backdrop" ref={backdropRef} role="presentation" onMouseDown={(event) => event.target === event.currentTarget && !busy && onCancel()}>
-      <section className="finish-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="finish-dialog-title" data-tour-id="finish-dialog">
-        <p className="eyebrow">Завершение тренировки</p>
-        <h2 id="finish-dialog-title">Закончить переговоры?</h2>
-        <p>После завершения новые реплики добавить не получится. Ответы уже сохранены и попадут в разбор.</p>
+      <section className="finish-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="finish-dialog-title" data-tour-id={leaving ? 'leave-dialog' : 'finish-dialog'}>
+        <p className="eyebrow">{leaving ? 'Выход из тренировки' : 'Завершение тренировки'}</p>
+        <h2 id="finish-dialog-title">{leaving ? 'Покинуть переговоры?' : 'Закончить переговоры?'}</h2>
+        <p>{leaving
+          ? 'Перед переходом мы завершим переговоры. Новые реплики добавить не получится, а сохранённые ответы попадут в разбор.'
+          : 'После завершения новые реплики добавить не получится. Ответы уже сохранены и попадут в разбор.'}</p>
         {error && <p className="finish-dialog__error" role="alert">{error}</p>}
         <div>
-          <AppButton type="button" variant="secondary" onClick={onCancel} disabled={busy}>Продолжить диалог</AppButton>
-          <AppButton type="button" onClick={onConfirm} disabled={busy}>{busy ? 'Завершаем…' : 'Завершить'}</AppButton>
+          <AppButton type="button" variant="secondary" onClick={onCancel} disabled={busy}>{leaving ? 'Остаться' : 'Продолжить диалог'}</AppButton>
+          <AppButton type="button" onClick={onConfirm} disabled={busy}>{busy ? 'Завершаем…' : leaving ? 'Завершить и покинуть' : 'Завершить'}</AppButton>
         </div>
       </section>
     </div>

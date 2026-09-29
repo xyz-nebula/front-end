@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 import {
   captureScreen,
   ensureArtifactsDirectory,
+  seedActiveVoiceArena,
   seedProtectedScreens,
   seedProductTourUser,
 } from './helpers'
@@ -272,4 +273,95 @@ test('an expired persisted session automatically starts evaluation after reload'
     const data = JSON.parse(serialized) as { results?: Array<{ sessionId?: string }> }
     return data.results?.filter((result) => result.sessionId === sessionId).length ?? 0
   }, { sessionId: state.expiredSessionId })).toBe(1)
+})
+
+for (const viewport of viewports) {
+  test(`${viewport.name} active voice arena confirms internal navigation`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+    const state = await seedActiveVoiceArena(page, `leave-${viewport.name}`)
+    await page.goto(`/arena/${state.activeVoiceSessionId}`)
+    await expect(page.locator('.duel-heading h1')).toBeVisible()
+
+    await page.getByRole('link', { name: 'Арена — на главную' }).click()
+    const leaveDialog = page.locator('[data-tour-id="leave-dialog"]')
+    await expect(leaveDialog).toBeVisible()
+    await captureScreen(page, 'arena-leave-dialog', viewport.name)
+    await leaveDialog.getByRole('button', { name: 'Остаться' }).click()
+    await expect(page).toHaveURL(new RegExp(`/arena/${state.activeVoiceSessionId}$`))
+
+    await page.getByRole('link', { name: 'Арена — на главную' }).click()
+    await leaveDialog.getByRole('button', { name: 'Завершить и покинуть' }).click()
+    await expect(page).toHaveURL(/\/$/)
+    await expect.poll(() => page.evaluate(({ sessionId }) => {
+      const serialized = localStorage.getItem('arena.mock.data.v2')
+      if (!serialized) return null
+      const data = JSON.parse(serialized) as { sessions?: Array<{ id?: string; status?: string }> }
+      return data.sessions?.find((session) => session.id === sessionId)?.status ?? null
+    }, { sessionId: state.activeVoiceSessionId })).toMatch(/^(finishing|finished)$/)
+  })
+}
+
+test('active voice arena guards browser history, tour actions, and logout', async ({ page }) => {
+  const state = await seedActiveVoiceArena(page, 'leave-actions')
+  await page.goto('/home')
+  await page.locator(`a[href="/arena/${state.activeVoiceSessionId}"]`).click()
+  await expect(page).toHaveURL(new RegExp(`/arena/${state.activeVoiceSessionId}$`))
+  await expect(page.locator('.duel-heading h1')).toBeVisible()
+
+  await page.evaluate(() => history.back())
+  const leaveDialog = page.locator('[data-tour-id="leave-dialog"]')
+  await expect(leaveDialog).toBeVisible()
+  await leaveDialog.getByRole('button', { name: 'Остаться' }).click()
+  await expect(page).toHaveURL(new RegExp(`/arena/${state.activeVoiceSessionId}$`))
+
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: /тур/i }).click()
+  await expect(leaveDialog).toBeVisible()
+  await expect(page.locator('[data-product-tour-tooltip]')).toHaveCount(0)
+  await leaveDialog.getByRole('button', { name: 'Остаться' }).click()
+
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Выйти' }).click()
+  await expect(leaveDialog).toBeVisible()
+  await expect.poll(() => page.evaluate(() => Boolean(localStorage.getItem('arena.auth.tokens.v1')))).toBe(true)
+  await leaveDialog.getByRole('button', { name: 'Завершить и покинуть' }).click()
+  await expect(page).toHaveURL(/\/login$/)
+})
+
+test('text arena navigation is not guarded', async ({ page }) => {
+  const state = await seedProtectedScreens(page, 'leave-text')
+  await page.goto(`/arena/${state.activeSessionId}`)
+  await page.getByRole('link', { name: 'Арена — на главную' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.locator('[data-tour-id="leave-dialog"]')).toHaveCount(0)
+})
+
+test('failed session finish does not trap an explicitly departing user', async ({ page }) => {
+  const state = await seedActiveVoiceArena(page, 'leave-failed-finish')
+  await page.goto(`/arena/${state.activeVoiceSessionId}`)
+  await expect(page.locator('.duel-heading h1')).toBeVisible()
+  await page.evaluate(async ({ sessionId }) => {
+    const [{ MockStorage }] = await Promise.all([
+      import('/src/services/mock/mockStorage.ts'),
+    ])
+    const storage = new MockStorage(localStorage)
+    await storage.mutate((data) => {
+      data.sessions = data.sessions.filter((session) => session.id !== sessionId)
+    })
+    storage.dispose()
+  }, { sessionId: state.activeVoiceSessionId })
+
+  await page.getByRole('link', { name: 'Арена — на главную' }).click()
+  await page.locator('[data-tour-id="leave-dialog"]').getByRole('button', { name: 'Завершить и покинуть' }).click()
+  await expect(page).toHaveURL(/\/$/)
+})
+
+test('finished session routes remain unguarded', async ({ page }) => {
+  const state = await seedProtectedScreens(page, 'leave-finished')
+  await page.goto(`/result/${state.finishedSessionId}`)
+  await expect(page.locator('.result-intro h1')).toHaveText('Разбор поединка')
+  await page.getByRole('link', { name: 'Арена — на главную' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.locator('[data-tour-id="leave-dialog"]')).toHaveCount(0)
 })

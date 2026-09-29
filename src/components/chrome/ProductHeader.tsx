@@ -52,7 +52,7 @@ const variantClasses: Record<ProductHeaderVariant, VariantClasses> = {
   },
 }
 
-export function ProductHeader({ actions, variant }: { actions?: ReactNode; variant: ProductHeaderVariant }) {
+export function ProductHeader({ actions, onDepartureRequest, variant }: { actions?: ReactNode; onDepartureRequest?: (action: () => void | Promise<void>) => void; variant: ProductHeaderVariant }) {
   const classes = variantClasses[variant]
   return (
     <header className={classes.root}>
@@ -66,6 +66,7 @@ export function ProductHeader({ actions, variant }: { actions?: ReactNode; varia
           <ProfileMenu
             className={classes.profile}
             menuClassName={classes.profileMenu}
+            onDepartureRequest={onDepartureRequest}
             toggleClassName={classes.profileToggle}
           />
         </div>
