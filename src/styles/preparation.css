@@ -91,6 +91,10 @@
 @keyframes preparation-fade-in { from { opacity: 0; } }
 @keyframes preparation-drawer-in { from { transform: translateX(100%); } }
 
+@media (min-width: 901px) {
+  .preparation-page.is-tour-start-duel .preparation-bottom__next { display: none; }
+}
+
 @media (max-width: 900px) {
   .preparation-shell { width: calc(100% - 32px); }
   .preparation-main { padding-bottom: 94px; }
@@ -108,6 +112,7 @@
   .preparation-bottom button { min-height: 51px; }
   .preparation-bottom__back { flex: 0 0 auto; }
   .preparation-bottom__next { flex: 1; }
+  .preparation-start { display: none; }
 }
 
 @media (max-width: 600px) {

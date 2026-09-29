@@ -48,7 +48,7 @@ export function ResultIcon({ children, tone = 'blue' }: { children: string; tone
 export function ResultOutcome({ outcome }: { outcome: NegotiationOutcome }) {
   if (outcome.status === 'failed') {
     return (
-      <section className="result-outcome is-unavailable" aria-labelledby="result-outcome-title">
+      <section className="result-outcome is-unavailable" aria-labelledby="result-outcome-title" data-tour-id="result">
         <div className="result-outcome__summary">
           <small>Итог переговоров</small>
           <h2 id="result-outcome-title">Итог недоступен</h2>
@@ -60,7 +60,7 @@ export function ResultOutcome({ outcome }: { outcome: NegotiationOutcome }) {
 
   const meta = outcomeMeta[outcome.kind]
   return (
-    <section className={`result-outcome is-${meta.tone}`} aria-labelledby="result-outcome-title">
+    <section className={`result-outcome is-${meta.tone}`} aria-labelledby="result-outcome-title" data-tour-id="result">
       <div className="result-outcome__summary">
         <small>Итог переговоров</small>
         <div>

@@ -61,8 +61,14 @@ function ScopedProductTourProvider({ children, ownerKey }: { children: ReactNode
       return
     }
     if (next.stepId === 'role' || next.stepId === 'voice-format') {
-      const restarted = transitionProductTour(next, { type: 'start' })
-      if (restarted) persist(restarted)
+      const canRestore = Boolean(next.caseId) && (next.stepId === 'role' || next.roleIndex !== undefined)
+      if (!canRestore) {
+        const restarted = transitionProductTour(next, { type: 'start' })
+        if (restarted) persist(restarted)
+        navigate('/home')
+        return
+      }
+      persist(next)
       navigate('/home')
       return
     }

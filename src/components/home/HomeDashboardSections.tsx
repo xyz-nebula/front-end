@@ -72,7 +72,7 @@ export function CaseCatalog({ cases, error, loading, onRetry, onSelect }: CaseCa
     <div className="arena-home__section-head"><h2 id="home-cases-title">Кейсы</h2></div>
     {loading && <p className="arena-home__history-state" role="status">Загружаем кейсы…</p>}
     {error && <div className="arena-home__history-state" role="alert">{error} <button type="button" onClick={onRetry}>Повторить</button></div>}
-    {!loading && !error && <div className="arena-home__case-grid">{cases.map((item, index) => <CaseCard key={item.id} item={item} onSelect={onSelect} tourTarget={index === 0} />)}</div>}
+    {!loading && !error && <div className="arena-home__case-grid">{cases.map((item) => <CaseCard key={item.id} item={item} onSelect={onSelect} />)}</div>}
   </section>
 }
 

@@ -18,6 +18,7 @@ export function HomePage() {
   const productTour = useProductTour()
   const { considerInvitation } = productTour
   const [selectedCase, setSelectedCase] = useState<TrainingCase | null>(null)
+  const [dismissedTourCaseId, setDismissedTourCaseId] = useState<string | null>(null)
   const [showAllHistory, setShowAllHistory] = useState(false)
   const recommendedCase = dashboard.cases[0]
   const activeSession = dashboard.activeSession ?? undefined
@@ -28,10 +29,24 @@ export function HomePage() {
     considerInvitation(!dashboard.casesLoading && !dashboard.casesError && dashboard.cases.length > 0)
   }, [considerInvitation, dashboard.cases.length, dashboard.casesError, dashboard.casesLoading])
 
+  const tourState = productTour.state
+  const restoredCase = tourState?.status === 'active'
+    && (tourState.stepId === 'role' || tourState.stepId === 'voice-format')
+    && tourState.caseId !== dismissedTourCaseId
+    ? dashboard.cases.find((item) => item.id === tourState.caseId) ?? null
+    : null
+  const modalCase = selectedCase ?? restoredCase
+
   const selectCase = (item: TrainingCase) => {
     const caseIndex = dashboard.cases.findIndex((candidate) => candidate.id === item.id)
     productTour.send({ type: 'case-opened', caseId: item.id, caseIndex: Math.max(0, caseIndex) })
+    setDismissedTourCaseId(null)
     setSelectedCase(item)
+  }
+
+  const closeCase = () => {
+    if (modalCase && modalCase.id === tourState?.caseId) setDismissedTourCaseId(modalCase.id)
+    setSelectedCase(null)
   }
 
   return <div className="arena-home">
@@ -44,7 +59,7 @@ export function HomePage() {
       <CaseCatalog cases={dashboard.cases} error={dashboard.casesError} loading={dashboard.casesLoading} onRetry={() => void dashboard.loadCases()} onSelect={selectCase} />
       <TrainingHistory cases={dashboard.cases} error={dashboard.historyError} history={dashboard.history} loading={dashboard.historyLoading} showAll={showAllHistory} onRetry={() => void dashboard.loadHistory()} onToggleAll={() => setShowAllHistory((value) => !value)} />
     </main>
-    {selectedCase && <TrainingModal item={selectedCase} onClose={() => setSelectedCase(null)} />}
+    {modalCase && <TrainingModal item={modalCase} onClose={closeCase} />}
     {productTour.invitationOpen && <ProductTourInvitation
       onStart={productTour.beginFromInvitation}
       onLater={productTour.deferInvitation}

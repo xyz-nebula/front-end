@@ -96,17 +96,33 @@ export function PreparationPage() {
 
   const sectionIndex = preparationSections.findIndex((section) => section.id === activeSectionId)
   const closeCaseDrawer = useCallback(() => setCaseDrawerOpen(false), [])
+  const tourStepId = tourState?.status === 'active' ? tourState.stepId : null
+  const startNegotiation = () => {
+    if (tourStepId === 'tactics') sendTourEvent({ type: 'next' })
+    void starter.start()
+  }
+  const handleBottomNext = () => {
+    if (tourStepId === 'tactics') {
+      sendTourEvent({ type: 'next' })
+      return
+    }
+    if (sectionIndex < preparationSections.length - 1) {
+      selectSection(preparationSections[sectionIndex + 1].id)
+      return
+    }
+    startNegotiation()
+  }
 
   if (roleIndex === null || mode === null) return <main className="arena-state"><span className="arena-state__mark">!</span><h1>Не выбран формат подготовки</h1><p>Вернитесь к кейсам и выберите свою роль и формат тренировки.</p><AppButton to="/home">К кейсам</AppButton></main>
   if (mode === 'text' && !supportsTextNegotiation) return <main className="arena-state"><span className="arena-state__mark">!</span><h1>Текстовые переговоры недоступны</h1><p>В основном режиме тренировки проходят только голосом. Выберите голосовой формат в каталоге кейсов.</p><AppButton to="/home">К кейсам</AppButton></main>
   if (loadedCase.loading) return <main className="arena-state" aria-live="polite"><span className="arena-state__spinner" /><h1>Загружаем подготовку…</h1></main>
   if (loadedCase.error || !loadedCase.trainingCase) return <main className="arena-state"><span className="arena-state__mark">!</span><h1>Не удалось открыть кейс</h1><p>{loadedCase.error ?? 'Кейс не найден.'}</p><div><AppButton type="button" onClick={() => void loadedCase.load()}>Повторить</AppButton><AppButton to="/home" variant="secondary">К кейсам</AppButton></div></main>
 
-  return <div className="preparation-page">
+  return <div className={`preparation-page ${tourStepId === 'start-duel' ? 'is-tour-start-duel' : ''}`}>
     <PreparationHeader />
     <main className="preparation-shell preparation-main">
       <PreparationContext caseButtonRef={caseButtonRef} item={loadedCase.trainingCase} roleIndex={roleIndex} saveState={preparation.saveState} onCaseOpen={() => setCaseDrawerOpen(true)} />
-      <PreparationOverview completedCount={preparation.completed.length} isStarting={starter.isStarting} onStart={() => void starter.start()} />
+      <PreparationOverview completedCount={preparation.completed.length} isStarting={starter.isStarting} onStart={startNegotiation} />
       {starter.error && <div className="form-alert preparation-error" role="alert">{starter.error}</div>}
       <div className="preparation-mobile-nav"><PreparationNavigation mobile activeSectionId={activeSectionId} activeStep={activeStep} completed={preparation.completed} onSectionSelect={selectSection} onStepSelect={scrollToStep} /></div>
       <div className="preparation-layout" data-tour-id={`preparation-${activeSectionId}`}>
@@ -115,7 +131,7 @@ export function PreparationPage() {
           <PreparationForm activeSectionId={activeSectionId} draft={preparation.draft} updateDraft={preparation.updateDraft} />
           <div className="preparation-bottom">
             {sectionIndex > 0 && <button className="preparation-bottom__back" type="button" onClick={() => selectSection(preparationSections[sectionIndex - 1].id)}><span>←</span> Назад</button>}
-            <button className="preparation-bottom__next" type="button" disabled={starter.isStarting} onClick={sectionIndex === preparationSections.length - 1 ? () => void starter.start() : () => selectSection(preparationSections[sectionIndex + 1].id)}>{sectionIndex === preparationSections.length - 1 ? starter.isStarting ? 'Создаём поединок…' : 'Начать поединок' : 'Далее'} <span>→</span></button>
+            <button className="preparation-bottom__next" type="button" disabled={starter.isStarting} onClick={handleBottomNext} data-tour-id={sectionIndex === preparationSections.length - 1 && tourStepId !== 'tactics' ? 'start-duel' : 'preparation-next'}>{sectionIndex === preparationSections.length - 1 ? tourStepId === 'tactics' ? 'Далее' : starter.isStarting ? 'Создаём поединок…' : 'Начать поединок' : 'Далее'} <span>→</span></button>
           </div>
         </div>
       </div>

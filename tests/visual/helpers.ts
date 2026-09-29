@@ -28,6 +28,44 @@ export async function captureScreen(page: Page, screen: string, viewport: string
   })
 }
 
+export async function seedProductTourUser(page: Page, seed: string): Promise<void> {
+  await page.goto('/')
+  await page.evaluate(async ({ seedValue }) => {
+    const [
+      { AUTH_STORAGE_KEY },
+      { MockAuthClient },
+      { MockStorage, MOCK_DATA_STORAGE_KEY },
+    ] = await Promise.all([
+      import('/src/auth/storage.ts'),
+      import('/src/services/mock/mockAuthClient.ts'),
+      import('/src/services/mock/mockStorage.ts'),
+    ])
+
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    localStorage.removeItem(MOCK_DATA_STORAGE_KEY)
+    sessionStorage.clear()
+
+    const ownerKey = `tour-owner-${seedValue}`
+    const storage = new MockStorage(localStorage)
+    const auth = new MockAuthClient(storage, 0)
+    const registered = await auth.register({
+      email: `tour-${seedValue}@example.com`,
+      first_name: 'Tour',
+      last_name: 'Test',
+      password: 'strong-password',
+    })
+    const tokens = await auth.activate(registered.demo_activation_code ?? '')
+
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+      tokens,
+      source: 'mock',
+      mockOwnerKey: ownerKey,
+      tourOwnerKey: ownerKey,
+    }))
+    storage.dispose()
+  }, { seedValue: seed })
+}
+
 export async function seedProtectedScreens(page: Page, seed: string): Promise<SeededSmokeState> {
   await page.goto('/')
 

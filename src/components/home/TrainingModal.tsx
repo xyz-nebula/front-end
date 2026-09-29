@@ -27,7 +27,12 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const navigate = useNavigate()
   const productTour = useProductTour()
   const { send: sendTourEvent } = productTour
-  const [role, setRole] = useState<0 | 1 | null>(null)
+  const [role, setRole] = useState<0 | 1 | null>(() => {
+    const state = productTour.state
+    return state?.status === 'active' && state.caseId === item.id && state.stepId === 'voice-format'
+      ? state.roleIndex ?? null
+      : null
+  })
   const backdropRef = useRef<HTMLDivElement>(null)
   const modalRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)

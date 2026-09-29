@@ -3,14 +3,13 @@ import { caseDifficultyLabels, caseDifficultyLevels, type TrainingCase } from '@
 interface CaseCardProps {
   item: TrainingCase
   onSelect: (item: TrainingCase) => void
-  tourTarget?: boolean
 }
 
-export function CaseCard({ item, onSelect, tourTarget = false }: CaseCardProps) {
+export function CaseCard({ item, onSelect }: CaseCardProps) {
   const difficultyLevel = caseDifficultyLevels[item.difficulty]
 
   return (
-    <button className="home-case-card" type="button" onClick={() => onSelect(item)} aria-label={`Выбрать кейс «${item.title}»`} data-tour-id={tourTarget ? 'case-card' : undefined}>
+    <button className="home-case-card" type="button" onClick={() => onSelect(item)} aria-label={`Выбрать кейс «${item.title}»`} data-tour-id="case-card">
       <span className="home-case-card__content">
         <span className="home-case-card__meta"><span className="home-case-card__category">{item.category}</span><span>{item.duration}</span></span>
         <strong>{item.title}</strong>

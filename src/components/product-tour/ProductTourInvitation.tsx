@@ -70,12 +70,13 @@ export function ProductTourInvitation({ onStart, onLater, onNever }: ProductTour
       >
         <p className="product-tour-invitation__eyebrow">Тур по продукту</p>
         <h1 id="product-tour-invitation-title">Познакомимся с Ареной?</h1>
-        <p id="product-tour-invitation-description">За несколько минут ты выберешь кейс, подготовишься, проведёшь голосовые переговоры и получишь подробный разбор. Все действия будут настоящими, а прогресс тура сохранится на этом устройстве.</p>
+        <p id="product-tour-invitation-description" className="product-tour-invitation__description">За 5–10 минут ты выберешь кейс, подготовишь позицию, проведёшь короткие голосовые переговоры с AI-оппонентом и получишь персональный разбор с рекомендациями. Понадобится микрофон.</p>
         <div className="product-tour-invitation__actions">
           <button ref={startButtonRef} type="button" onClick={onStart}>Начать тур</button>
           <button type="button" onClick={onLater}>Позже</button>
-          <button type="button" onClick={onNever}>Никогда</button>
+          <button type="button" onClick={onNever}>Больше не показывать</button>
         </div>
+        <p className="product-tour-invitation__hint">Тур всегда можно запустить позже из меню профиля.</p>
       </section>
     </div>,
     document.body,
