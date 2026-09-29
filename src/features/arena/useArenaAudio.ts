@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { CaptureAttemptGuard } from '@/features/arena/captureAttemptGuard'
+import { shouldRecoverCaptureAfterTransportChange } from '@/features/arena/captureRecovery'
 import { useDomainServices } from '@/services/domainServices'
 import type { AudioClient } from '@/services/contracts/audioClient'
 import type { AudioCaptureMessage, AudioConnectionState, AudioEngineEvent, AudioTranscriptDrafts } from '@/types/audio'
@@ -184,6 +185,7 @@ export function useArenaAudio(
         for (const byte of bytes) binary += String.fromCharCode(byte)
         client.sendAudio(btoa(binary))
       } catch (caught) {
+        captureRecoveryPendingRef.current = true
         stopCapture()
         setError(caught instanceof Error ? caught.message : 'Не удалось передать звук. Подключитесь снова.')
       }
@@ -456,7 +458,11 @@ export function useArenaAudio(
       }
     })
     const unsubscribeState = client.subscribeState((nextState) => {
-      if (isCurrent()) setState(nextState)
+      if (!isCurrent()) return
+      setState(nextState)
+      if (shouldRecoverCaptureAfterTransportChange(nextState, captureRecoveryPendingRef.current)) {
+        queueMicrotask(recoverCapture)
+      }
     })
     return () => {
       contextGenerationRef.current += 1
