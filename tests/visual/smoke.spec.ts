@@ -55,8 +55,11 @@ for (const viewport of viewports) {
 
     await page.goto('/home')
     await expect(page.locator('#home-cases-title')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Продолжить подготовку' })).toBeVisible()
+    await expect(page.locator('.arena-home__continue-head > span')).toContainText('Черновик')
     await expect(page.getByRole('meter', { name: 'Прогресс подготовки' })).toHaveAttribute('aria-valuenow', '30')
     await expect(page.getByText('Подготовка:', { exact: false })).toContainText('30%')
+    await expect(page.getByRole('link', { name: 'Продолжить' })).toHaveAttribute('href', '/cases/salary-review/preparation?role=0&mode=voice&section=strategy')
     const caseCards = page.locator('.home-case-card')
     await expect(caseCards).toHaveCount(6)
     await expect(caseCards.first().locator('.home-case-card__description')).toHaveText('Вы считаете, что ваши результаты и выросшая ответственность заслуживают пересмотра зарплаты. Руководитель ценит ваш вклад, но бюджет команды ограничен и решение потребует убедительных аргументов.')
@@ -116,16 +119,68 @@ test('home hides preparation progress before a training is started', async ({ pa
   await expect(page.locator('.arena-home__preparation')).toHaveCount(0)
 })
 
-test('home shows zero progress when an active session has no local preparation snapshot', async ({ page }) => {
-  await seedProtectedScreens(page, 'home-without-preparation')
+test('an active session does not replace the start card when there is no recent preparation', async ({ page }) => {
+  const state = await seedProtectedScreens(page, 'home-without-recent-preparation')
   await page.evaluate(() => {
     for (const key of Object.keys(localStorage)) {
-      if (key.startsWith('arena.session-preparation.v2.')) localStorage.removeItem(key)
+      if (key.startsWith('arena.recent-preparation.v1.')) localStorage.removeItem(key)
     }
   })
   await page.goto('/home')
+  await expect(page.getByRole('heading', { name: 'Начать тренировку' })).toBeVisible()
+  await expect(page.locator('.arena-home__preparation')).toHaveCount(0)
+  await expect(page.locator('.arena-home__continue').getByRole('link', { name: 'Продолжить' })).toHaveCount(0)
+  await expect(page.locator(`.arena-home__history-row a[href="/arena/${state.activeSessionId}"]`)).toBeVisible()
+})
+
+test('opening an empty preparation creates a resumable zero-percent draft', async ({ page }) => {
+  await seedProtectedScreens(page, 'empty-recent-preparation')
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('arena.recent-preparation.v1.') || key.startsWith('arena.preparation-draft.v2.')) localStorage.removeItem(key)
+    }
+  })
+  await page.goto('/cases/salary-review/preparation?role=1&mode=voice&section=analysis')
+  await expect(page.getByRole('heading', { name: 'Подготовка к переговорам' })).toBeVisible()
+  await page.getByRole('link', { name: 'Назад' }).click()
+  await expect(page.getByRole('heading', { name: 'Продолжить подготовку' })).toBeVisible()
   await expect(page.getByRole('meter', { name: 'Прогресс подготовки' })).toHaveAttribute('aria-valuenow', '0')
-  await expect(page.getByText('Подготовка:', { exact: false })).toContainText('0%')
+  await expect(page.getByRole('link', { name: 'Продолжить' })).toHaveAttribute('href', '/cases/salary-review/preparation?role=1&mode=voice&section=analysis')
+})
+
+test('quickly leaving preparation flushes fields and resumes the last section', async ({ page }) => {
+  await seedProtectedScreens(page, 'quick-preparation-return')
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('arena.recent-preparation.v1.') || key.startsWith('arena.preparation-draft.v2.')) localStorage.removeItem(key)
+    }
+  })
+  await page.goto('/cases/salary-review/preparation?role=0&mode=voice&section=tactics')
+  await page.getByRole('textbox', { name: 'Сценарий' }).fill('Сначала обозначить общую цель.')
+  await page.getByRole('textbox', { name: 'Загрузка' }).fill('Предлагаю обсудить условия.')
+  await page.getByRole('link', { name: 'Назад' }).click()
+  await expect(page.getByRole('meter', { name: 'Прогресс подготовки' })).toHaveAttribute('aria-valuenow', '20')
+  const resumeLink = page.getByRole('link', { name: 'Продолжить' })
+  await expect(resumeLink).toHaveAttribute('href', '/cases/salary-review/preparation?role=0&mode=voice&section=tactics')
+  await resumeLink.click()
+  await expect(page).toHaveURL(/section=tactics$/)
+  await expect(page.getByRole('textbox', { name: 'Сценарий' })).toHaveValue('Сначала обозначить общую цель.')
+})
+
+test('starting a negotiation removes the preparation from the home resume card', async ({ page }) => {
+  await seedProtectedScreens(page, 'started-preparation')
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('arena.recent-preparation.v1.') || key.startsWith('arena.preparation-draft.v2.')) localStorage.removeItem(key)
+    }
+  })
+  await page.goto('/cases/salary-review/preparation?role=0&mode=text&section=analysis')
+  await page.getByRole('textbox', { name: 'Корневой конфликт' }).fill('Нужно согласовать ожидания.')
+  await page.getByRole('button', { name: 'Начать поединок' }).click()
+  await expect(page).toHaveURL(/\/arena\//)
+  await page.goto('/home')
+  await expect(page.getByRole('heading', { name: 'Начать тренировку' })).toBeVisible()
+  await expect(page.locator('.arena-home__preparation')).toHaveCount(0)
 })
 
 test('preparation remains available after signing in again in the same browser profile', async ({ page }) => {
@@ -176,6 +231,8 @@ test('preparation remains available after signing in again in the same browser p
   const preparationUrl = '/cases/salary-review/preparation?role=0&mode=voice&section=analysis'
   await page.goto(preparationUrl)
   await expect(page.getByRole('textbox', { name: 'Корневой конфликт' })).toHaveValue(expectedConflict)
+  await page.goto('/home')
+  await expect(page.getByRole('heading', { name: 'Продолжить подготовку' })).toBeVisible()
 
   await page.evaluate(async ({ emailValue, passwordValue }) => {
     const [
@@ -197,6 +254,9 @@ test('preparation remains available after signing in again in the same browser p
     storage.dispose()
   }, { emailValue: email, passwordValue: password })
 
+  await page.goto('/home')
+  await expect(page.getByRole('heading', { name: 'Продолжить подготовку' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Продолжить' })).toHaveAttribute('href', preparationUrl)
   await page.goto(preparationUrl)
   await expect(page.getByRole('textbox', { name: 'Корневой конфликт' })).toHaveValue(expectedConflict)
 })

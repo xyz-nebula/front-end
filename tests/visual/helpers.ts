@@ -73,7 +73,7 @@ export async function seedProtectedScreens(page: Page, seed: string): Promise<Se
     const [
       { AUTH_STORAGE_KEY },
       { deferProductTourPrompt },
-      { saveSessionPreparation },
+      { savePreparationDraft, saveRecentPreparation, saveSessionPreparation },
       { MockAuthClient },
       { MockRuntime },
       { MockStorage, MOCK_DATA_STORAGE_KEY },
@@ -132,6 +132,14 @@ export async function seedProtectedScreens(page: Page, seed: string): Promise<Se
         batna: '', scenario: '', opening: '',
       },
     }
+    savePreparationDraft(ownerKey, 'salary-review', 0, activePreparation.draft)
+    saveRecentPreparation(ownerKey, {
+      caseId: 'salary-review',
+      roleIndex: 0,
+      mode: 'voice',
+      sectionId: 'strategy',
+      updatedAt: '2026-09-29T12:00:00.000Z',
+    })
     saveSessionPreparation(ownerKey, activeSession.id, activePreparation)
     const finishedSession = await runtime.createSession(ownerKey, {
       caseId: 'salary-review',

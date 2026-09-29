@@ -11,7 +11,7 @@
 | `/login` | GuestRoute | Email, пароль и необязательный TOTP |
 | `/register` | GuestRoute | Регистрация и переход к подтверждению email |
 | `/activate` | ActivationRoute | Ожидание письма, активация по query code, success/error |
-| `/home` | ProtectedRoute + ProtectedProductShell | Каталог, история, прогресс, приглашение/старт тура, logout и управление TOTP |
+| `/home` | ProtectedRoute + ProtectedProductShell | Возврат к последней подготовке, каталог, история, прогресс, приглашение/старт тура, logout и управление TOTP |
 | `/cases/:caseId/preparation` | ProtectedRoute + ProtectedProductShell | Выбор стратегии и подготовка к выбранному кейсу; тур синхронизирует раздел через `section` |
 | `/arena/:sessionId` | ProtectedRoute + ProtectedProductShell | Text/voice mock flow либо voice-only real flow согласно режиму; голосовые шаги тура |
 | `/result/:sessionId` | ProtectedRoute + ProtectedProductShell | Polling и отображение mock- либо server-разбора, финальный шаг тура и повтор кейса |

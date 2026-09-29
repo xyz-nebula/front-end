@@ -1,4 +1,17 @@
+import type { NegotiationMode } from '@/types/negotiation'
 import type { PreparationDraft, SessionPreparationSnapshot } from '@/types/preparation'
+
+export type RecentPreparationSectionId = 'analysis' | 'strategy' | 'tactics'
+
+export interface RecentPreparation {
+  caseId: string
+  roleIndex: 0 | 1
+  mode: NegotiationMode
+  sectionId: RecentPreparationSectionId
+  updatedAt: string
+}
+
+export type RecentPreparationIdentity = Pick<RecentPreparation, 'caseId' | 'roleIndex' | 'mode'>
 
 export type PreparationStepId =
   | 'root-conflict'
@@ -110,6 +123,7 @@ export function parsePreparationDraft(value: unknown): PreparationDraft | null {
 
 const DRAFT_PREFIX = 'arena.preparation-draft.v2'
 const SNAPSHOT_PREFIX = 'arena.session-preparation.v2'
+const RECENT_PREPARATION_PREFIX = 'arena.recent-preparation.v1'
 const PREPARATION_STORAGE_PREFIXES = [DRAFT_PREFIX, SNAPSHOT_PREFIX] as const
 const memoryStorage = new Map<string, string>()
 
@@ -137,12 +151,26 @@ function writeStoredValue(key: string, value: string): void {
   }
 }
 
+function removeStoredValue(key: string): void {
+  memoryStorage.delete(key)
+  try {
+    window.localStorage.removeItem(key)
+  } catch {
+    // The in-memory value was already removed.
+  }
+}
+
 export function draftStorageKey(ownerKey: string, caseId: string, roleIndex: 0 | 1): string {
   return `${scopedStorageKey(DRAFT_PREFIX, ownerKey, caseId)}.${roleIndex}`
 }
 
 export function sessionPreparationStorageKey(ownerKey: string, sessionId: string): string {
   return scopedStorageKey(SNAPSHOT_PREFIX, ownerKey, sessionId)
+}
+
+export function recentPreparationStorageKey(ownerKey: string): string {
+  if (!ownerKey) throw new Error('Preparation storage requires an authenticated owner.')
+  return `${RECENT_PREPARATION_PREFIX}.${encodeURIComponent(ownerKey)}`
 }
 
 export function migratePreparationStorageOwner(sourceOwnerKey: string, targetOwnerKey: string): void {
@@ -171,6 +199,13 @@ export function migratePreparationStorageOwner(sourceOwnerKey: string, targetOwn
     const value = readStoredValue(key)
     if (value !== null) writeStoredValue(targetKey, value)
   }
+
+  const sourceRecentKey = recentPreparationStorageKey(sourceOwnerKey)
+  const targetRecentKey = recentPreparationStorageKey(targetOwnerKey)
+  if (readStoredValue(targetRecentKey) === null) {
+    const recentValue = readStoredValue(sourceRecentKey)
+    if (recentValue !== null) writeStoredValue(targetRecentKey, recentValue)
+  }
 }
 
 export function readPreparationDraft(ownerKey: string, caseId: string, roleIndex: 0 | 1): PreparationDraft {
@@ -185,6 +220,54 @@ export function readPreparationDraft(ownerKey: string, caseId: string, roleIndex
 
 export function savePreparationDraft(ownerKey: string, caseId: string, roleIndex: 0 | 1, draft: PreparationDraft): void {
   writeStoredValue(draftStorageKey(ownerKey, caseId, roleIndex), JSON.stringify(draft))
+}
+
+function parseRecentPreparation(value: unknown): RecentPreparation | null {
+  if (typeof value !== 'object' || value === null) return null
+  const source = value as Record<string, unknown>
+  if (typeof source.caseId !== 'string' || source.caseId.length === 0) return null
+  if (source.roleIndex !== 0 && source.roleIndex !== 1) return null
+  if (source.mode !== 'text' && source.mode !== 'voice') return null
+  if (source.sectionId !== 'analysis' && source.sectionId !== 'strategy' && source.sectionId !== 'tactics') return null
+  if (typeof source.updatedAt !== 'string' || !Number.isFinite(Date.parse(source.updatedAt))) return null
+  return {
+    caseId: source.caseId,
+    roleIndex: source.roleIndex,
+    mode: source.mode,
+    sectionId: source.sectionId,
+    updatedAt: source.updatedAt,
+  }
+}
+
+export function readRecentPreparation(ownerKey: string): RecentPreparation | null {
+  const key = recentPreparationStorageKey(ownerKey)
+  try {
+    const serialized = readStoredValue(key)
+    if (!serialized) return null
+    const recent = parseRecentPreparation(JSON.parse(serialized) as unknown)
+    if (recent) return recent
+  } catch {
+    // Invalid storage is removed below.
+  }
+  removeStoredValue(key)
+  return null
+}
+
+export function saveRecentPreparation(ownerKey: string, recent: RecentPreparation): void {
+  writeStoredValue(recentPreparationStorageKey(ownerKey), JSON.stringify(recent))
+}
+
+export function clearRecentPreparation(ownerKey: string, expected?: RecentPreparationIdentity): void {
+  if (expected) {
+    const recent = readRecentPreparation(ownerKey)
+    if (
+      !recent
+      || recent.caseId !== expected.caseId
+      || recent.roleIndex !== expected.roleIndex
+      || recent.mode !== expected.mode
+    ) return
+  }
+  removeStoredValue(recentPreparationStorageKey(ownerKey))
 }
 
 export function saveSessionPreparation(ownerKey: string, sessionId: string, snapshot: SessionPreparationSnapshot): void {

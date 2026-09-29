@@ -8,7 +8,7 @@ import { PreparationForm } from '@/components/preparation/PreparationForm'
 import { PreparationNavigation } from '@/components/preparation/PreparationNavigation'
 import { AppButton } from '@/components/ui/AppButton'
 import { parsePreparationSection, preparationSections, type PreparationSectionId } from '@/features/preparation/metadata'
-import type { PreparationStepId } from '@/features/preparation/preparation'
+import { saveRecentPreparation, type PreparationStepId } from '@/features/preparation/preparation'
 import { usePreparationCase } from '@/features/preparation/usePreparationCase'
 import { usePreparationDraft } from '@/features/preparation/usePreparationDraft'
 import { useStartNegotiation } from '@/features/preparation/useStartNegotiation'
@@ -57,6 +57,17 @@ export function PreparationPage() {
     nextParams.set('section', activeSectionId)
     setSearchParams(nextParams, { replace: true })
   }, [activeSectionId, searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (!loadedCase.trainingCase || roleIndex === null || mode === null || preparation.saveState !== 'saved') return
+    saveRecentPreparation(preparationOwnerKey, {
+      caseId: loadedCase.trainingCase.id,
+      roleIndex,
+      mode,
+      sectionId: activeSectionId,
+      updatedAt: new Date().toISOString(),
+    })
+  }, [activeSectionId, loadedCase.trainingCase, mode, preparation.saveState, preparationOwnerKey, roleIndex])
 
   useEffect(() => {
     if (

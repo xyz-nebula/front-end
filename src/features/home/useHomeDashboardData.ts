@@ -5,7 +5,6 @@ import type { TrainingCase } from '@/types/case'
 import type { NegotiationSessionSummary } from '@/types/negotiation'
 
 export function useHomeDashboardData(negotiationClient: NegotiationClient) {
-  const [activeSession, setActiveSession] = useState<NegotiationSessionSummary | null>(null)
   const [history, setHistory] = useState<NegotiationSessionSummary[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [historyLoading, setHistoryLoading] = useState(true)
@@ -20,14 +19,8 @@ export function useHomeDashboardData(negotiationClient: NegotiationClient) {
     setHistoryLoading(true)
     setHistoryError(null)
     try {
-      const [sessions, active] = await Promise.all([
-        negotiationClient.listSessions(),
-        negotiationClient.getActiveSession(),
-      ])
-      if (request === historyRequestRef.current) {
-        setHistory(sessions)
-        setActiveSession(active?.status === 'active' ? active : null)
-      }
+      const sessions = await negotiationClient.listSessions()
+      if (request === historyRequestRef.current) setHistory(sessions)
     } catch (caught) {
       if (request === historyRequestRef.current) setHistoryError(caught instanceof Error ? caught.message : 'Не удалось загрузить историю.')
     } finally {
@@ -51,14 +44,8 @@ export function useHomeDashboardData(negotiationClient: NegotiationClient) {
 
   useEffect(() => {
     const request = ++historyRequestRef.current
-    void Promise.all([
-      negotiationClient.listSessions(),
-      negotiationClient.getActiveSession(),
-    ]).then(([sessions, active]) => {
-      if (request === historyRequestRef.current) {
-        setHistory(sessions)
-        setActiveSession(active?.status === 'active' ? active : null)
-      }
+    void negotiationClient.listSessions().then((sessions) => {
+      if (request === historyRequestRef.current) setHistory(sessions)
     }).catch((caught: unknown) => {
       if (request === historyRequestRef.current) setHistoryError(caught instanceof Error ? caught.message : 'Не удалось загрузить историю.')
     }).finally(() => {
@@ -79,5 +66,5 @@ export function useHomeDashboardData(negotiationClient: NegotiationClient) {
     return () => { casesRequestRef.current += 1 }
   }, [negotiationClient])
 
-  return { activeSession, cases, casesError, casesLoading, loadCases, history, historyError, historyLoading, loadHistory }
+  return { cases, casesError, casesLoading, loadCases, history, historyError, historyLoading, loadHistory }
 }
