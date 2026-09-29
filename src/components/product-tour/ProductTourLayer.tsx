@@ -78,24 +78,45 @@ function scrollTargetIntoMobileView(target: Element, panelHeight: number): void 
   else window.scrollBy({ top: delta, behavior })
 }
 
-function positionFor(target: Element, placement: ProductTourPlacement, collapsed: boolean): CSSProperties {
+interface PositionedTooltip {
+  placement: ProductTourPlacement
+  style: CSSProperties
+}
+
+function positionFor(target: Element, preferredPlacement: ProductTourPlacement, collapsed: boolean, measuredHeight: number): PositionedTooltip {
   const rect = target.getBoundingClientRect()
   const width = collapsed ? 132 : Math.min(TOOLTIP_WIDTH, window.innerWidth - VIEWPORT_GAP * 2)
-  const height = collapsed ? 40 : 280
-  let left = rect.left + rect.width / 2 - width / 2
-  let top = rect.bottom + 14
-
-  if (placement === 'top') top = rect.top - height - 14
-  if (placement === 'right') {
-    left = rect.right + 14
-    top = rect.top + rect.height / 2 - height / 2
+  const height = collapsed ? 40 : measuredHeight
+  const placements = [preferredPlacement, 'top', 'bottom', 'right']
+    .filter((placement, index, values) => values.indexOf(placement) === index) as ProductTourPlacement[]
+  const coordinates = (placement: ProductTourPlacement) => {
+    let left = rect.left + rect.width / 2 - width / 2
+    let top = rect.bottom + 14
+    if (placement === 'top') top = rect.top - height - 14
+    if (placement === 'right') {
+      left = rect.right + 14
+      top = rect.top + rect.height / 2 - height / 2
+    }
+    return { left, top }
   }
+
+  for (const placement of placements) {
+    const { left, top } = coordinates(placement)
+    if (
+      left >= VIEWPORT_GAP
+      && left + width <= window.innerWidth - VIEWPORT_GAP
+      && top >= VIEWPORT_GAP
+      && top + height <= window.innerHeight - VIEWPORT_GAP
+    ) return { placement, style: { left, top, width } }
+  }
+
+  let { left, top } = coordinates(preferredPlacement)
   if (left + width > window.innerWidth - VIEWPORT_GAP) left = window.innerWidth - width - VIEWPORT_GAP
   if (left < VIEWPORT_GAP) left = VIEWPORT_GAP
   if (top + height > window.innerHeight - VIEWPORT_GAP) top = window.innerHeight - height - VIEWPORT_GAP
   if (top < VIEWPORT_GAP) top = VIEWPORT_GAP
 
-  return { left, top, width }
+  return { placement: preferredPlacement, style: { left, top, width } }
 }
 
 function ProductTourBeacon({ onRestore }: { onRestore: () => void }) {
@@ -121,6 +142,8 @@ export function ProductTourLayer() {
   const steps = useMemo(() => getProductTourSteps(Boolean(productTour.resultReady)), [productTour.resultReady])
   const step = active ? steps[stepIndex] : undefined
   const target = step?.target
+  const highlight = step?.highlight ?? target
+  const highlightFirstRow = step?.highlightFirstRow ?? false
   const reportTargetUnavailable = productTour.reportTargetUnavailable
 
   useEffect(() => {
@@ -128,14 +151,31 @@ export function ProductTourLayer() {
       return
     }
 
-    let highlighted: Element | null = null
+    let highlighted: Element[] = []
+    let locatedTarget: Element | null = null
     let found = false
     const updateTarget = () => {
       const next = [...document.querySelectorAll(target)].find((element) => element.getClientRects().length > 0) ?? null
-      if (highlighted !== next) {
-        highlighted?.classList.remove('product-tour-target')
-        next?.classList.add('product-tour-target')
-        highlighted = next
+      let nextHighlighted = highlight
+        ? [...document.querySelectorAll(highlight)].filter((element) => element.getClientRects().length > 0)
+        : []
+      if (highlightFirstRow && nextHighlighted.length > 0) {
+        const firstElement = nextHighlighted.reduce((first, element) => (
+          element.getBoundingClientRect().top < first.getBoundingClientRect().top ? element : first
+        ))
+        const firstRect = firstElement.getBoundingClientRect()
+        nextHighlighted = nextHighlighted.filter((element) => {
+          const rect = element.getBoundingClientRect()
+          return rect.top < firstRect.bottom && rect.bottom > firstRect.top
+        })
+      }
+      if (highlighted.length !== nextHighlighted.length || highlighted.some((element, index) => element !== nextHighlighted[index])) {
+        highlighted.forEach((element) => element.classList.remove('product-tour-target'))
+        nextHighlighted.forEach((element) => element.classList.add('product-tour-target'))
+        highlighted = nextHighlighted
+      }
+      if (locatedTarget !== next) {
+        locatedTarget = next
         setTargetElement(next)
       }
       if (next && !found) {
@@ -155,9 +195,9 @@ export function ProductTourLayer() {
     return () => {
       observer.disconnect()
       window.clearTimeout(timeout)
-      highlighted?.classList.remove('product-tour-target')
+      highlighted.forEach((element) => element.classList.remove('product-tour-target'))
     }
-  }, [active, reportTargetUnavailable, target])
+  }, [active, highlight, highlightFirstRow, reportTargetUnavailable, target])
 
   useEffect(() => {
     const media = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`)
@@ -167,7 +207,7 @@ export function ProductTourLayer() {
   }, [])
 
   useEffect(() => {
-    if (!active || collapsed || !mobile) return
+    if (!active || collapsed) return
     const floater = floaterRef.current
     if (!floater) return
     const updateHeight = () => setPanelHeight(Math.ceil(floater.getBoundingClientRect().height))
@@ -175,7 +215,7 @@ export function ProductTourLayer() {
     const observer = new ResizeObserver(updateHeight)
     observer.observe(floater)
     return () => observer.disconnect()
-  }, [active, collapsed, mobile, stepId, targetElement])
+  }, [active, collapsed, stepId, targetElement])
 
   useEffect(() => {
     if (!active || collapsed || !mobile) return
@@ -253,9 +293,11 @@ export function ProductTourLayer() {
   if (!active || !step || !targetElement) return null
 
   void positionVersion
-  const style = mobile && !collapsed ? undefined : positionFor(targetElement, step.placement, collapsed)
+  const positioned = mobile && !collapsed
+    ? { placement: step.placement, style: undefined }
+    : positionFor(targetElement, step.placement, collapsed, panelHeight)
   return (
-    <div className="product-tour-floater" ref={floaterRef} style={style}>
+    <div className="product-tour-floater" data-placement={positioned.placement} ref={floaterRef} style={positioned.style}>
       {collapsed
         ? <ProductTourBeacon onRestore={() => { focusTooltipAfterRestoreRef.current = true; setCollapsed(false) }} />
         : <ProductTourTooltip step={step} onCollapse={() => setCollapsed(true)} />}

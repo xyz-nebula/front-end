@@ -176,6 +176,22 @@
   html.product-tour-mobile-panel-open .arena-page { bottom: var(--product-tour-panel-height); height: auto; }
 }
 
+@media (min-width: 761px) {
+  .product-tour-floater:has(.product-tour-tooltip)::before {
+    position: absolute;
+    z-index: 1;
+    width: 16px;
+    height: 16px;
+    border: 1px solid rgb(109 73 198 / 28%);
+    background: #fff;
+    content: '';
+    transform: rotate(45deg);
+  }
+  .product-tour-floater[data-placement="right"]::before { top: 50%; left: -8px; border-width: 0 0 1px 1px; transform: translateY(-50%) rotate(45deg); }
+  .product-tour-floater[data-placement="top"]::before { bottom: -8px; left: 50%; border-width: 0 1px 1px 0; transform: translateX(-50%) rotate(45deg); }
+  .product-tour-floater[data-placement="bottom"]::before { top: -8px; left: 50%; border-width: 1px 0 0 1px; transform: translateX(-50%) rotate(45deg); }
+}
+
 @media (max-width: 360px) {
   .product-tour-tooltip__footer { align-items: stretch; }
   .product-tour-tooltip__actions { width: 100%; }

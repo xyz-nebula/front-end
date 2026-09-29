@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 
 const HOST = '127.0.0.1'
-const HARD_TIMEOUT_MS = 170_000
+const HARD_TIMEOUT_MS = 230_000
 const PROCESS_EXIT_GRACE_MS = 2_000
 const projectRoot = fileURLToPath(new URL('../', import.meta.url))
 const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url))

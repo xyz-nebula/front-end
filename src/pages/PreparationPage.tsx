@@ -102,12 +102,12 @@ export function PreparationPage() {
     void starter.start()
   }
   const handleBottomNext = () => {
-    if (sectionIndex < preparationSections.length - 1) {
-      selectSection(preparationSections[sectionIndex + 1].id)
-      return
-    }
     if (tourStepId === 'tactics') {
       sendTourEvent({ type: 'next' })
+      return
+    }
+    if (sectionIndex < preparationSections.length - 1) {
+      selectSection(preparationSections[sectionIndex + 1].id)
       return
     }
     startNegotiation()
