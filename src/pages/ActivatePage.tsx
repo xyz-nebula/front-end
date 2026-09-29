@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 
 import { getErrorMessage, getFieldErrors } from '@/auth/errors'
-import { useAuth } from '@/auth/useAuth'
+import { useAuth, useAuthHomePath } from '@/auth/useAuth'
 import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import '@/styles/activation.css'
 
@@ -68,10 +68,12 @@ function ActivationMark({ state }: { state: ActivationState['kind'] }) {
 }
 
 function ActivationLayout({ state, title, description, children }: ActivationLayoutProps) {
+  const homePath = useAuthHomePath()
+
   return (
     <main className={`activation-page activation-page--${state}`}>
       <header className="activation-page__header">
-        <Link className="activation-page__brand" to="/" aria-label="Арена переговоров — на главную">
+        <Link className="activation-page__brand" to={homePath} aria-label="Арена переговоров — на главную">
           <ArenaCubeMark className="activation-page__brand-mark" />
           <span>Арена переговоров</span>
         </Link>

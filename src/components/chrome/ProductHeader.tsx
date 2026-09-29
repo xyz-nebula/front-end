@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
+import { useAuthHomePath } from '@/auth/useAuth'
 import { ProfileMenu } from '@/components/chrome/ProfileMenu'
 import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import '@/styles/product-header.css'
@@ -54,10 +55,11 @@ const variantClasses: Record<ProductHeaderVariant, VariantClasses> = {
 
 export function ProductHeader({ actions, onDepartureRequest, variant }: { actions?: ReactNode; onDepartureRequest?: (action: () => void | Promise<void>) => void; variant: ProductHeaderVariant }) {
   const classes = variantClasses[variant]
+  const homePath = useAuthHomePath()
   return (
     <header className={classes.root}>
       <div className={classes.inner}>
-        <Link className={classes.brand} to="/" aria-label="Арена — на главную">
+        <Link className={classes.brand} to={homePath} aria-label="Арена — на главную">
           <ArenaCubeMark />
           <span>АРЕНА</span>
         </Link>

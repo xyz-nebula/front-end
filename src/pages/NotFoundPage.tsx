@@ -1,14 +1,13 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
-import { useAuth } from '@/auth/useAuth'
+import { useAuthHomePath } from '@/auth/useAuth'
 import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import '@/styles/not-found.css'
 
 export function NotFoundPage() {
-  const { status } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const homePath = status === 'authenticated' ? '/home' : '/'
+  const homePath = useAuthHomePath()
 
   const goBack = () => {
     if (location.key !== 'default' && window.history.length > 1) {

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { getErrorMessage, getFieldErrors } from '@/auth/errors'
-import { useAuth } from '@/auth/useAuth'
+import { useAuth, useAuthHomePath } from '@/auth/useAuth'
 import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import '@/styles/login.css'
 
@@ -20,6 +20,7 @@ function getReturnPath(state: unknown) {
 
 export function LoginPage() {
   const { login } = useAuth()
+  const homePath = useAuthHomePath()
   const navigate = useNavigate()
   const location = useLocation()
   const [fields, setFields] = useState<LoginFields>({ email: '', password: '', totp_token: '' })
@@ -78,7 +79,7 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <header className="login-page__header">
-        <Link className="login-page__brand" to="/" aria-label="Арена переговоров — на главную">
+        <Link className="login-page__brand" to={homePath} aria-label="Арена переговоров — на главную">
           <ArenaCubeMark className="login-page__brand-mark" />
           <span>Арена переговоров</span>
         </Link>

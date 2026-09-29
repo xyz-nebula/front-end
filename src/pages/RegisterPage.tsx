@@ -2,7 +2,7 @@ import { useState, type FormEvent, type InputHTMLAttributes } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { getErrorMessage, getFieldErrors } from '@/auth/errors'
-import { useAuth } from '@/auth/useAuth'
+import { useAuth, useAuthHomePath } from '@/auth/useAuth'
 import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import type { AuthRegisterRequest } from '@/types/auth'
 import '@/styles/login.css'
@@ -38,6 +38,7 @@ function RegisterField({ label, error, hint, id, ...props }: RegisterFieldProps)
 
 export function RegisterPage() {
   const { register } = useAuth()
+  const homePath = useAuthHomePath()
   const navigate = useNavigate()
   const [fields, setFields] = useState(initialFields)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -103,7 +104,7 @@ export function RegisterPage() {
   return (
     <main className="login-page register-page">
       <header className="login-page__header">
-        <Link className="login-page__brand" to="/" aria-label="Арена переговоров — на главную">
+        <Link className="login-page__brand" to={homePath} aria-label="Арена переговоров — на главную">
           <ArenaCubeMark className="login-page__brand-mark" />
           <span>Арена переговоров</span>
         </Link>
