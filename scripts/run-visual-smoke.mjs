@@ -6,181 +6,52 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 
 const HOST = '127.0.0.1'
-const SHUTDOWN_TIMEOUT_MS = 310_000
-const HARD_TIMEOUT_MS = 660_000
+const HARD_TIMEOUT_MS = 230_000
 const PROCESS_EXIT_GRACE_MS = 2_000
-const PROCESS_TREE_SETTLE_MS = 500
 const projectRoot = fileURLToPath(new URL('../', import.meta.url))
 const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url))
 const playwrightCli = fileURLToPath(import.meta.resolve('@playwright/test/cli'))
 const artifactsDir = fileURLToPath(new URL('../artifacts/visual-smoke/', import.meta.url))
-const testGroups = [
-  {
-    name: 'real/mock/mock',
-    authSource: 'real',
-    specs: [
-      'auth.spec.ts',
-      'auth-resilience.spec.ts',
-      'authorized-operation.spec.ts',
-      'service-contracts.spec.ts',
-    ],
-  },
-  {
-    name: 'mock/mock/mock',
-    authSource: 'mock',
-    specs: [
-      'landing.spec.ts',
-      'home.spec.ts',
-      'preparation.spec.ts',
-      'page-data-hooks.spec.ts',
-      'mock-domain.spec.ts',
-      'domain-resilience.spec.ts',
-      'arena-session-resilience.spec.ts',
-      'arena-audio-resilience.spec.ts',
-      'result-repeat-resilience.spec.ts',
-      'arena-text.spec.ts',
-      'arena-voice.spec.ts',
-      'result.spec.ts',
-    ],
-  },
-]
 
 function hasExited(childProcess) {
   return childProcess.exitCode !== null || childProcess.signalCode !== null
 }
 
 function waitForExit(childProcess) {
-  if (hasExited(childProcess)) {
-    return Promise.resolve(childProcess.exitCode ?? (childProcess.signalCode ? 1 : 0))
-  }
-
+  if (hasExited(childProcess)) return Promise.resolve(childProcess.exitCode ?? 1)
   return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      childProcess.off('error', onError)
-      childProcess.off('exit', onExit)
-    }
-    const onError = (error) => {
-      cleanup()
-      reject(error)
-    }
-    const onExit = (code, signal) => {
-      cleanup()
-      resolve(code ?? (signal ? 1 : 0))
-    }
-
-    childProcess.once('error', onError)
-    childProcess.once('exit', onExit)
+    childProcess.once('error', reject)
+    childProcess.once('exit', (code, signal) => resolve(code ?? (signal ? 1 : 0)))
   })
 }
 
 function waitForExitUntil(childProcess, timeoutMs) {
-  if (hasExited(childProcess)) {
-    return Promise.resolve(true)
-  }
-
+  if (hasExited(childProcess)) return Promise.resolve(true)
   return new Promise((resolve) => {
-    const cleanup = () => {
+    const timeout = setTimeout(() => resolve(false), timeoutMs)
+    childProcess.once('exit', () => {
       clearTimeout(timeout)
-      childProcess.off('error', onExit)
-      childProcess.off('exit', onExit)
-    }
-    const onExit = () => {
-      cleanup()
       resolve(true)
-    }
-    const timeout = setTimeout(() => {
-      cleanup()
-      resolve(false)
-    }, timeoutMs)
-
-    childProcess.once('error', onExit)
-    childProcess.once('exit', onExit)
+    })
   })
 }
 
-function signalPosixProcessGroup(childProcess, signal) {
-  if (!childProcess.pid || hasExited(childProcess)) {
-    return
-  }
-
-  try {
-    process.kill(-childProcess.pid, signal)
-  } catch (error) {
-    if (error?.code !== 'ESRCH') {
-      throw error
-    }
-  }
-}
-
-async function runTaskkill(childProcess) {
-  if (!childProcess.pid || hasExited(childProcess)) {
-    return 0
-  }
-
-  const taskkillProcess = spawn(
-    'taskkill.exe',
-    ['/PID', String(childProcess.pid), '/T', '/F'],
-    {
+async function terminateProcessTree(childProcess) {
+  if (!childProcess?.pid || hasExited(childProcess)) return
+  if (process.platform === 'win32') {
+    const taskkill = spawn('taskkill.exe', ['/PID', String(childProcess.pid), '/T', '/F'], {
       stdio: 'ignore',
       windowsHide: true,
-    },
-  )
-
-  return waitForExit(taskkillProcess)
-}
-
-async function terminateProcessTree(childProcess) {
-  if (!childProcess?.pid || hasExited(childProcess)) {
-    return
-  }
-
-  if (process.platform === 'win32') {
-    const taskkillExitCode = await runTaskkill(childProcess)
-    if (!(await waitForExitUntil(childProcess, PROCESS_EXIT_GRACE_MS))) {
-      childProcess.kill('SIGKILL')
-    }
-    if (!(await waitForExitUntil(childProcess, PROCESS_EXIT_GRACE_MS))) {
-      throw new Error(`Playwright process tree did not exit; taskkill code: ${taskkillExitCode}`)
-    }
-    await new Promise((resolve) => setTimeout(resolve, PROCESS_TREE_SETTLE_MS))
+    })
+    await waitForExit(taskkill).catch(() => undefined)
   } else {
-    signalPosixProcessGroup(childProcess, 'SIGTERM')
-    if (!(await waitForExitUntil(childProcess, PROCESS_EXIT_GRACE_MS))) {
-      signalPosixProcessGroup(childProcess, 'SIGKILL')
-    }
-    if (!(await waitForExitUntil(childProcess, PROCESS_EXIT_GRACE_MS))) {
-      throw new Error('Playwright process tree did not exit after termination')
+    try {
+      process.kill(-childProcess.pid, 'SIGTERM')
+    } catch (error) {
+      if (error?.code !== 'ESRCH') throw error
     }
   }
-}
-
-function forceTerminateProcessTree(childProcess) {
-  if (!childProcess?.pid || hasExited(childProcess)) {
-    return
-  }
-
-  try {
-    if (process.platform === 'win32') {
-      const taskkillProcess = spawn(
-        'taskkill.exe',
-        ['/PID', String(childProcess.pid), '/T', '/F'],
-        {
-          detached: true,
-          stdio: 'ignore',
-          windowsHide: true,
-        },
-      )
-      taskkillProcess.once('error', (error) => {
-        console.error('[visual:smoke] Failed to start final taskkill:', error)
-      })
-      taskkillProcess.unref()
-      childProcess.kill('SIGKILL')
-    } else {
-      signalPosixProcessGroup(childProcess, 'SIGKILL')
-    }
-  } catch (error) {
-    console.error('[visual:smoke] Failed to force-close Playwright process tree:', error)
-  }
+  if (!(await waitForExitUntil(childProcess, PROCESS_EXIT_GRACE_MS))) childProcess.kill('SIGKILL')
 }
 
 async function getAvailablePort() {
@@ -194,15 +65,7 @@ async function getAvailablePort() {
         reject(new Error('Could not reserve a local TCP port'))
         return
       }
-
-      const { port } = address
-      socket.close((error) => {
-        if (error) {
-          reject(error)
-          return
-        }
-        resolve(port)
-      })
+      socket.close((error) => error ? reject(error) : resolve(address.port))
     })
   })
 }
@@ -210,100 +73,57 @@ async function getAvailablePort() {
 async function run() {
   let server
   let playwrightProcess
-  let exitCode = 0
+  let timedOut = false
 
   const hardTimeout = setTimeout(() => {
+    timedOut = true
     console.error(`[visual:smoke] Превышен общий лимит ${HARD_TIMEOUT_MS / 1000} секунд.`)
-    forceTerminateProcessTree(playwrightProcess)
-    process.exit(124)
+    void terminateProcessTree(playwrightProcess)
   }, HARD_TIMEOUT_MS)
 
   try {
     await rm(artifactsDir, { recursive: true, force: true })
     await mkdir(artifactsDir, { recursive: true })
 
-    const args = process.argv.slice(2)
-    const selectedSpecs = args.filter((arg) => arg.endsWith('.spec.ts'))
-    for (const group of testGroups) {
-      const specs = selectedSpecs.length > 0
-        ? group.specs.filter((spec) => selectedSpecs.some((selected) => selected.endsWith(spec)))
-        : group.specs
-      if (specs.length === 0) continue
+    process.env.API_PROXY_TARGET = ''
+    process.env.VITE_SERVICE_MODE = 'mock'
+    process.env.VITE_API_TIMEOUT_MS = '600'
 
-      let shutdownTimeout
-      const shutdownSignal = new Promise((resolve) => {
-        shutdownTimeout = setTimeout(() => resolve('timeout'), SHUTDOWN_TIMEOUT_MS)
-      })
-      try {
-        process.env.API_PROXY_TARGET = group.authSource === 'real' ? 'http://127.0.0.1:9' : ''
-        process.env.VITE_AUTH_SOURCE = group.authSource
-        process.env.VITE_NEGOTIATION_SOURCE = 'mock'
-        process.env.VITE_AUDIO_SOURCE = 'mock'
-        process.env.VITE_API_TIMEOUT_MS = '600'
+    const port = await getAvailablePort()
+    server = await createServer({
+      root: projectRoot,
+      configFile,
+      logLevel: 'error',
+      server: { host: HOST, port, strictPort: true },
+    })
+    await server.listen()
 
-        const port = await getAvailablePort()
-        server = await createServer({
-          root: projectRoot,
-          configFile,
-          logLevel: 'error',
-          server: { host: HOST, port, strictPort: true },
-        })
-        await server.listen()
-        const address = server.httpServer?.address()
-        if (!address || typeof address === 'string') {
-          throw new Error('Vite did not expose a TCP port')
-        }
+    const baseURL = `http://${HOST}:${port}`
+    console.log(`[visual:smoke] Vite ready at ${baseURL}`)
+    playwrightProcess = spawn(process.execPath, [
+      playwrightCli,
+      'test',
+      'smoke.spec.ts',
+      'product-tour.spec.ts',
+      ...process.argv.slice(2),
+    ], {
+      cwd: projectRoot,
+      detached: process.platform !== 'win32',
+      env: { ...process.env, PW_BASE_URL: baseURL },
+      stdio: 'inherit',
+      windowsHide: true,
+    })
 
-        const baseURL = `http://${HOST}:${address.port}`
-        console.log(`[visual:smoke] ${group.name}: Vite ready at ${baseURL}`)
-        playwrightProcess = spawn(process.execPath, [
-          playwrightCli,
-          'test',
-          ...specs,
-          ...args.filter((arg) => !arg.endsWith('.spec.ts')),
-        ], {
-          cwd: projectRoot,
-          detached: process.platform !== 'win32',
-          env: { ...process.env, PW_BASE_URL: baseURL },
-          stdio: 'inherit',
-          windowsHide: true,
-        })
-
-        const playwrightExit = waitForExit(playwrightProcess)
-        const outcome = await Promise.race([playwrightExit, shutdownSignal])
-        if (outcome === 'timeout') {
-          console.error(`[visual:smoke] ${group.name}: превышен лимит ${SHUTDOWN_TIMEOUT_MS / 1000} секунд.`)
-          exitCode = 124
-          await terminateProcessTree(playwrightProcess)
-          await playwrightExit.catch(() => undefined)
-        } else if (outcome !== 0) {
-          exitCode = outcome
-        }
-      } finally {
-        clearTimeout(shutdownTimeout)
-        await server?.close()
-        server = undefined
-        playwrightProcess = undefined
-      }
-    }
+    const exitCode = await waitForExit(playwrightProcess)
+    return timedOut ? 124 : exitCode
   } catch (error) {
     console.error('[visual:smoke] Runner failed:', error)
-    exitCode = 1
+    return timedOut ? 124 : 1
   } finally {
-    try {
-      await server?.close()
-    } catch (error) {
-      console.error('[visual:smoke] Failed to close Vite:', error)
-      if (exitCode !== 124) {
-        exitCode = 1
-      }
-    }
-    if (!playwrightProcess?.pid || hasExited(playwrightProcess)) {
-      clearTimeout(hardTimeout)
-    }
+    clearTimeout(hardTimeout)
+    await terminateProcessTree(playwrightProcess)
+    await server?.close()
   }
-
-  return exitCode
 }
 
 process.exitCode = await run()

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuthHomePath } from '@/auth/useAuth'
 import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 
 const navLinks = [
@@ -12,8 +13,10 @@ const navLinks = [
 type SectionId = (typeof navLinks)[number]['to']
 
 function ArenaBrand() {
+  const homePath = useAuthHomePath()
+
   return (
-    <Link className="arena-brand" to="/" aria-label="Арена — на главную">
+    <Link className="arena-brand" to={homePath} aria-label="Арена — на главную">
       <ArenaCubeMark className="arena-brand__mark" />
       <span>АРЕНА</span>
     </Link>

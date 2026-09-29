@@ -85,7 +85,7 @@ export class AudioEngineClient implements AudioClient {
         try {
           const parsed: unknown = JSON.parse(String(message.data))
           const event = parseAudioEngineEvent(parsed)
-          if (event.type === 'transcript_delta' || event.type === 'audio_frame') {
+          if (event.type === 'transcript_completed' || event.type === 'audio_frame') {
             this.emit(event)
           } else if (event.type === 'error') {
             this.emit({ ...event, recoverable: true })

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 
-import { useAuth } from '@/auth/useAuth'
+import { useAuth, useAuthHomePath } from '@/auth/useAuth'
 import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
 import '@/styles/session.css'
 
@@ -9,11 +9,12 @@ type SessionLoadingMode = 'booting' | 'signing-out'
 
 export function SessionLoading({ mode = 'booting' }: { mode?: SessionLoadingMode }) {
   const signingOut = mode === 'signing-out'
+  const homePath = useAuthHomePath()
 
   return (
     <main className="session-state-page" aria-live="polite" aria-label={signingOut ? 'Завершаем сессию' : 'Проверяем сессию'}>
       <header className="session-state-page__header">
-        <Link className="session-state-page__brand" to="/" aria-label="Арена переговоров — на главную">
+        <Link className="session-state-page__brand" to={homePath} aria-label="Арена переговоров — на главную">
           <ArenaCubeMark />
           <span>Арена переговоров</span>
         </Link>
@@ -29,11 +30,12 @@ export function SessionLoading({ mode = 'booting' }: { mode?: SessionLoadingMode
 
 function SessionRecovery() {
   const { logout, retrySession } = useAuth()
+  const homePath = useAuthHomePath()
 
   return (
     <main className="session-state-page session-state-page--recovery">
       <header className="session-state-page__header">
-        <Link className="session-state-page__brand" to="/" aria-label="Арена переговоров — на главную">
+        <Link className="session-state-page__brand" to={homePath} aria-label="Арена переговоров — на главную">
           <ArenaCubeMark />
           <span>Арена переговоров</span>
         </Link>

@@ -1,7 +1,7 @@
 import type { NegotiationMessage, NegotiationMode, NegotiationResult, NegotiationStatus } from '@/types/negotiation'
 import { ServiceError } from '@/types/api'
 
-export const MOCK_DATA_STORAGE_KEY = 'arena.mock.data.v1'
+export const MOCK_DATA_STORAGE_KEY = 'arena.mock.data.v2'
 const MOCK_LEASE_STORAGE_KEY = `${MOCK_DATA_STORAGE_KEY}.lease`
 const MOCK_LOCK_NAME = `${MOCK_DATA_STORAGE_KEY}.mutation`
 const LEASE_TTL_MS = 6_000
@@ -24,6 +24,7 @@ export interface MockSessionRecord {
   id: string
   ownerKey: string
   caseId: string
+  selectedRole?: 0 | 1
   mode: NegotiationMode
   status: NegotiationStatus
   startedAt: string
@@ -53,7 +54,7 @@ export interface MockAudioTicketRecord {
 }
 
 export interface MockData {
-  version: 1
+  version: 2
   users: MockUserRecord[]
   sessions: MockSessionRecord[]
   results: MockResultRecord[]
@@ -67,7 +68,7 @@ interface StorageLike {
 }
 
 function emptyData(): MockData {
-  return { version: 1, users: [], sessions: [], results: [], audioTickets: [] }
+  return { version: 2, users: [], sessions: [], results: [], audioTickets: [] }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -82,46 +83,86 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isString)
 }
 
-function isAgreement(value: unknown): boolean {
+function isEvidence(value: unknown): boolean {
   return isRecord(value)
-    && isString(value.title)
-    && isStringArray(value.points)
-    && isString(value.tradeoff)
-    && isString(value.nextStep)
+    && Number.isSafeInteger(value.messageIndex)
+    && typeof value.isAi === 'boolean'
+    && isString(value.quote)
 }
 
-function isJudgeReview(value: unknown): boolean {
+function isCoachingPoint(value: unknown): boolean {
   return isRecord(value)
-    && ['name', 'question', 'criterion', 'quote', 'observation', 'effect', 'comparison'].every(
-      (key) => isString(value[key]),
-    )
-    && (value.verdict === 'user' || value.verdict === 'opponent')
+    && isEvidence(value.evidence)
+    && ['action', 'situationChange', 'consequence'].every((key) => isString(value[key]))
 }
 
-function isCoachEpisode(value: unknown): boolean {
-  return isRecord(value)
-    && ['quote', 'action', 'change', 'consequence'].every((key) => isString(value[key]))
+function isOutcome(value: unknown): boolean {
+  if (!isRecord(value) || (value.status !== 'ready' && value.status !== 'failed')) return false
+  if (value.status === 'failed') return value.reason === 'analysis-unavailable' || value.reason === 'invalid-analysis'
+  return ['agreement', 'partial-agreement', 'deferred', 'no-agreement', 'not-assessable'].includes(String(value.kind))
+    && isString(value.summary)
+    && isStringArray(value.agreedTerms)
+    && isStringArray(value.openPoints)
+    && (value.nextStep === null || isString(value.nextStep))
+    && Array.isArray(value.evidence)
+    && value.evidence.every(isEvidence)
+}
+
+function isJudge(value: unknown): boolean {
+  if (!isRecord(value) || !['hiring', 'negotiation', 'ownership'].includes(String(value.college))) return false
+  if (value.status === 'failed') {
+    return ['unavailable', 'invalid-output', 'retrieval-unavailable', 'invalid-retrieval', 'insufficient-evidence']
+      .includes(String(value.reason))
+  }
+  const verdict = value.verdict
+  return value.status === 'ready'
+    && isRecord(verdict)
+    && (verdict.choice === 'user' || verdict.choice === 'opponent')
+    && ['criterion', 'observation', 'effect', 'comparison'].every((key) => isString(verdict[key]))
+    && isEvidence(verdict.evidence)
 }
 
 function isPlanComparison(value: unknown): boolean {
   return isRecord(value)
-    && isString(value.plan)
-    && isString(value.reality)
+    && isString(value.preparationText)
     && (value.status === 'followed' || value.status === 'adapted' || value.status === 'unused')
+    && (value.evidence === null || isEvidence(value.evidence))
+    && isString(value.observation)
 }
 
-function isResultAnalysis(value: unknown): boolean {
+function isGoalAssessment(value: unknown): boolean {
   return isRecord(value)
-    && isAgreement(value.agreement)
-    && Array.isArray(value.judges)
-    && value.judges.every(isJudgeReview)
-    && isString(value.coachSummary)
-    && Array.isArray(value.worked)
-    && value.worked.every(isCoachEpisode)
-    && Array.isArray(value.hindered)
-    && value.hindered.every(isCoachEpisode)
-    && Array.isArray(value.planComparison)
-    && value.planComparison.every(isPlanComparison)
+    && ['achieved', 'partially-achieved', 'not-achieved', 'not-assessable'].includes(String(value.status))
+    && (value.goalText === null || isString(value.goalText))
+    && isString(value.explanation)
+    && Array.isArray(value.evidence)
+    && value.evidence.every(isEvidence)
+}
+
+function isTrainer(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  if (value.status === 'failed') {
+    return ['unavailable', 'invalid-output', 'insufficient-evidence'].includes(String(value.reason))
+  }
+  if (value.status !== 'ready' || !isRecord(value.feedback)) return false
+  const feedback = value.feedback
+  return isString(feedback.summary)
+    && ['strengths', 'mistakes', 'missedOpportunities'].every((key) => (
+      Array.isArray(feedback[key]) && feedback[key].every(isCoachingPoint)
+    ))
+    && isStringArray(feedback.nextTry)
+    && feedback.nextTry.length >= 2
+    && feedback.nextTry.length <= 3
+    && (
+      feedback.planVsReality === null
+      || (
+        isRecord(feedback.planVsReality)
+        && isString(feedback.planVsReality.summary)
+        && Array.isArray(feedback.planVsReality.items)
+        && feedback.planVsReality.items.every(isPlanComparison)
+      )
+    )
+    && isGoalAssessment(feedback.goalAssessment)
 }
 
 function isMessage(value: unknown): value is NegotiationMessage {
@@ -148,16 +189,21 @@ function isTextTurnRecord(value: unknown): value is MockSessionRecord['textTurns
 }
 
 function isNegotiationResult(value: unknown): value is NegotiationResult {
-  return isRecord(value)
-    && isString(value.sessionId)
-    && (value.outcome === 'victory' || value.outcome === 'defeat')
-    && typeof value.score === 'number'
-    && Number.isFinite(value.score)
-    && isString(value.summary)
-    && isStringArray(value.strengths)
-    && isStringArray(value.improvements)
-    && isStringArray(value.recommendations)
-    && (value.analysis === undefined || isResultAnalysis(value.analysis))
+  if (
+    !isRecord(value)
+    || !isString(value.sessionId)
+    || value.source !== 'mock'
+    || value.contractVersion !== undefined
+    || !isOutcome(value.outcome)
+    || !Array.isArray(value.judges)
+    || value.judges.length !== 3
+    || !value.judges.every(isJudge)
+    || !isTrainer(value.trainer)
+  ) return false
+
+  const colleges = value.judges.map((judge) => isRecord(judge) ? judge.college : undefined)
+  return new Set(colleges).size === 3
+    && ['hiring', 'negotiation', 'ownership'].every((college) => colleges.includes(college))
 }
 
 function isUser(value: unknown): value is MockUserRecord {
@@ -175,6 +221,7 @@ function isSession(value: unknown): value is MockSessionRecord {
   return isRecord(value)
     && ['id', 'ownerKey', 'caseId', 'startedAt', 'createCommandId'].every((key) => isString(value[key]))
     && (value.mode === 'text' || value.mode === 'voice')
+    && (value.selectedRole === undefined || value.selectedRole === 0 || value.selectedRole === 1)
     && (value.status === 'active' || value.status === 'finishing' || value.status === 'finished')
     && (value.finishedAt === undefined || isString(value.finishedAt))
     && Array.isArray(value.messages)
@@ -188,13 +235,22 @@ function isSession(value: unknown): value is MockSessionRecord {
 }
 
 function isResult(value: unknown): value is MockResultRecord {
-  return isRecord(value)
-    && isString(value.sessionId)
-    && (value.status === 'processing' || value.status === 'ready' || value.status === 'failed')
-    && typeof value.readyAt === 'number'
-    && Number.isFinite(value.readyAt)
-    && (value.result === undefined || isNegotiationResult(value.result))
-    && (value.message === undefined || isString(value.message))
+  if (
+    !isRecord(value)
+    || !isString(value.sessionId)
+    || typeof value.readyAt !== 'number'
+    || !Number.isFinite(value.readyAt)
+  ) return false
+  if (value.status === 'processing') return value.result === undefined && value.message === undefined
+  if (value.status === 'ready') {
+    return isNegotiationResult(value.result)
+      && value.result.sessionId === value.sessionId
+      && value.message === undefined
+  }
+  return value.status === 'failed'
+    && value.result === undefined
+    && isString(value.message)
+    && value.message.trim().length > 0
 }
 
 function isTicket(value: unknown): value is MockAudioTicketRecord {
@@ -207,11 +263,15 @@ function parseData(serialized: string | null): MockData | null {
   if (!serialized) return emptyData()
   try {
     const value: unknown = JSON.parse(serialized)
-    if (!isRecord(value) || value.version !== 1) return null
+    if (!isRecord(value) || value.version !== 2) return null
     if (!Array.isArray(value.users) || !value.users.every(isUser)) return null
     if (!Array.isArray(value.sessions) || !value.sessions.every(isSession)) return null
     if (!Array.isArray(value.results) || !value.results.every(isResult)) return null
     if (!Array.isArray(value.audioTickets) || !value.audioTickets.every(isTicket)) return null
+    const sessionIds = new Set(value.sessions.map((session) => session.id))
+    const resultSessionIds = value.results.map((result) => result.sessionId)
+    if (resultSessionIds.some((sessionId) => !sessionIds.has(sessionId))) return null
+    if (new Set(resultSessionIds).size !== resultSessionIds.length) return null
     return value as unknown as MockData
   } catch {
     return null

@@ -1,5 +1,7 @@
 import { getMockAiResponse } from '@/mocks/negotiation-scenarios'
-import { createMockResultAnalysis } from '@/mocks/resultAnalysis'
+import { trainingCases } from '@/mocks/cases'
+import { createMockResultFixture } from '@/mocks/resultFixtures'
+import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { MockStorage, type MockData, type MockSessionRecord } from '@/services/mock/mockStorage'
 import type {
   AudioTicket,
@@ -30,12 +32,33 @@ function findOwnedSession(data: MockData, ownerKey: string, sessionId: string): 
 }
 
 function toSession(record: MockSessionRecord): NegotiationSession {
+  const trainingCase = trainingCases.find((item) => item.id === record.caseId)
+  const preparationOverview = getDuelPreparation(record.caseId)
+  const timeLimitSeconds = trainingCase?.timeLimitSeconds ?? 15 * 60
   return {
     id: record.id,
     caseId: record.caseId,
+    caseSnapshot: trainingCase ? {
+      id: trainingCase.id,
+      title: trainingCase.title,
+      description: trainingCase.description,
+      goal: trainingCase.goal,
+      timeLimitSeconds: trainingCase.timeLimitSeconds,
+      roles: trainingCase.roles,
+    } : {
+      id: record.caseId,
+      title: record.caseId,
+      description: '',
+      goal: '',
+      timeLimitSeconds,
+      roles: ['Участник', 'AI-оппонент'],
+    },
+    selectedRole: record.selectedRole ?? 0,
+    ...(preparationOverview ? { preparationOverview } : {}),
     mode: record.mode,
     status: record.status,
     startedAt: record.startedAt,
+    timeLimitSeconds,
     ...(record.finishedAt ? { finishedAt: record.finishedAt } : {}),
     messages: clone(record.messages).sort((left, right) => left.sequence - right.sequence),
   }
@@ -60,31 +83,8 @@ function appendMessage(
 
 function createResult(session: MockSessionRecord): NegotiationResult {
   const userTurns = session.messages.filter((message) => message.speaker === 'user').length
-  const score = Math.min(94, 68 + userTurns * 6 + (session.mode === 'voice' ? 2 : 0))
-  const outcome = score >= 75 ? 'victory' : 'defeat'
-  const publicSession = toSession(session)
-  return {
-    sessionId: session.id,
-    outcome,
-    score,
-    summary: score >= 75
-      ? 'Вы удерживали фокус на интересах сторон и завершили разговор конкретными договорённостями.'
-      : 'Вы обозначили позицию, но договорённости стоит подкреплять вопросами и конкретными условиями.',
-    strengths: [
-      'Спокойная и последовательная аргументация',
-      'Фокус на решении вместо личного противостояния',
-    ],
-    improvements: [
-      'Чаще уточняйте мотивы и ограничения оппонента',
-      'Фиксируйте измеримые следующие шаги',
-    ],
-    recommendations: [
-      'Перед следующим раундом подготовьте три открытых вопроса',
-      'Сформулируйте желаемый результат и приемлемую альтернативу',
-      'Закрепляйте уступки встречными обязательствами и сроками',
-    ],
-    analysis: createMockResultAnalysis(publicSession, outcome),
-  }
+  const outcome = userTurns >= 2 ? 'agreement' : 'no-agreement'
+  return createMockResultFixture(toSession(session), outcome)
 }
 
 export interface ConsumedAudioTicket {
@@ -105,6 +105,7 @@ export class MockRuntime {
     caseId: string
     mode: 'text' | 'voice'
     clientCommandId: string
+    selectedRole?: 0 | 1
   }): Promise<NegotiationSession> {
     return this.storage.mutate((data) => {
       const existing = data.sessions.find(
@@ -116,6 +117,7 @@ export class MockRuntime {
         id: crypto.randomUUID(),
         ownerKey,
         caseId: input.caseId,
+        selectedRole: input.selectedRole ?? 0,
         mode: input.mode,
         status: 'active',
         startedAt: new Date().toISOString(),

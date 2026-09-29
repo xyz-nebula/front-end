@@ -48,6 +48,23 @@ export class MockNegotiationClient implements NegotiationClient {
     return this.runtime.getSession(ownerKey, sessionId)
   }
 
+  async getActiveSession(): Promise<NegotiationSessionSummary | null> {
+    const ownerKey = this.requireOwner()
+    await this.delay()
+    return this.runtime.storage.read((data) => {
+      const active = data.sessions
+        .filter((session) => session.ownerKey === ownerKey && session.status === 'active')
+        .sort((left, right) => right.startedAt.localeCompare(left.startedAt))[0]
+      return active ? {
+        id: active.id,
+        caseId: active.caseId,
+        mode: active.mode,
+        status: active.status,
+        startedAt: active.startedAt,
+      } : null
+    })
+  }
+
   async activateSession(sessionId: string): Promise<void> {
     const ownerKey = this.requireOwner()
     await this.delay()
@@ -85,7 +102,6 @@ export class MockNegotiationClient implements NegotiationClient {
       .filter((session) => session.ownerKey === ownerKey)
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
       .map((session) => {
-        const result = data.results.find((candidate) => candidate.sessionId === session.id)
         return {
           id: session.id,
           caseId: session.caseId,
@@ -93,7 +109,6 @@ export class MockNegotiationClient implements NegotiationClient {
           status: session.status,
           startedAt: session.startedAt,
           ...(session.finishedAt ? { finishedAt: session.finishedAt } : {}),
-          ...(result?.result ? { score: result.result.score } : {}),
         }
       }))
   }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 
-import type { TrainingCase } from '@/types/case'
+import { caseDifficultyLabels, type TrainingCase } from '@/types/case'
 
 interface CaseConditionDrawerProps {
   item: TrainingCase
@@ -41,7 +41,7 @@ export function CaseConditionDrawer({ item, roleIndex, triggerRef, onClose }: Ca
         <button ref={closeButtonRef} type="button" aria-label="Закрыть условие кейса" onClick={onClose}>×</button>
       </header>
       <div className="preparation-case-drawer__content">
-        <div className="preparation-case-drawer__badges"><span>{item.category}</span><span>{item.difficulty}</span><span>{item.duration}</span></div>
+        <div className="preparation-case-drawer__badges"><span>{item.category}</span><span>{caseDifficultyLabels[item.difficulty]}</span><span>{item.duration}</span></div>
         <section><h3>Ситуация</h3><p>{item.synopsis}</p>{item.description && item.description !== item.synopsis && <p>{item.description}</p>}</section>
         <section><h3>Участники</h3><div className="preparation-case-drawer__roles">
           <div><span>Ваша роль</span><strong>{item.roles[roleIndex]}</strong></div>

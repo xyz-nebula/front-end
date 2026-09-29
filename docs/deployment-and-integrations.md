@@ -29,7 +29,7 @@ Frontend поставляется как статическая Vite-сборк�
 | Audio | WebSocket через `AudioEngineClient`, control events, reconnect после auth error и backpressure guard |
 | Захват | `getUserMedia` + AudioWorklet, преобразование в mono PCM s16le 24 kHz и отправка base64 chunks |
 | Воспроизведение | Декодирование входящих PCM frames и очередь Web Audio |
-| Результат | Локальный демонстрационный разбор; backend finish/result не вызываются |
+| Результат | `POST /v1/chats/{uuid}/evaluate`, polling `GET /v1/chats/{uuid}/result` и строгая проверка AI-контракта `2.0.0-rc.1` |
 
 Реализация real adapters сама по себе не подтверждает совместимость живых
 сервисов. Канонические спецификации и текущий drift описаны в
@@ -48,19 +48,18 @@ npm run build
 production-сервером. Все `VITE_*` переменные встраиваются в JavaScript во время
 сборки; изменение окружения статического сервера не меняет готовый bundle.
 
-Основной профиль разработки:
+Основной режим:
 
 ```dotenv
-VITE_AUTH_SOURCE=real
-VITE_NEGOTIATION_SOURCE=mock
-VITE_AUDIO_SOURCE=mock
+VITE_SERVICE_MODE=real
 VITE_API_BASE_URL=/api
 VITE_AUDIO_WS_URL=/audio/v1/audio-stream
 ```
 
-Частично поддерживаемый интеграционный профиль меняет negotiation и audio source
-на `real`. Другие гибриды не считаются поддерживаемыми. Значения и defaults
-перечислены в `.env.example`, а правила профилей — в
+`VITE_SERVICE_MODE` обязателен и принимает только `real` или `mock`. В `real`
+все три интеграции используют внешние сервисы; в `mock` все три остаются
+локальными. Гибридных конфигураций нет. Значения и defaults остальных переменных
+перечислены в `.env.example`, а правила режимов — в
 [architecture.md](architecture.md).
 
 `API_PROXY_TARGET` и `AUDIO_PROXY_TARGET` используются только Vite dev-
@@ -124,25 +123,34 @@ Auth-запросы идут с browser на `/api/v1/auth/*`. Защищённ�
 `/audio/v1/audio-stream?token=<access-token>`. После пользовательского действия
 браузер запрашивает микрофон, формирует PCM chunks и отправляет сообщения
 `{type: "audio", audio: "..."}`. Audio-engine возвращает PCM и транскрипты.
-История перечитывается из backend после завершения транскрипта.
+Каждый `transcript` считается полным завершённым текстом отдельной реплики;
+история перечитывается из backend и сверяется по новым `message.id`.
+
+При завершении переговоров frontend запускает evaluation через backend. Страница
+результата читает состояние задания до `done` или `failed`; для `done` она
+дополнительно получает актуальный транскрипт чата и валидирует привязку evidence
+перед отображением. Прямых запросов browser к AI-сервису нет.
 
 ## Известные ограничения
 
-- Frontend и backend `docker/dev` используют разные chat paths и create DTO.
-- Frontend ожидает другую форму case response.
-- Значение `transcript` из AsyncAPI трактуется frontend как текстовая дельта.
-- Пользователь выбирает роль в UI, но role ID/index не передаётся backend.
+- Audio-engine выбирает чат через глобальный для аккаунта `/v1/chats/active`,
+  поэтому одновременные voice-подключения в разных вкладках не изолированы.
+- WebSocket transcript не содержит backend `message.id`; frontend получает его
+  повторным чтением истории.
 - Real negotiation поддерживает только voice: текстовый ход отсутствует.
-- Finish и result остаются локальной демонстрацией и не меняют backend-статус.
+- Отображаемая подготовка берётся только из owner-scoped `localStorage`; server
+  preparations и mock fixtures не используются как fallback.
+- Полнота `plan_vs_reality` зависит от сохранения `preparations` backend; при
+  `null` frontend не подмешивает локальный анализ.
 - Нет подтверждённого живого E2E-прогона frontend + backend + audio-engine.
 
-Поэтому `real/real/real` следует маркировать как частично поддерживаемый
-интеграционный профиль. Зелёные frontend-тесты используют adapters и сетевые
-перехваты и не доказывают работу развёрнутого голосового тракта.
+Зелёные frontend-тесты используют adapters и не доказывают работу развёрнутого
+голосового тракта.
 
 ## Проверка стенда
 
-Перед демонстрацией real-профиля вручную проверьте auth/TOTP, загрузку кейсов,
+Перед демонстрацией real-режима вручную проверьте auth/TOTP, загрузку кейсов,
 создание и активацию чата, разрешение микрофона, двустороннее аудио, оба
-транскрипта, восстановление после reload и обрыва WebSocket, а также честную
-маркировку демонстрационного результата.
+транскрипта, восстановление после reload и обрыва WebSocket, запуск evaluation,
+переход `pending/processing` в `done`, соответствие evidence транскрипту и
+отсутствие демонстрационной пометки у server result.

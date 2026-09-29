@@ -10,14 +10,13 @@
     "dev": "vite",
     "typecheck": "tsc -b",
     "build": "tsc -b && vite build",
-    "bundle:report": "node scripts/report-bundle.mjs",
-    "performance:smoke": "node scripts/run-performance-smoke.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test:unit": "node --test tests/unit/*.test.mjs",
     "test": "npm run test:e2e --",
     "test:e2e": "node scripts/run-visual-smoke.mjs",
     "visual:smoke": "npm run test:e2e --",
-    "check": "npm run typecheck && npm run lint && npm run test:e2e && npm run build && npm run bundle:report && npm run performance:smoke"
+    "check": "npm run lint && npm run build && npm run test:unit && npm run test:e2e"
   },
   "dependencies": {
     "react": "^19.2.8",

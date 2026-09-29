@@ -1,12 +1,13 @@
-import type { ServiceSource } from '@/services/config'
+import type { ServiceMode } from '@/services/config'
 import type { AuthTokens } from '@/types/auth'
 
 export const AUTH_STORAGE_KEY = 'arena.auth.tokens.v1'
 
 export interface StoredAuthSession {
   tokens: AuthTokens
-  source: ServiceSource
+  source: ServiceMode
   mockOwnerKey: string
+  tourOwnerKey?: string
 }
 
 export interface StoredSessionResult {
@@ -28,7 +29,7 @@ function isAuthTokens(value: unknown): value is AuthTokens {
     && value.refreshToken.length > 0
 }
 
-function isServiceSource(value: unknown): value is ServiceSource {
+function isServiceMode(value: unknown): value is ServiceMode {
   return value === 'mock' || value === 'real'
 }
 
@@ -40,12 +41,15 @@ function parseStoredValue(serialized: string | null): StoredAuthSession | null {
   if (!serialized) return null
   try {
     const parsed: unknown = JSON.parse(serialized)
-    if (isRecord(parsed) && isAuthTokens(parsed.tokens) && isServiceSource(parsed.source)) {
+    if (isRecord(parsed) && isAuthTokens(parsed.tokens) && isServiceMode(parsed.source)) {
       if (typeof parsed.mockOwnerKey !== 'string' || parsed.mockOwnerKey.length === 0) return null
       return {
         tokens: parsed.tokens,
         source: parsed.source,
         mockOwnerKey: parsed.mockOwnerKey,
+        ...(typeof parsed.tourOwnerKey === 'string' && parsed.tourOwnerKey.length > 0
+          ? { tourOwnerKey: parsed.tourOwnerKey }
+          : {}),
       }
     }
 
@@ -66,13 +70,13 @@ function parseStoredValue(serialized: string | null): StoredAuthSession | null {
 
 export function parseStoredSession(
   serialized: string | null,
-  expectedSource: ServiceSource,
+  expectedSource: ServiceMode,
 ): StoredAuthSession | null {
   const session = parseStoredValue(serialized)
   return session?.source === expectedSource ? session : null
 }
 
-export function readStoredSession(source: ServiceSource): StoredSessionResult {
+export function readStoredSession(source: ServiceMode): StoredSessionResult {
   let serialized: string | null
   try {
     serialized = window.localStorage.getItem(AUTH_STORAGE_KEY)
@@ -128,7 +132,7 @@ export function removeStoredSession(): boolean {
 
 export function removeStoredSessionIfRefreshTokenMatches(
   expectedRefreshToken: string,
-  expectedSource: ServiceSource,
+  expectedSource: ServiceMode,
 ): ConditionalTokenRemovalResult {
   try {
     const serialized = window.localStorage.getItem(AUTH_STORAGE_KEY)
@@ -144,10 +148,15 @@ export function removeStoredSessionIfRefreshTokenMatches(
   }
 }
 
-export function createStoredSession(tokens: AuthTokens, source: ServiceSource): StoredAuthSession {
+export function createStoredSession(
+  tokens: AuthTokens,
+  source: ServiceMode,
+  tourOwnerKey?: string,
+): StoredAuthSession {
   return {
     tokens,
     source,
     mockOwnerKey: createMockOwnerKey(),
+    ...(tourOwnerKey ? { tourOwnerKey } : {}),
   }
 }

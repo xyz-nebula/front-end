@@ -7,6 +7,7 @@
 .preparation-header__profile { display: flex; align-items: center; gap: 24px; }
 .preparation-header__profile > span { padding: 9px 16px; border-radius: 999px; color: #9d2830; background: #fff0f1; }
 .preparation-header__profile img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+.preparation-header__profile-control { position: relative; }
 .preparation-main { padding-block: 22px 96px; }
 .preparation-context { display: flex; align-items: center; gap: 18px; min-height: 40px; color: #63728c; font-size: 14px; }
 .preparation-context > a { color: #0870ed; }
@@ -90,6 +91,10 @@
 @keyframes preparation-fade-in { from { opacity: 0; } }
 @keyframes preparation-drawer-in { from { transform: translateX(100%); } }
 
+@media (min-width: 901px) {
+  .preparation-page.is-tour-start-duel .preparation-bottom__next { display: none; }
+}
+
 @media (max-width: 900px) {
   .preparation-shell { width: calc(100% - 32px); }
   .preparation-main { padding-bottom: 94px; }
@@ -107,6 +112,7 @@
   .preparation-bottom button { min-height: 51px; }
   .preparation-bottom__back { flex: 0 0 auto; }
   .preparation-bottom__next { flex: 1; }
+  .preparation-start { display: none; }
 }
 
 @media (max-width: 600px) {

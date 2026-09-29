@@ -7,10 +7,14 @@ Auth доступен как в реальном, так и в mock-режиме
 и `src/components/auth/RouteGate.tsx`.
 Документ фиксирует поведение; он не разрешает новые API-интеграции.
 
-`VITE_AUTH_SOURCE=real` использует backend через `/api` для регистрации,
-активации, login/refresh/logout и TOTP. `VITE_AUTH_SOURCE=mock` выполняет те же
-frontend-сценарии локально. Auth storage содержит `source`, поэтому credentials
+`VITE_SERVICE_MODE=real` использует backend через `/api` для регистрации,
+активации, login/refresh/logout и TOTP. `VITE_SERVICE_MODE=mock` выполняет те же
+frontend-сценарии локально. Auth storage содержит режим, поэтому credentials
 одного режима не восстанавливаются в другом.
+
+В текущем демо-интерфейсе TOTP недоступен: форма входа отправляет только
+email и пароль, а меню профиля не позволяет подключать или отключать 2FA. TOTP-методы,
+адаптеры и mock-модель сохранены для возможного возврата функции, но не имеют точки входа в UI.
 
 ## Состояния
 
@@ -24,10 +28,19 @@ frontend-сценарии локально. Auth storage содержит `sourc
 
 Без сохранённых токенов стартуем гостем. Наличие токенов запускает bootstrap
 refresh один раз, в том числе под React StrictMode. Пара access/refresh,
-`source` и стабильный `mockOwnerKey` хранятся под `arena.auth.tokens.v1`; wire
+`source`, стабильный `mockOwnerKey` и frontend-only `tourOwnerKey` хранятся под
+`arena.auth.tokens.v1`; wire
 API использует snake_case, клиент — camelCase.
 Успешный HTTP-ответ сам по себе недостаточен: клиент проверяет структуру токенов,
 регистрации и TOTP enrollment, несовместимый ответ становится `invalid-response`.
+
+`tourOwnerKey` — локальный псевдоним владельца для прогресса продуктового тура.
+Он вычисляется после login/activation как SHA-256 от нормализованного email,
+источника auth и случайной локальной соли. Email не входит в ключи tour storage
+и не отправляется в новые API. Существующий auth envelope без `tourOwnerKey`
+остаётся читаемым: ключ восстанавливается при следующем успешном создании
+сессии. Refresh сохраняет identity, а logout очищает только session-scoped
+отсрочку приглашения, не удаляя owner-scoped прогресс тура.
 
 ## Инварианты AuthContext
 
@@ -83,20 +96,11 @@ API использует snake_case, клиент — camelCase.
 
 ## Regression-защита
 
-Не упрощать эти механизмы без эквивалентных regression-тестов, сохраняющих
-проверку гонок, ошибок и защиты новой сессии. Проходящий happy path не заменяет
-проверки late responses. Runtime-код не требуется менять для актуализации docs.
+Обязательный browser smoke проверяет только доступность auth-экранов, гостевой
+редирект с защищённого маршрута и загрузку mock-сессии. Он не покрывает API
+payload, StrictMode, refresh/retry, TOTP, поздние ответы, конкурентные вкладки,
+storage fallback и ротацию токенов.
 
-| Область | Существующие сценарии |
-| --- | --- |
-| Реальные API-формы, payload, StrictMode, gates, refresh/retry, TOTP | [auth.spec.ts](../tests/visual/auth.spec.ts): `activates from a link only once…`, `does not replace an existing session…`, `returns to a protected route…`, `refreshes once after a protected 401…`. |
-| Валидация API-ответов | `auth.spec.ts`: сценарии `rejects malformed…` для login, activation, refresh, registration и enrollment. |
-| Поздние ответы и last-started login | [auth-resilience.spec.ts](../tests/visual/auth-resilience.spec.ts): `does not let a delayed activation…`, `keeps the result of the last-started concurrent login`, `does not restore a pending login after logout`. |
-| Optimistic logout и revoke | `auth-resilience.spec.ts`: `optimistic logout clears the UI…`, `retries remote logout after refreshing a rejected snapshot`. |
-| Временные ошибки и окончательный отказ | `auth-resilience.spec.ts`: `keeps tokens after a transient bootstrap failure…`, network/timeout варианты, `clears a session when refresh is rejected with 403`, `keeps an authenticated session when refresh fails…`; invalid refresh также проверяется в `auth.spec.ts`. |
-| Защита новой сессии от операций старой | `auth-resilience.spec.ts`: `does not retry a protected request with a replacement session`, `discards a late protected success…`, `closes an open security modal…`. |
-| Storage, memory и межвкладочная ротация | `auth-resilience.spec.ts`: `survives corrupted storage…`, `uses a one-tab memory session…`, `synchronizes login, token rotation, and logout between tabs`, `serializes simultaneous bootstrap refreshes between tabs`, `does not let a stale refresh overwrite…`. |
-
-Эта карта связывает инварианты с имеющимися проверками, но не утверждает, что
-каждая внутренняя ветвь отдельно покрыта: при изменении конкретного механизма
-добавляйте regression для его ветви и конкурентного сценария.
+При изменении перечисленных механизмов добавляйте узкую проверку в рамках
+соответствующей задачи или выполняйте интеграционный smoke на стенде. Общие
+ограничения минимального набора описаны в [testing.md](testing.md).

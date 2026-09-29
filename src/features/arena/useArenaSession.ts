@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
 import { useDomainServices } from '@/services/domainServices'
+import { mergeMessages } from '@/features/arena/messageReconciliation'
 import { isServiceError } from '@/types/api'
 import type {
   NegotiationMessage,
@@ -98,15 +99,6 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
-function mergeMessages(
-  current: readonly NegotiationMessage[],
-  incoming: readonly NegotiationMessage[],
-): NegotiationMessage[] {
-  const byId = new Map(current.map((message) => [message.id, message]))
-  incoming.forEach((message) => byId.set(message.id, message))
-  return [...byId.values()].sort((left, right) => left.sequence - right.sequence)
-}
-
 export function useArenaSession(sessionId: string): UseArenaSessionValue {
   const { negotiationClient } = useDomainServices()
   const arenaContext = useMemo<ArenaContext>(
@@ -170,6 +162,11 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
         clientCommandId: commandId,
       })
       if (!isCurrent(arenaContext)) return false
+      if (result.status === 'failed') {
+        setViewState('ready')
+        setError(result.message)
+        return false
+      }
       removeSessionValue(pendingFinishKey(arenaContext.sessionId))
       setSession((current) => current ? {
         ...current,
@@ -222,7 +219,12 @@ export function useArenaSession(sessionId: string): UseArenaSessionValue {
   const refreshSession = useCallback(async () => {
     try {
       const loaded = await arenaContext.negotiationClient.getSession(arenaContext.sessionId)
-      if (isCurrent(arenaContext)) setSession(loaded)
+      if (isCurrent(arenaContext)) {
+        setSession((current) => current ? {
+          ...loaded,
+          messages: mergeMessages(current.messages, loaded.messages),
+        } : loaded)
+      }
       return isCurrent(arenaContext) ? loaded : null
     } catch (caught) {
       if (!isCurrent(arenaContext)) return null

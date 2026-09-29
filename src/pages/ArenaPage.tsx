@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 
 import { useAuthRuntime } from '@/auth/runtime'
 import { ArenaConversation } from '@/components/arena/ArenaConversation'
@@ -9,51 +9,137 @@ import { FinishDialog } from '@/components/arena/FinishDialog'
 import { TextComposer } from '@/components/arena/TextComposer'
 import { VoiceControls } from '@/components/arena/VoiceControls'
 import { AppButton } from '@/components/ui/AppButton'
+import type { DepartureReason } from '@/components/chrome/ProfileMenu'
 import { useArenaSession } from '@/features/arena/useArenaSession'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
-import { trainingCases } from '@/mocks/cases'
-import { getDuelPreparation } from '@/mocks/duelPreparation'
+import { useSessionTimer } from '@/features/arena/useSessionTimer'
+import { useProductTour } from '@/features/product-tour/useProductTour'
 import { readSessionPreparation } from '@/features/preparation/preparation'
 import { useDomainServices } from '@/services/domainServices'
-import type { TrainingCase } from '@/types/case'
 import '@/styles/duel.css'
-
-function fallbackCase(title: string): TrainingCase {
-  return {
-    id: title,
-    title,
-    description: 'Голосовой разговор с AI. Сценарий и роль оппонента пока не привязаны к карточке.',
-    synopsis: 'Переговорная сессия из истории.',
-    category: 'Карьера',
-    duration: 'Без ограничения',
-    difficulty: 'Средне',
-    opponent: 'AI-оппонент',
-    roles: ['Участник', 'AI-оппонент'],
-    roleSummaries: ['Участник переговоров.', 'AI-оппонент.'],
-    accent: 'violet',
-    icon: 'dialogue',
-  }
-}
 
 export function ArenaPage() {
   const { sessionId = '' } = useParams()
-  const { mockOwnerKey } = useAuthRuntime()
-  if (!mockOwnerKey) throw new Error('ArenaPage requires an authenticated owner.')
+  const { preparationOwnerKey } = useAuthRuntime()
+  if (!preparationOwnerKey) throw new Error('ArenaPage requires an authenticated owner.')
   const navigate = useNavigate()
-  const { isRealVoice } = useDomainServices()
+  const { isRealVoice, supportsTextNegotiation } = useDomainServices()
   const arena = useArenaSession(sessionId)
+  const productTour = useProductTour()
+  const {
+    clearScenarioError,
+    reportScenarioError,
+    send: sendTourEvent,
+    state: tourState,
+  } = productTour
   const audio = useArenaAudio(sessionId, arena.session?.mode === 'voice' && arena.session.status === 'active', arena.addCommittedMessage, arena.refreshSession)
+  const connectAudio = audio.connect
   const [showFinishDialog, setShowFinishDialog] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
+  const [isDeparting, setIsDeparting] = useState(false)
+  const [departureAction, setDepartureAction] = useState<(() => void | Promise<void>) | null>(null)
+  const [departureReason, setDepartureReason] = useState<DepartureReason>('default')
   const [finishError, setFinishError] = useState<string | null>(null)
-  const trainingCase = trainingCases.find(
-    (item) => item.id === arena.session?.caseId || item.title === arena.session?.name,
-  ) ?? (arena.session ? fallbackCase(arena.session.name ?? 'Переговоры с AI') : undefined)
-  const sessionPreparation = arena.session ? readSessionPreparation(mockOwnerKey, arena.session.id) : null
+  const [timeoutFinishFailed, setTimeoutFinishFailed] = useState(false)
+  const finishButtonRef = useRef<HTMLButtonElement>(null)
+  const timeoutFinishInFlightRef = useRef(false)
+  const departureInFlightRef = useRef(false)
+  const allowDepartureRef = useRef(false)
+  const trainingCase = arena.session?.caseSnapshot
+  const sessionPreparation = arena.session ? readSessionPreparation(preparationOwnerKey, arena.session.id) : null
+  const sessionTimer = useSessionTimer(
+    arena.session?.messages ?? [],
+    arena.session?.timeLimitSeconds ?? 0,
+  )
+  const shouldWarnBeforeUnload = arena.session?.mode === 'voice' && arena.session.status === 'active'
+  const navigationBlocker = useBlocker(useCallback(() => (
+    shouldWarnBeforeUnload && !allowDepartureRef.current
+  ), [shouldWarnBeforeUnload]))
+  const departureDialogOpen = navigationBlocker.state === 'blocked' || departureAction !== null
 
   useEffect(() => {
-    if (arena.viewState === 'finished') navigate(`/result/${sessionId}`, { replace: true })
+    if (!shouldWarnBeforeUnload) return
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [shouldWarnBeforeUnload])
+
+  useEffect(() => {
+    const session = arena.session
+    if (!session || session.mode !== 'voice' || tourState?.status !== 'active') return
+    const userMessages = session.messages.filter((message) => message.speaker === 'user').length
+    const aiMessages = session.messages.filter((message) => message.speaker === 'ai').length
+    if (!tourState.sessionId && ['voice-format', 'analysis', 'strategy', 'tactics', 'start-duel'].includes(tourState.stepId)) {
+      sendTourEvent({ type: 'session-created', sessionId: session.id, userMessages, aiMessages })
+    }
+    if (session.status !== 'active') sendTourEvent({ type: 'session-finished' })
+  }, [arena.session, sendTourEvent, tourState])
+
+  useEffect(() => {
+    if (audio.state !== 'connected' || !arena.session) return
+    sendTourEvent({
+      type: 'audio-connected',
+      userMessages: arena.session.messages.filter((message) => message.speaker === 'user').length,
+      aiMessages: arena.session.messages.filter((message) => message.speaker === 'ai').length,
+    })
+  }, [arena.session, audio.state, sendTourEvent])
+
+  useEffect(() => {
+    if (tourState?.status !== 'active' || tourState.stepId !== 'microphone') return
+    if (audio.state !== 'error' || !audio.error) {
+      clearScenarioError()
+      return
+    }
+    const kind = /микрофон|доступ/i.test(audio.error) ? 'microphone' : 'audio'
+    reportScenarioError(kind, () => { void connectAudio() })
+  }, [audio.error, audio.state, clearScenarioError, connectAudio, reportScenarioError, tourState])
+
+  useEffect(() => {
+    const baseline = tourState?.dialogueBaseline
+    const messages = arena.session?.messages ?? []
+    if (tourState?.status !== 'active' || tourState.stepId !== 'dialogue' || !baseline) return
+    const messagesAfterBaseline = messages
+      .slice(baseline.userMessages + baseline.aiMessages)
+      .sort((left, right) => left.sequence - right.sequence)
+    const userIndex = messagesAfterBaseline.findIndex((message) => message.speaker === 'user')
+    if (userIndex >= 0 && messagesAfterBaseline.slice(userIndex + 1).some((message) => message.speaker === 'ai')) {
+      sendTourEvent({ type: 'dialogue-completed' })
+    }
+  }, [arena.session?.messages, sendTourEvent, tourState])
+
+  useEffect(() => {
+    if (arena.viewState === 'finished' && !departureInFlightRef.current) navigate(`/result/${sessionId}`, { replace: true })
   }, [arena.viewState, navigate, sessionId])
+
+  useEffect(() => {
+    if (
+      !sessionTimer.expired
+      || arena.session?.status !== 'active'
+      || arena.viewState !== 'ready'
+      || arena.turnState === 'sending'
+      || arena.turnState === 'thinking'
+      || isFinishing
+      || timeoutFinishFailed
+      || timeoutFinishInFlightRef.current
+    ) return
+
+    timeoutFinishInFlightRef.current = true
+    setShowFinishDialog(false)
+    void (async () => {
+      try {
+        if (arena.session?.mode === 'voice') await audio.stop()
+        const finished = await arena.finishSession()
+        if (!finished) setTimeoutFinishFailed(true)
+      } catch {
+        setTimeoutFinishFailed(true)
+      } finally {
+        timeoutFinishInFlightRef.current = false
+      }
+    })()
+  }, [arena, audio, isFinishing, sessionTimer.expired, timeoutFinishFailed])
 
   if (arena.viewState === 'loading') {
     return (
@@ -78,9 +164,12 @@ export function ArenaPage() {
   }
 
   const isFinished = arena.viewState === 'finished' || arena.session.status !== 'active'
+  const interactionDisabled = isFinished || sessionTimer.expired
   const isSending = arena.turnState === 'sending' || arena.turnState === 'thinking'
   const isConnecting = audio.state === 'connecting' || audio.state === 'reconnecting'
-  const preparation = getDuelPreparation(trainingCase.id)
+  const selectedRole = arena.session.selectedRole ?? 0
+  const userRole = trainingCase.roles[selectedRole]
+  const opponentRole = trainingCase.roles[selectedRole === 0 ? 1 : 0]
 
   const confirmFinish = async () => {
     if (isFinishing) return
@@ -89,7 +178,10 @@ export function ArenaPage() {
     try {
       if (arena.session?.mode === 'voice') await audio.stop()
       const finished = await arena.finishSession()
-      if (finished) setShowFinishDialog(false)
+      if (finished) {
+        sendTourEvent({ type: 'session-finished' })
+        setShowFinishDialog(false)
+      }
     } catch (caught) {
       setFinishError(caught instanceof Error
         ? caught.message
@@ -99,36 +191,107 @@ export function ArenaPage() {
     }
   }
 
+  const openFinishDialog = () => {
+    sendTourEvent({ type: 'finish-opened' })
+    setShowFinishDialog(true)
+  }
+
+  const closeFinishDialog = () => {
+    sendTourEvent({ type: 'finish-cancelled' })
+    setShowFinishDialog(false)
+  }
+
+  const requestDeparture = (action: () => void | Promise<void>, reason: DepartureReason = 'default') => {
+    if (!shouldWarnBeforeUnload) {
+      void action()
+      return
+    }
+    setDepartureReason(reason)
+    setDepartureAction(() => action)
+  }
+
+  const cancelDeparture = () => {
+    if (isDeparting) return
+    setDepartureAction(null)
+    setDepartureReason('default')
+    if (navigationBlocker.state === 'blocked') navigationBlocker.reset()
+  }
+
+  const confirmDeparture = async () => {
+    if (isDeparting || departureInFlightRef.current) return
+    const requestedAction = departureAction
+    departureInFlightRef.current = true
+    setIsDeparting(true)
+    try {
+      try {
+        await audio.stop()
+      } catch {
+        // Leaving remains available even when local audio cleanup reports a failure.
+      }
+      try {
+        await arena.finishSession()
+      } catch {
+        // The user explicitly chose to leave even if the backend cannot finish the session.
+      }
+    } finally {
+      allowDepartureRef.current = true
+      setDepartureAction(null)
+      setDepartureReason('default')
+      if (navigationBlocker.state === 'blocked') navigationBlocker.proceed()
+      else await requestedAction?.()
+    }
+  }
+
+  if (arena.session.mode === 'text' && !supportsTextNegotiation) {
+    return (
+      <main className="arena-state">
+        <span className="arena-state__mark" aria-hidden="true">!</span>
+        <p className="eyebrow">Арена переговоров</p>
+        <h1>Текстовые переговоры недоступны</h1>
+        <p>В основном режиме поддерживаются только голосовые тренировки.</p>
+        <AppButton to="/home">К кейсам</AppButton>
+      </main>
+    )
+  }
+
+  const retryTimeoutFinish = () => {
+    setTimeoutFinishFailed(false)
+  }
+
   return (
     <div className="arena-page">
       <ArenaHeader
         title={trainingCase.title}
-        userRole={sessionPreparation?.userRole ?? preparation?.userRole ?? 'Вы'}
-        opponentRole={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? trainingCase.opponent}
-        startedAt={arena.session.startedAt}
+        userRole={sessionPreparation?.userRole ?? userRole}
+        opponentRole={sessionPreparation?.opponentRole ?? opponentRole}
+        remainingSeconds={sessionTimer.remainingSeconds}
+        timerStarted={sessionTimer.started}
+        timerExpired={sessionTimer.expired}
         mode={arena.session.mode}
         audioState={audio.state}
         isDemoVoice={!isRealVoice}
         isSending={isSending}
-        finishDisabled={isSending || isFinished || isConnecting}
-        onFinish={() => setShowFinishDialog(true)}
+        finishDisabled={isSending || interactionDisabled || isConnecting}
+        onFinish={openFinishDialog}
+        onDepartureRequest={requestDeparture}
+        finishButtonRef={finishButtonRef}
       />
       <main className="duel-shell arena-layout">
         <section className="arena-dialog-panel">
           <h2 className="arena-dialog-panel__title">Диалог</h2>
-          <ArenaConversation messages={arena.session.messages} opponent={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? trainingCase.opponent} isThinking={isSending} mode={arena.session.mode} partial={audio.partial} />
-          {arena.error && <div className="arena-inline-error" role="alert"><span>{arena.error}</span><button type="button" onClick={() => arena.turnState === 'error' ? void arena.sendTextTurn() : setShowFinishDialog(true)}>Повторить</button></div>}
+          <ArenaConversation messages={arena.session.messages} opponent={sessionPreparation?.opponentRole ?? opponentRole} isThinking={isSending} mode={arena.session.mode} partial={audio.partial} />
+          {timeoutFinishFailed ? <div className="arena-inline-error" role="alert"><span>{arena.error ?? 'Не удалось завершить переговоры по таймеру.'}</span><button type="button" onClick={retryTimeoutFinish}>Повторить завершение</button></div> : arena.error && <div className="arena-inline-error" role="alert"><span>{arena.error}</span><button type="button" onClick={() => arena.turnState === 'error' ? void arena.sendTextTurn() : openFinishDialog()}>Повторить</button></div>}
         </section>
-        <DuelPreparation data={preparation} description={trainingCase.description} isRealVoice={isRealVoice} snapshot={sessionPreparation} />
+        <DuelPreparation fallback={arena.session.preparationOverview} snapshot={sessionPreparation} />
         <div className="duel-controls">
           {isFinished ? (
             <div className="arena-finished" role="status"><div><strong>Переговоры завершены</strong><span>Открываем разбор…</span></div><Link to={`/result/${sessionId}`}>Посмотреть результат →</Link></div>
           ) : arena.session.mode === 'voice' ? (
-            <VoiceControls state={audio.state} error={audio.error} isPlaying={audio.isPlaying} disabled={arena.viewState !== 'ready'} isDemo={!isRealVoice} isUserSpeaking={Boolean(audio.partial.user)} getInputLevel={audio.getInputLevel} onConnect={() => void audio.connect()} onPause={audio.pause} onResume={audio.resume} onStop={() => void audio.stop()} />
+            <VoiceControls state={audio.state} error={audio.error} isPlaying={audio.isPlaying} disabled={arena.viewState !== 'ready' || interactionDisabled} isDemo={!isRealVoice} isUserSpeaking={Boolean(audio.partial.user)} getInputLevel={audio.getInputLevel} onConnect={() => void audio.connect()} onPause={audio.pause} onResume={audio.resume} />
           ) : (
             <TextComposer
               value={arena.draft}
-              disabled={isSending || arena.turnState === 'error' || arena.viewState !== 'ready'}
+              disabled={isSending || arena.turnState === 'error' || arena.viewState !== 'ready' || interactionDisabled}
               isSending={isSending}
               onChange={arena.setDraft}
               onSubmit={() => void arena.sendTextTurn()}
@@ -139,8 +302,15 @@ export function ArenaPage() {
       {showFinishDialog && <FinishDialog
         busy={isFinishing}
         error={finishError ?? arena.error}
-        onCancel={() => setShowFinishDialog(false)}
+        onCancel={closeFinishDialog}
         onConfirm={() => { void confirmFinish() }}
+        returnFocusRef={finishButtonRef}
+      />}
+      {departureDialogOpen && <FinishDialog
+        busy={isDeparting}
+        onCancel={cancelDeparture}
+        onConfirm={() => { void confirmDeparture() }}
+        variant={departureReason === 'tour-restart' ? 'tour-restart' : departureReason === 'tour-start' ? 'tour-start' : 'leave'}
       />}
     </div>
   )

@@ -6,63 +6,69 @@
 | --- | --- |
 | `npm run typecheck` | Проверить TypeScript-проекты без сборки приложения |
 | `npm run lint` | Проверить исходники и тестовую инфраструктуру ESLint |
-| `npm run test:e2e` | Запустить Playwright-группы в изолированных source-профилях |
-| `npm run visual:smoke` | Тот же browser suite с диагностическими screenshots |
 | `npm run build` | Выполнить TypeScript build и собрать production bundle |
-| `npm run bundle:report` | Сверить состав `dist/` с bundle budgets |
-| `npm run performance:smoke` | Проверить landing в заданном browser/network profile |
-| `npm run check` | Последовательно выполнить все обязательные проверки |
+| `npm run test:unit` | Проверить чистую логику и owner isolation подготовки |
+| `npm test` | Запустить короткий Playwright smoke в mock-режиме |
+| `npm run test:e2e` | Та же browser-проверка |
+| `npm run visual:smoke` | Та же browser-проверка с диагностическими PNG |
+| `npm run check` | Последовательно выполнить lint, build, unit-тесты и browser smoke |
 
-Актуальную последовательность `check`, значения budget и параметры runner не
-дублируйте в документации: источники истины — `package.json`, файлы в
-`scripts/` и `playwright.config.ts`.
+`build` уже выполняет TypeScript-проверку, поэтому `check` не запускает
+`typecheck` отдельно. Unit-тесты используют встроенный Node test runner без
+дополнительной зависимости. Browser smoke всегда идёт последним. Runner один раз
+поднимает Vite на свободном loopback-порту, запускает Chrome и завершает оба
+процесса после прогона. Общий лимит runner — 110 секунд.
 
-Для просмотра актуального состава Playwright suite используйте:
-
-```shell
-npm run test:e2e -- --list
-```
-
-Отдельный spec или сценарий можно выбрать стандартными аргументами Playwright:
+Стандартные аргументы Playwright можно передать после `--`, например:
 
 ```shell
-npm run test:e2e -- auth.spec.ts
-npm run test:e2e -- auth-resilience.spec.ts --grep "between tabs"
+npm test -- --grep desktop
 ```
 
-Runner самостоятельно поднимает Vite на свободном loopback-порту, передаёт
-`PW_BASE_URL` и завершает сервер после каждой source-группы. Одновременные
-прогоны в одном checkout не поддерживаются, потому что используют общую папку
-артефактов. Живой backend для обычного suite не нужен: real auth и service
-contracts проверяются сетевыми перехватами, а продуктовые сценарии — mock
-adapters.
+## Покрытие smoke-набора
 
-## Виды проверок
+В `tests/visual/smoke.spec.ts` находятся два маршрутных сценария: desktop
+`1440×900` и mobile `390×844`. `tests/visual/product-tour.spec.ts` отдельно
+проверяет полный продуктовый тур на desktop и mobile, доступность ролей при
+ширинах 320, 360, 390 и 430 px, закрытие без восстановления после reload,
+подтверждение перезапуска, отсутствие пересечений обязательных целей с
+подсказкой и диагностические кадры ключевых шагов. Runner принудительно задаёт
+`VITE_SERVICE_MODE=mock` и очищает API proxy, поэтому проверка не зависит от
+backend/audio-engine. Каждый сценарий открывает landing, login,
+register, activation, 404, home, окно выбора роли до и после выбора,
+preparation, текстовую arena и готовый result.
+Для каждого экрана проверяются основной UI и отсутствие горизонтального
+overflow, затем сохраняется PNG.
 
-- Auth specs покрывают wire payload, route gates, refresh/retry, TOTP,
-  конкуренцию вкладок и восстановление сессии.
-- Service contract specs проверяют frontend runtime parsers и DTO fixtures. Они
-  не заменяют проверку drift против канонических спецификаций сервисов.
-- Domain specs покрывают mock storage/runtime, подготовку, переговоры,
-  устойчивость аудио и повтор кейса.
-- Visual scenarios проверяют desktop/mobile состояния и horizontal overflow.
-- Bundle и performance scripts используют budgets из `scripts/`, а не значения
-  из Markdown.
+После изменений UI вручную откройте относящиеся к задаче desktop/mobile PNG из
+`artifacts/visual-smoke/`. Real smoke остаётся живой ручной проверкой стенда:
+auth → cases → preparation → create → activate → voice → transcript → finish →
+evaluation → result. Text mode в real должен завершаться экраном недоступности
+до создания чата.
 
-Playwright specs и harnesses сейчас исполняются Playwright и проверяются ESLint,
-но не включены в отдельный TypeScript project. Это известное ограничение
-тестовой инфраструктуры.
+Защищённые экраны получают валидные owner-scoped данные через существующие
+`MockAuthClient`, `MockStorage` и `MockRuntime`. Это позволяет проверять маршруты
+без прохождения полного цикла регистрации и переговоров через UI. Живые backend
+и audio-engine для smoke-набора не нужны.
 
-## Артефакты и визуальная проверка
+Набор намеренно не проверяет real adapters, DTO-контракты, auth races,
+конкурентные вкладки, повреждение storage, все переходы product tour state
+machine, реальный audio-engine, polling и performance budgets. При изменении
+этих механизмов нужна отдельная целевая проверка в рамках соответствующей задачи.
 
-`artifacts/visual-smoke/` содержит временные PNG, а `test-results/` — traces
-ошибочных прогонов. Эти каталоги не коммитятся.
+`tests/unit/messageReconciliation.test.mjs` проверяет разделение completed
+transcript, защиту от повторяющегося текста и монотонное объединение истории.
+`tests/unit/productTourState.test.mjs` проверяет чистый новый запуск, завершение
+без повторного приглашения и миграцию legacy `active`/`paused` состояний.
 
-После изменения UI, CSS или адаптивности:
+## Артефакты
 
-1. запустите `npm run visual:smoke`;
-2. откройте относящиеся к изменению desktop/mobile PNG;
-3. проверьте композицию, overflow, состояния и читаемость вручную.
+`artifacts/visual-smoke/` содержит 22 базовых временных PNG: по одному desktop и
+mobile кадру для каждого из одиннадцати экранов и состояний. Сценарий тура
+добавляет кадры приглашения, кейсов, ролей, подготовки, микрофона, завершения и
+результата, включая контрольный кадр шириной 320 px. `test-results/` содержит
+диагностические артефакты неудачных прогонов. Эти каталоги не коммитятся.
 
-Успешный Playwright-прогон не заменяет визуальный просмотр и не подтверждает
-совместимость с живыми backend/audio-engine.
+После UI, CSS или адаптивных изменений запустите `npm run visual:smoke` и
+вручную откройте относящиеся к изменению PNG. Успешный Playwright-прогон не
+заменяет визуальный просмотр и не подтверждает совместимость с живыми сервисами.

@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import profileArtwork from '@/assets/home/profile-kirill.webp'
-import directorArtwork from '@/assets/home/role-director.webp'
-import { useDomainServices } from '@/services/domainServices'
-import type { TrainingCase } from '@/types/case'
-import type { NegotiationMode } from '@/types/negotiation'
+import opponentArtwork from '@/assets/home/opponent.webp'
+import profileArtwork from '@/assets/home/profile.webp'
+import { useProductTour } from '@/features/product-tour/useProductTour'
+import { caseDifficultyLabels, type TrainingCase } from '@/types/case'
 
 interface TrainingModalProps {
   item: TrainingCase
@@ -13,12 +12,27 @@ interface TrainingModalProps {
 }
 
 const SWIPE_CLOSE_THRESHOLD = 90
+const DEFAULT_USER_ROLE_SUMMARY = 'Ваша роль в этом переговорном кейсе.'
+const DEFAULT_OPPONENT_ROLE_SUMMARY = 'Роль AI-оппонента в этом кейсе.'
+
+function getRoleSummary(item: TrainingCase, index: number, selectedRole: 0 | 1): string {
+  const usesDefaultRoleSummaries = item.presentation.roleSummaries[0] === DEFAULT_USER_ROLE_SUMMARY
+    && item.presentation.roleSummaries[1] === DEFAULT_OPPONENT_ROLE_SUMMARY
+
+  if (!usesDefaultRoleSummaries) return item.presentation.roleSummaries[index]
+  return selectedRole === index ? DEFAULT_USER_ROLE_SUMMARY : DEFAULT_OPPONENT_ROLE_SUMMARY
+}
 
 export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const navigate = useNavigate()
-  const { isRealVoice } = useDomainServices()
-  const [mode, setMode] = useState<NegotiationMode>(isRealVoice ? 'voice' : 'text')
-  const [role, setRole] = useState<0 | 1 | null>(null)
+  const productTour = useProductTour()
+  const { send: sendTourEvent } = productTour
+  const [role, setRole] = useState<0 | 1 | null>(() => {
+    const state = productTour.state
+    return state?.status === 'active' && state.caseId === item.id && state.stepId === 'voice-format'
+      ? state.roleIndex ?? null
+      : null
+  })
   const backdropRef = useRef<HTMLDivElement>(null)
   const modalRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -28,7 +42,10 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
   const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
-
+  useEffect(() => {
+    const opponentImage = new Image()
+    opponentImage.src = opponentArtwork
+  }, [])
   useEffect(() => {
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const backgroundElements = [...(backdropRef.current?.parentElement?.children ?? [])]
@@ -38,7 +55,11 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
 
     const focusableElements = () => [...(modalRef.current?.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    ) ?? [])].filter((element) => !element.hidden && element.getClientRects().length > 0)
+    ) ?? []), ...document.querySelectorAll<HTMLElement>('[data-product-tour-tooltip] button:not([disabled]), .react-joyride__beacon:not([disabled])')]
+      .filter((element) => !element.hidden && element.getClientRects().length > 0)
+    const containsFocus = (node: Node | null) => Boolean(
+      node && (modalRef.current?.contains(node) || document.querySelector('[data-product-tour-tooltip]')?.contains(node) || document.querySelector('.react-joyride__beacon')?.contains(node)),
+    )
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -56,7 +77,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
       const active = document.activeElement
-      if (!modalRef.current?.contains(active)) {
+      if (!containsFocus(active)) {
         event.preventDefault()
         first.focus()
       } else if (event.shiftKey && active === first) {
@@ -68,7 +89,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
       }
     }
     const handleFocusIn = (event: FocusEvent) => {
-      if (event.target instanceof Node && !modalRef.current?.contains(event.target)) {
+      if (event.target instanceof Node && !containsFocus(event.target)) {
         closeButtonRef.current?.focus()
       }
     }
@@ -88,7 +109,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
 
   const startPreparation = () => {
     if (role === null) return
-    navigate(`/cases/${encodeURIComponent(item.id)}/preparation?role=${role}&mode=${mode}`)
+    navigate(`/cases/${encodeURIComponent(item.id)}/preparation?role=${role}&mode=voice&section=analysis`)
   }
 
   const handleDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -145,30 +166,28 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
         ><span /></div>
         <div className="home-case-modal__scroll">
           <button className="home-case-modal__close" ref={closeButtonRef} type="button" onClick={onClose} aria-label="Закрыть">×</button>
-          <div className="home-case-modal__badges"><span>{item.category}</span><span>{item.difficulty}</span><span>{item.duration}</span></div>
+          <div className="home-case-modal__badges"><span>{item.category}</span><span>{caseDifficultyLabels[item.difficulty]}</span><span>{item.duration}</span></div>
           <h2 id="training-modal-title">{item.title}</h2>
           <p className="home-case-modal__intro">{item.description}</p>
-          <div className="home-case-modal__section"><h3>Ситуация</h3><p>{item.synopsis}</p><p>{item.description}</p></div>
           <div className="home-case-modal__section">
             <h3>Выберите свою роль</h3>
             <p>Вторая роль автоматически станет AI-оппонентом.</p>
-            <div className="home-case-modal__roles" role="radiogroup" aria-label="Выберите свою роль">
-              {item.roles.map((title, index) => <label className={`home-case-modal__role ${role === index ? 'is-selected' : role !== null ? 'is-opponent' : ''}`} key={title}>
-                <input type="radio" name="case-role" checked={role === index} onChange={() => setRole(index as 0 | 1)} />
-                <img src={/руководител|директор/i.test(title) ? directorArtwork : profileArtwork} alt="" width={400} height={400} loading="lazy" decoding="async" />
-                <span className="home-case-modal__role-copy">{role !== null && <span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span>}<strong>{title}</strong><small>{item.roleSummaries[index]}</small></span>
+            <div className="home-case-modal__roles" role="radiogroup" aria-label="Выберите свою роль" data-tour-id="role-selector">
+              {item.roles.map((title, index) => <label className={`home-case-modal__role ${role !== null ? 'has-avatar' : ''} ${role === index ? 'is-selected' : role !== null ? 'is-opponent' : ''}`} key={title}>
+                <input type="radio" name="case-role" checked={role === index} onChange={() => {
+                  const roleIndex = index as 0 | 1
+                  setRole(roleIndex)
+                  sendTourEvent({ type: 'role-selected', roleIndex })
+                }} />
+                {role !== null && <img src={role === index ? profileArtwork : opponentArtwork} alt="" width={400} height={400} decoding="async" />}
+                <span className="home-case-modal__role-copy">{role !== null && <span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span>}<strong>{title}</strong>{role !== null && <small>{getRoleSummary(item, index, role)}</small>}</span>
                 <span className="home-case-modal__radio-mark" aria-hidden="true">{role === index ? '✓' : ''}</span>
               </label>)}
             </div>
             <p className="home-case-modal__demo-note">Выбранная роль сохранится в подготовке и поединке.</p>
           </div>
-          <fieldset className="home-case-modal__modes">
-            <legend>Формат тренировки</legend>
-            {!isRealVoice && <label className={mode === 'text' ? 'is-selected' : ''}><input type="radio" name="training-mode" value="text" checked={mode === 'text'} onChange={() => setMode('text')} />Текст</label>}
-            <label className={mode === 'voice' ? 'is-selected' : ''}><input type="radio" name="training-mode" value="voice" checked={mode === 'voice'} onChange={() => setMode('voice')} />Голос</label>
-          </fieldset>
         </div>
-        <div className="home-case-modal__footer"><button className="arena-home__primary-button" type="button" onClick={startPreparation} disabled={role === null}>Начать подготовку <span aria-hidden="true">→</span></button></div>
+        <div className="home-case-modal__footer" data-tour-id="voice-preparation"><button className="arena-home__primary-button" type="button" onClick={startPreparation} disabled={role === null}>Начать подготовку <span aria-hidden="true">→</span></button></div>
       </section>
     </div>
   )

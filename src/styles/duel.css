@@ -40,6 +40,8 @@
 .arena-page .duel-participants__person span { color: var(--duel-muted); font-size: 16px; }
 .arena-page .duel-participants__center { display: grid; align-content: center; justify-items: center; gap: 3px; min-height: 125px; padding: 0 18px; border-inline: 1px solid var(--duel-line); text-align: center; }
 .arena-page .duel-participants__center time { font-size: clamp(42px, 4.1vw, 58px); line-height: 1; font-weight: 850; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.arena-page .duel-participants__center--urgent time { color: #b23e38; }
+.arena-page .duel-participants__center--urgent strong { color: #b23e38; }
 .arena-page .duel-participants__center strong { color: var(--duel-blue); font-size: 25px; line-height: 1.2; }
 .arena-page .duel-participants__center span { color: var(--duel-muted); font-size: 16px; line-height: 1.3; }
 .arena-page .arena-layout { display: grid; width: min(1436px, calc(100% - 112px)); min-height: 0; grid-template-columns: minmax(0, 2.15fr) minmax(320px, 1fr); grid-template-rows: auto auto; align-items: start; gap: 14px; margin: 15px auto 30px; }
@@ -108,7 +110,6 @@
 .arena-page .voice-controls__status strong { color: var(--duel-ink); font-size: 22px; }
 .arena-page .voice-controls__status > span { width: auto; height: auto; border-radius: 0; background: transparent; box-shadow: none; font-size: 14px; }
 .arena-page .voice-controls__status small { font-size: 12px; }
-.arena-page .voice-controls__stop { margin-top: 9px; padding: 6px 12px; border: 0; color: #466793; background: transparent; cursor: pointer; text-decoration: underline; }
 .arena-page .voice-controls__error { max-width: 620px; margin: 0 auto 12px; }
 .arena-page .arena-composer { padding: 0; border: 0; background: transparent; }
 .arena-page .arena-composer > label { color: #405b85; font-size: 13px; }
@@ -186,7 +187,6 @@
   .arena-page .voice-controls__status strong { font-size: 17px; }
   .arena-page .voice-controls__status > span { font-size: 11px; }
   .arena-page .voice-controls__status small { display: none; }
-  .arena-page .voice-controls__stop { margin-top: 2px; padding-block: 3px; font-size: 11px; }
   .arena-page .arena-composer > label { font-size: 11px; }
   .arena-page .arena-composer textarea { max-height: 58px; font-size: 13px; }
   .arena-page .arena-composer > small { display: none; }

@@ -1,25 +1,28 @@
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
+import { getCasePresentation } from '@/features/cases/casePresentation'
 import type { RunAuthorized } from '@/services/serviceAdapters'
 import {
   parseBackendError,
   parseCases,
   parseChat,
   parseChatList,
+  parseChatWithCase,
   parseChatWithMessages,
+  parseEvaluateTrigger,
+  parseEvaluationResult,
   toActivateChatDto,
   toCreateChatDto,
   type ParsedChat,
+  type ParsedChatWithCase,
   type ParsedChatWithMessages,
 } from '@/services/real/targetContract'
 import { featureUnavailable, isServiceError, ServiceError } from '@/types/api'
 import type {
-  NegotiationResultState,
   NegotiationSession,
   NegotiationSessionSummary,
   NegotiationStatus,
 } from '@/types/negotiation'
-import type { CaseAccent, CaseIcon, TrainingCase } from '@/types/case'
-import { trainingCases } from '@/mocks/cases'
+import type { TrainingCase } from '@/types/case'
 
 interface BackendNegotiationClientOptions {
   baseUrl: string
@@ -37,65 +40,118 @@ const defaultOptions: BackendNegotiationClientOptions = {
 }
 
 function mapStatus(status: ParsedChat['status']): NegotiationStatus {
-  return status === 'ongoing' ? 'active' : 'finished'
+  if (status === 'ongoing') return 'active'
+  if (status === 'evaluating') return 'finishing'
+  return 'finished'
 }
 
 function mapSession(chat: ParsedChatWithMessages): NegotiationSession {
   return {
     id: chat.id,
-    caseId: chat.case?.id ?? chat.name,
+    caseId: chat.case.id,
+    caseSnapshot: {
+      id: chat.case.id,
+      title: chat.case.name,
+      description: chat.case.description,
+      goal: chat.case.goal,
+      timeLimitSeconds: chat.case.timeLimit,
+      roles: [chat.case.firstRole, chat.case.secondRole],
+    },
     name: chat.case?.name ?? chat.name,
     mode: 'voice',
     status: mapStatus(chat.status),
     backendStatus: chat.status,
+    selectedRole: chat.selectedRole === 0 ? 1 : 0,
     startedAt: chat.createdAt,
+    timeLimitSeconds: chat.case.timeLimit,
     messages: chat.messages,
   }
-}
-
-const accents: CaseAccent[] = ['violet', 'lime', 'orange', 'blue', 'pink', 'mint']
-const icons: CaseIcon[] = ['wallet', 'people', 'clock', 'receipt', 'tag', 'dialogue']
-
-function normalizedTitle(value: string): string { return value.trim().toLocaleLowerCase('ru-RU') }
-
-function mapDifficulty(value: string): TrainingCase['difficulty'] {
-  if (value === 'easy') return 'Легко'
-  if (value === 'hard' || value === 'insane') return 'Сложно'
-  return 'Средне'
 }
 
 function formatTimeLimit(seconds: number): string {
   return `${Math.ceil(seconds / 60)} мин`
 }
 
-function mapCase(item: ReturnType<typeof parseCases>[number], index: number): TrainingCase {
-  const known = trainingCases.find((candidate) => normalizedTitle(candidate.title) === normalizedTitle(item.name))
+function mapCase(item: ReturnType<typeof parseCases>[number]): TrainingCase {
   return {
     id: item.id,
     title: item.name,
     description: item.description,
+    goal: item.goal,
     synopsis: item.synopsis,
     category: item.category,
     duration: formatTimeLimit(item.timeLimit),
-    difficulty: mapDifficulty(item.difficulty),
+    timeLimitSeconds: item.timeLimit,
+    difficulty: item.difficulty,
     opponent: item.secondRole,
     roles: [item.firstRole, item.secondRole],
-    roleSummaries: known?.roleSummaries ?? ['Ваша роль в этом переговорном кейсе.', 'Роль AI-оппонента в этом кейсе.'],
-    accent: known?.accent ?? accents[index % accents.length],
-    icon: known?.icon ?? icons[index % icons.length],
+    presentation: getCasePresentation({ id: item.id, title: item.name }),
   }
 }
 
-function mapSummary(chat: ParsedChat): NegotiationSessionSummary {
+function mapSummary(chat: ParsedChatWithCase): NegotiationSessionSummary {
   return {
     id: chat.id,
-    caseId: chat.name,
-    name: chat.name,
+    caseId: chat.case.id,
+    name: chat.case.name,
     mode: 'voice',
     status: mapStatus(chat.status),
     backendStatus: chat.status,
     startedAt: chat.createdAt,
   }
+}
+
+function evaluationSessionStub(sessionId: string): NegotiationSession {
+  return {
+    id: sessionId,
+    caseId: '',
+    caseSnapshot: {
+      id: '',
+      title: '',
+      description: '',
+      goal: '',
+      timeLimitSeconds: 1,
+      roles: ['', ''],
+    },
+    mode: 'voice',
+    status: 'finishing',
+    startedAt: '',
+    timeLimitSeconds: 1,
+    messages: [],
+  }
+}
+
+function isDoneEvaluation(value: unknown): boolean {
+  return typeof value === 'object'
+    && value !== null
+    && 'status' in value
+    && value.status === 'done'
+}
+
+function evaluationHttpError(error: ServiceError, action: 'start' | 'read'): ServiceError {
+  const messages = action === 'start'
+    ? {
+        404: 'Переговоры не найдены.',
+        409: 'Не удалось запустить разбор для текущего состояния переговоров.',
+        422: 'Сервис не смог запустить разбор переговоров.',
+      }
+    : {
+        404: 'Переговоры не найдены.',
+        409: 'Разбор переговоров пока недоступен.',
+        422: 'Сервис не смог получить разбор переговоров.',
+      }
+  const message = error.status === 404 || error.status === 409 || error.status === 422
+    ? messages[error.status]
+    : undefined
+  if (!message) return error
+  return new ServiceError(message, {
+    reason: 'http',
+    status: error.status,
+    code: error.code,
+    field: error.field,
+    recoverable: true,
+    cause: error,
+  })
 }
 
 export class BackendNegotiationClient implements NegotiationClient {
@@ -184,7 +240,19 @@ export class BackendNegotiationClient implements NegotiationClient {
         method: 'POST',
         body: toCreateChatDto(input.caseName ?? input.caseId, input.caseId, input.preparations, input.selectedRole),
       }))
-      return mapSession({ ...created, messages: [] })
+      return {
+        id: created.id,
+        caseId: input.caseId,
+        caseSnapshot: input.caseSnapshot,
+        name: input.caseName ?? created.name,
+        mode: input.mode,
+        status: mapStatus(created.status),
+        backendStatus: created.status,
+        selectedRole: created.selectedRole === 0 ? 1 : 0,
+        startedAt: created.createdAt,
+        timeLimitSeconds: input.timeLimitSeconds,
+        messages: [],
+      }
     })
   }
 
@@ -209,6 +277,17 @@ export class BackendNegotiationClient implements NegotiationClient {
     })
   }
 
+  getActiveSession(): Promise<NegotiationSessionSummary | null> {
+    return this.authorized(async (accessToken) => {
+      try {
+        return mapSummary(parseChatWithCase(await this.request(accessToken, '/v1/chats/active')))
+      } catch (error) {
+        if (isServiceError(error) && error.status === 404 && error.code === 'no_active_chat') return null
+        throw error
+      }
+    })
+  }
+
   async sendTextTurn(): ReturnType<NegotiationClient['sendTextTurn']> {
     throw featureUnavailable('negotiation')
   }
@@ -218,26 +297,51 @@ export class BackendNegotiationClient implements NegotiationClient {
   }
 
   async finishSession(input: Parameters<NegotiationClient['finishSession']>[0]): ReturnType<NegotiationClient['finishSession']> {
-    return this.demoResult(input.sessionId)
+    return this.authorized(async (accessToken) => {
+      try {
+        const trigger = parseEvaluateTrigger(await this.request(
+          accessToken,
+          `/v1/chats/${encodeURIComponent(input.sessionId)}/evaluate`,
+          { method: 'POST' },
+        ))
+        if (trigger.status === 'failed') {
+          return { status: 'failed', message: 'Не удалось запустить разбор переговоров.' }
+        }
+        return { status: 'processing' }
+      } catch (error) {
+        if (isServiceError(error) && error.status === 409 && error.code === 'already_evaluating') {
+          return { status: 'processing' }
+        }
+        if (isServiceError(error)) throw evaluationHttpError(error, 'start')
+        throw error
+      }
+    })
   }
 
   async getResult(sessionId: string): ReturnType<NegotiationClient['getResult']> {
-    return this.demoResult(sessionId)
-  }
+    return this.authorized(async (accessToken) => {
+      let payload: unknown
+      try {
+        payload = await this.request(
+          accessToken,
+          `/v1/chats/${encodeURIComponent(sessionId)}/result`,
+        )
+      } catch (error) {
+        if (isServiceError(error) && error.status === 404 && error.code === 'evaluation_not_found') {
+          return { status: 'failed', message: 'Разбор переговоров ещё не запускался.' }
+        }
+        if (isServiceError(error)) throw evaluationHttpError(error, 'read')
+        throw error
+      }
 
-  private demoResult(sessionId: string): NegotiationResultState {
-    return {
-      status: 'ready',
-      result: {
-        sessionId,
-        outcome: 'victory',
-        score: 74,
-        summary: 'Демонстрационный разбор показывает будущий формат обратной связи и не является ответом сервиса.',
-        strengths: ['Вы обозначили позицию и поддерживали диалог', 'Разговор сохранён в истории чата'],
-        improvements: ['Задавайте больше открытых вопросов', 'Фиксируйте конкретные следующие шаги'],
-        recommendations: ['Просмотрите сохранённые реплики и подготовьте альтернативный вариант предложения'],
-      },
-    }
+      const session = isDoneEvaluation(payload)
+        ? mapSession(parseChatWithMessages(await this.request(
+            accessToken,
+            `/v1/chats/${encodeURIComponent(sessionId)}`,
+          )))
+        : evaluationSessionStub(sessionId)
+      return parseEvaluationResult(payload, session)
+    })
   }
 
   listSessions(): Promise<NegotiationSessionSummary[]> {

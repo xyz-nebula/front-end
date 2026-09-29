@@ -1,16 +1,17 @@
-import type { RefObject } from 'react'
 import { Link } from 'react-router-dom'
 
 import heroArtwork from '@/assets/home/hero-negotiation.webp'
-import profileArtwork from '@/assets/home/profile-kirill.webp'
+import profileArtwork from '@/assets/home/profile.webp'
 import { CaseCard } from '@/components/home/CaseCard'
-import { ArenaCubeMark } from '@/components/ui/ArenaCubeMark'
-import { caseArtwork } from '@/mocks/caseArtwork'
 import type { TrainingCase } from '@/types/case'
 import type { NegotiationSessionSummary } from '@/types/negotiation'
 
 function trainingTitle(item: NegotiationSessionSummary, cases: TrainingCase[]) {
   return cases.find((trainingCase) => trainingCase.id === item.caseId || trainingCase.title === item.name)?.title ?? item.name ?? 'Переговоры с AI'
+}
+
+function trainingArtwork(item: NegotiationSessionSummary, cases: TrainingCase[]): string {
+  return cases.find((trainingCase) => trainingCase.id === item.caseId)?.presentation.artwork ?? heroArtwork
 }
 
 function trainingStatus(item: NegotiationSessionSummary) {
@@ -30,57 +31,28 @@ function trainingCountLabel(count: number) {
   return 'тренировок'
 }
 
-interface HomeHeaderProps {
-  externalSessionVersion: number
-  isLoggingOut: boolean
-  profileOpen: boolean
-  profileRef: RefObject<HTMLDivElement | null>
-  onLogout: () => void
-  onProfileToggle: () => void
-  onSecurityOpen: (version: number) => void
-}
-
-export function HomeHeader({ externalSessionVersion, isLoggingOut, profileOpen, profileRef, onLogout, onProfileToggle, onSecurityOpen }: HomeHeaderProps) {
-  return <header className="arena-home__header">
-    <div className="arena-home__shell arena-home__header-inner">
-      <Link className="arena-home__brand" to="/" aria-label="Арена — на главную"><ArenaCubeMark /><span>АРЕНА</span></Link>
-      <div className="arena-home__header-actions">
-        <span className="arena-home__streak" aria-label="Демо: серия 4 дня"><span aria-hidden="true">🔥</span><span>Серия: <strong>4 дня</strong></span></span>
-        <div className="arena-home__profile" ref={profileRef}>
-          <button className="arena-home__profile-toggle" type="button" aria-label="Меню профиля" aria-expanded={profileOpen} onClick={onProfileToggle}><img src={profileArtwork} alt="" width={400} height={400} decoding="async" /></button>
-          {profileOpen && <div className="arena-home__profile-menu">
-            <span className="arena-home__profile-name">Кирилл <small>Демо-профиль</small></span>
-            <button type="button" onClick={() => onSecurityOpen(externalSessionVersion)}>Настроить 2FA</button>
-            <button type="button" disabled={isLoggingOut} onClick={onLogout}>{isLoggingOut ? 'Выходим…' : 'Выйти'}</button>
-          </div>}
-        </div>
-      </div>
-    </div>
-  </header>
-}
-
 interface HomeOverviewProps {
-  activeSession?: NegotiationSessionSummary
   casesLoading: boolean
   displayedCase?: TrainingCase
   historyCount: number
   historyLoading: boolean
+  preparationResume?: { href: string; progress: number }
   recommendedCase?: TrainingCase
   onCaseSelect: (item: TrainingCase) => void
 }
 
-export function HomeOverview({ activeSession, casesLoading, displayedCase, historyCount, historyLoading, recommendedCase, onCaseSelect }: HomeOverviewProps) {
+export function HomeOverview({ casesLoading, displayedCase, historyCount, historyLoading, preparationResume, recommendedCase, onCaseSelect }: HomeOverviewProps) {
   return <div className="arena-home__overview">
-    <section className="arena-home__continue" aria-labelledby={historyLoading ? undefined : 'continue-title'} aria-label={historyLoading ? 'Тренировка' : undefined}>
-      {historyLoading ? <div className="arena-home__continue-skeleton" role="status" aria-label="Загружаем тренировку"><span className="arena-home__skeleton-title" /><div><span className="arena-home__skeleton-image" /><span className="arena-home__skeleton-copy" /></div></div> : <>
-        <div className="arena-home__continue-head"><h2 id="continue-title">{activeSession ? 'Продолжить тренировку' : 'Начать тренировку'}</h2><span>▣ &nbsp;{activeSession ? 'В процессе' : 'Рекомендуем'}</span></div>
+    <section className="arena-home__continue" aria-labelledby={casesLoading ? undefined : 'continue-title'} aria-label={casesLoading ? 'Тренировка' : undefined}>
+      {casesLoading ? <div className="arena-home__continue-skeleton" role="status" aria-label="Загружаем тренировку"><span className="arena-home__skeleton-title" /><div><span className="arena-home__skeleton-image" /><span className="arena-home__skeleton-copy" /></div></div> : <>
+        <div className="arena-home__continue-head"><h2 id="continue-title">{preparationResume ? 'Продолжить подготовку' : 'Начать тренировку'}</h2><span>▣ &nbsp;{preparationResume ? 'Черновик' : 'Рекомендуем'}</span></div>
         <div className="arena-home__continue-body">
-          <img src={activeSession && displayedCase ? caseArtwork[displayedCase.id] ?? heroArtwork : heroArtwork} alt="" decoding="async" />
+          <img src={preparationResume && displayedCase ? displayedCase.presentation.artwork ?? heroArtwork : heroArtwork} alt="" decoding="async" />
           <div className="arena-home__continue-info">
             <h3>{displayedCase?.title ?? (casesLoading ? 'Загружаем кейс…' : 'Выберите кейс')}</h3>
             <p>{displayedCase ? `${displayedCase.category} · ${displayedCase.duration}` : 'Подготовьтесь и проведите переговоры с AI'}</p>
-            <div className="arena-home__preparation"><span>Подготовка: <strong>65%</strong></span><div role="meter" aria-label="Демо: прогресс подготовки" aria-valuenow={65} aria-valuemin={0} aria-valuemax={100}><i /></div></div>
-            {activeSession ? <Link className="arena-home__primary-button" to={`/arena/${activeSession.id}`}>Продолжить <span aria-hidden="true">→</span></Link> : <button className="arena-home__primary-button" type="button" disabled={!recommendedCase} onClick={() => recommendedCase && onCaseSelect(recommendedCase)}>Начать кейс <span aria-hidden="true">→</span></button>}
+            {preparationResume && <div className="arena-home__preparation"><span>Подготовка: <strong>{preparationResume.progress}%</strong></span><div role="meter" aria-label="Прогресс подготовки" aria-valuenow={preparationResume.progress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${preparationResume.progress}%` }} /></div></div>}
+            {preparationResume ? <Link className="arena-home__primary-button" to={preparationResume.href}>Продолжить <span aria-hidden="true">→</span></Link> : <button className="arena-home__primary-button" type="button" disabled={!recommendedCase} onClick={() => recommendedCase && onCaseSelect(recommendedCase)}>Начать кейс <span aria-hidden="true">→</span></button>}
           </div>
         </div>
       </>}
@@ -117,7 +89,7 @@ export function TrainingHistory({ cases, error, history, loading, showAll, onRet
       {!loading && !error && visibleHistory.map((item) => {
         const title = trainingTitle(item, cases)
         return <div className="arena-home__history-row" key={item.id}>
-          <img src={caseArtwork[item.caseId] ?? heroArtwork} alt="" loading="lazy" decoding="async" />
+          <img src={trainingArtwork(item, cases)} alt="" loading="lazy" decoding="async" />
           <div className="arena-home__history-title"><strong>{title}</strong><span>{item.mode === 'voice' ? 'Голос' : 'Текст'}</span></div>
           <span className={`arena-home__history-status ${item.status === 'active' ? 'is-active' : item.backendStatus === 'victory' ? 'is-success' : item.backendStatus === 'defeat' ? 'is-failure' : 'is-neutral'}`}>{trainingStatus(item)}</span>
           <time dateTime={item.startedAt}>{new Date(item.startedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</time>

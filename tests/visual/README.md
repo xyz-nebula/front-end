@@ -1,8 +1,8 @@
-# Playwright scenarios
+# Playwright smoke
 
-В этом каталоге находятся browser, resilience и visual-сценарии, а также
-вспомогательные harness-компоненты.
+В каталоге находятся маршрутные сценарии из `smoke.spec.ts`, полный desktop/mobile
+тур из `product-tour.spec.ts` и общие компактные helpers. Они проверяют интерфейс
+в режиме `mock` без доступных backend/audio-engine и создают диагностические PNG.
 
-Команды запуска, правила source-групп, артефакты и ограничения описаны в едином
-документе [docs/testing.md](../../docs/testing.md). Актуальный список тестов
-выводит `npm run test:e2e -- --list`.
+Команды, покрытие и ограничения описаны в
+[docs/testing.md](../../docs/testing.md).
