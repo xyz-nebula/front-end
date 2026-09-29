@@ -79,7 +79,7 @@ export function ProfileMenu({ className = '', menuClassName = '', toggleClassNam
       </button>
       {open && (
         <div className={`product-header-menu ${menuClassName}`.trim()}>
-          <span className="product-header-menu__identity">Кирилл <small>Демо-профиль</small></span>
+          <span className="product-header-menu__identity">Демо-профиль</span>
           {pathname !== '/home' && <Link to="/home" onClick={() => closeMenu()}>К кейсам</Link>}
           <button type="button" disabled={!ownerKey} onClick={openTour}>{menuLabel}</button>
           <button type="button" onClick={openSecurity}>Настроить 2FA</button>
