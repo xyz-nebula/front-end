@@ -1,11 +1,13 @@
 import type { CaseCategory, TrainingCase, TrainingHistoryItem } from '@/types/case'
+import { getCasePresentation } from '@/features/cases/casePresentation'
 
 function defineTrainingCase(
-  item: Omit<TrainingCase, 'duration'>,
+  item: Omit<TrainingCase, 'duration' | 'presentation'>,
 ): TrainingCase {
   return {
     ...item,
     duration: `${Math.ceil(item.timeLimitSeconds / 60)} мин`,
+    presentation: getCasePresentation(item),
   }
 }
 
@@ -22,9 +24,6 @@ export const trainingCases: TrainingCase[] = [
     difficulty: 'moderate',
     opponent: 'Анна, руководитель',
     roles: ['Сотрудник', 'Руководитель'],
-    roleSummaries: ['Добивается пересмотра условий и готов подтвердить свой вклад.', 'Отвечает за бюджет команды и принимает решение о повышении.'],
-    accent: 'violet',
-    icon: 'wallet',
   }),
   defineTrainingCase({
     id: 'difficult-employee',
@@ -36,9 +35,6 @@ export const trainingCases: TrainingCase[] = [
     difficulty: 'hard',
     opponent: 'Максим, сотрудник',
     roles: ['Руководитель', 'Сотрудник'],
-    roleSummaries: ['Хочет сохранить доверие и вернуть результативную работу.', 'Объясняет свою позицию и ожидания от руководителя.'],
-    accent: 'lime',
-    icon: 'people',
   }),
   defineTrainingCase({
     id: 'missed-deadline',
@@ -50,9 +46,6 @@ export const trainingCases: TrainingCase[] = [
     difficulty: 'moderate',
     opponent: 'Илья, подрядчик',
     roles: ['Заказчик', 'Подрядчик'],
-    roleSummaries: ['Отвечает за общий срок и хочет восстановить контроль над проектом.', 'Объясняет задержку и предлагает план завершения работы.'],
-    accent: 'orange',
-    icon: 'clock',
   }),
   defineTrainingCase({
     id: 'refund',
@@ -64,9 +57,6 @@ export const trainingCases: TrainingCase[] = [
     difficulty: 'easy',
     opponent: 'Олег, менеджер',
     roles: ['Покупатель', 'Менеджер'],
-    roleSummaries: ['Добивается справедливого возврата денег.', 'Проверяет условия возврата и защищает интересы компании.'],
-    accent: 'blue',
-    icon: 'receipt',
   }),
   defineTrainingCase({
     id: 'price-talks',
@@ -78,9 +68,6 @@ export const trainingCases: TrainingCase[] = [
     difficulty: 'hard',
     opponent: 'Елена, закупщик',
     roles: ['Продавец', 'Закупщик'],
-    roleSummaries: ['Сохраняет ценность предложения и маржу.', 'Ищет лучшие условия для своей компании.'],
-    accent: 'pink',
-    icon: 'tag',
   }),
   defineTrainingCase({
     id: 'team-conflict',
@@ -92,9 +79,6 @@ export const trainingCases: TrainingCase[] = [
     difficulty: 'moderate',
     opponent: 'Двое коллег',
     roles: ['Тимлид', 'Сотрудник'],
-    roleSummaries: ['Помогает команде договориться и продолжить работу.', 'Рассказывает о своих потребностях и причинах конфликта.'],
-    accent: 'mint',
-    icon: 'dialogue',
   }),
 ]
 

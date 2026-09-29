@@ -1,4 +1,5 @@
 import type { NegotiationClient } from '@/services/contracts/negotiationClient'
+import { getCasePresentation } from '@/features/cases/casePresentation'
 import type { RunAuthorized } from '@/services/serviceAdapters'
 import {
   parseBackendError,
@@ -19,8 +20,7 @@ import type {
   NegotiationSessionSummary,
   NegotiationStatus,
 } from '@/types/negotiation'
-import type { CaseAccent, CaseIcon, TrainingCase } from '@/types/case'
-import { trainingCases } from '@/mocks/cases'
+import type { TrainingCase } from '@/types/case'
 
 interface BackendNegotiationClientOptions {
   baseUrl: string
@@ -64,17 +64,11 @@ function mapSession(chat: ParsedChatWithMessages): NegotiationSession {
   }
 }
 
-const accents: CaseAccent[] = ['violet', 'lime', 'orange', 'blue', 'pink', 'mint']
-const icons: CaseIcon[] = ['wallet', 'people', 'clock', 'receipt', 'tag', 'dialogue']
-
-function normalizedTitle(value: string): string { return value.trim().toLocaleLowerCase('ru-RU') }
-
 function formatTimeLimit(seconds: number): string {
   return `${Math.ceil(seconds / 60)} мин`
 }
 
-function mapCase(item: ReturnType<typeof parseCases>[number], index: number): TrainingCase {
-  const known = trainingCases.find((candidate) => normalizedTitle(candidate.title) === normalizedTitle(item.name))
+function mapCase(item: ReturnType<typeof parseCases>[number]): TrainingCase {
   return {
     id: item.id,
     title: item.name,
@@ -86,9 +80,7 @@ function mapCase(item: ReturnType<typeof parseCases>[number], index: number): Tr
     difficulty: item.difficulty,
     opponent: item.secondRole,
     roles: [item.firstRole, item.secondRole],
-    roleSummaries: known?.roleSummaries ?? ['Ваша роль в этом переговорном кейсе.', 'Роль AI-оппонента в этом кейсе.'],
-    accent: known?.accent ?? accents[index % accents.length],
-    icon: known?.icon ?? icons[index % icons.length],
+    presentation: getCasePresentation({ id: item.id, title: item.name }),
   }
 }
 

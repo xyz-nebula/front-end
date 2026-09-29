@@ -161,7 +161,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
                   sendTourEvent({ type: 'role-selected', roleIndex })
                 }} />
                 {role !== null && <img src={role === index ? profileArtwork : opponentArtwork} alt="" width={400} height={400} loading="lazy" decoding="async" />}
-                <span className="home-case-modal__role-copy">{role !== null && <span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span>}<strong>{title}</strong><small>{item.roleSummaries[index]}</small></span>
+                <span className="home-case-modal__role-copy">{role !== null && <span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span>}<strong>{title}</strong><small>{item.presentation.roleSummaries[index]}</small></span>
                 <span className="home-case-modal__radio-mark" aria-hidden="true">{role === index ? '✓' : ''}</span>
               </label>)}
             </div>

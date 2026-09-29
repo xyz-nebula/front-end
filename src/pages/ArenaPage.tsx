@@ -13,6 +13,7 @@ import { useArenaSession } from '@/features/arena/useArenaSession'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
 import { useSessionTimer } from '@/features/arena/useSessionTimer'
 import { useProductTour } from '@/features/product-tour/useProductTour'
+import { getCasePresentation } from '@/features/cases/casePresentation'
 import { trainingCases } from '@/mocks/cases'
 import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { readSessionPreparation } from '@/features/preparation/preparation'
@@ -32,9 +33,7 @@ function fallbackCase(title: string, timeLimitSeconds: number): TrainingCase {
     difficulty: 'moderate',
     opponent: 'AI-оппонент',
     roles: ['Участник', 'AI-оппонент'],
-    roleSummaries: ['Участник переговоров.', 'AI-оппонент.'],
-    accent: 'violet',
-    icon: 'dialogue',
+    presentation: getCasePresentation({ id: title, title }),
   }
 }
 

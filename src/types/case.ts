@@ -18,6 +18,13 @@ export const caseDifficultyLevels: Record<CaseDifficulty, number> = {
   insane: 4,
 }
 
+export interface CasePresentation {
+  roleSummaries: [string, string]
+  accent: CaseAccent
+  icon: CaseIcon
+  artwork?: string
+}
+
 export interface TrainingCase {
   id: string
   title: string
@@ -29,9 +36,7 @@ export interface TrainingCase {
   difficulty: CaseDifficulty
   opponent: string
   roles: [string, string]
-  roleSummaries: [string, string]
-  accent: CaseAccent
-  icon: CaseIcon
+  presentation: CasePresentation
 }
 
 export interface TrainingHistoryItem {
