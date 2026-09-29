@@ -1,4 +1,4 @@
-import type { CaseCategory, TrainingCase, TrainingHistoryItem } from '@/types/case'
+import type { TrainingCase } from '@/types/case'
 import { getCasePresentation } from '@/features/cases/casePresentation'
 
 function defineTrainingCase(
@@ -10,8 +10,6 @@ function defineTrainingCase(
     presentation: getCasePresentation(item),
   }
 }
-
-export const caseCategories: CaseCategory[] = ['Все', 'Карьера', 'Управление', 'Конфликты', 'Продажи']
 
 export const trainingCases: TrainingCase[] = [
   defineTrainingCase({
@@ -86,10 +84,4 @@ export const trainingCases: TrainingCase[] = [
     opponent: 'Двое коллег',
     roles: ['Тимлид', 'Сотрудник'],
   }),
-]
-
-export const recentTrainings: TrainingHistoryItem[] = [
-  { caseTitle: 'Повышение зарплаты', date: 'Сегодня, 10:24', score: 78, change: 6 },
-  { caseTitle: 'Возврат денег', date: '5 сентября', score: 71, change: 4 },
-  { caseTitle: 'Срыв дедлайна', date: '2 сентября', score: 67, change: 0 },
 ]

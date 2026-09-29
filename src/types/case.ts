@@ -1,5 +1,3 @@
-export type CaseCategory = 'Все' | 'Карьера' | 'Управление' | 'Конфликты' | 'Продажи'
-
 export type CaseAccent = 'violet' | 'lime' | 'orange' | 'blue' | 'pink' | 'mint'
 export type CaseIcon = 'wallet' | 'people' | 'clock' | 'receipt' | 'tag' | 'dialogue'
 export type CaseDifficulty = 'easy' | 'moderate' | 'hard' | 'insane'
@@ -40,9 +38,3 @@ export interface TrainingCase {
   presentation: CasePresentation
 }
 
-export interface TrainingHistoryItem {
-  caseTitle: string
-  date: string
-  score: number
-  change: number
-}

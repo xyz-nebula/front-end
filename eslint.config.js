@@ -34,4 +34,19 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: [
+      'src/services/real/**/*.{ts,tsx}',
+      'src/pages/**/*.{ts,tsx}',
+      'src/features/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['@/mocks/*', '**/mocks/*'],
+          message: 'Real adapters, pages, and features must not depend on mock fixtures.',
+        }],
+      }],
+    },
+  },
 )
