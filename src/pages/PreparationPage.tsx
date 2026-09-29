@@ -22,8 +22,8 @@ function parseMode(value: string | null): NegotiationMode | null { return value 
 
 export function PreparationPage() {
   const { caseId = '' } = useParams()
-  const { mockOwnerKey } = useAuthRuntime()
-  if (!mockOwnerKey) throw new Error('PreparationPage requires an authenticated owner.')
+  const { preparationOwnerKey } = useAuthRuntime()
+  if (!preparationOwnerKey) throw new Error('PreparationPage requires an authenticated owner.')
   const [searchParams, setSearchParams] = useSearchParams()
   const roleIndex = parseRole(searchParams.get('role'))
   const mode = parseMode(searchParams.get('mode'))
@@ -34,7 +34,7 @@ export function PreparationPage() {
   const productTour = useProductTour()
   const { send: sendTourEvent, state: tourState } = productTour
   const loadedCase = usePreparationCase(negotiationClient, caseId)
-  const preparation = usePreparationDraft(mockOwnerKey, caseId, roleIndex)
+  const preparation = usePreparationDraft(preparationOwnerKey, caseId, roleIndex)
   const [activeStep, setActiveStep] = useState<PreparationStepId>(activeSection.steps[0])
   const [caseDrawerOpen, setCaseDrawerOpen] = useState(false)
   const caseButtonRef = useRef<HTMLButtonElement>(null)
@@ -45,7 +45,7 @@ export function PreparationPage() {
   const starter = useStartNegotiation(negotiationClient, {
     draft: preparation.draft,
     mode,
-    ownerKey: mockOwnerKey,
+    ownerKey: preparationOwnerKey,
     roleIndex,
     supportsTextNegotiation,
     trainingCase: loadedCase.trainingCase,

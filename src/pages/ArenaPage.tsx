@@ -19,8 +19,8 @@ import '@/styles/duel.css'
 
 export function ArenaPage() {
   const { sessionId = '' } = useParams()
-  const { mockOwnerKey } = useAuthRuntime()
-  if (!mockOwnerKey) throw new Error('ArenaPage requires an authenticated owner.')
+  const { preparationOwnerKey } = useAuthRuntime()
+  if (!preparationOwnerKey) throw new Error('ArenaPage requires an authenticated owner.')
   const navigate = useNavigate()
   const { isRealVoice, supportsTextNegotiation } = useDomainServices()
   const arena = useArenaSession(sessionId)
@@ -40,7 +40,7 @@ export function ArenaPage() {
   const finishButtonRef = useRef<HTMLButtonElement>(null)
   const timeoutFinishInFlightRef = useRef(false)
   const trainingCase = arena.session?.caseSnapshot
-  const sessionPreparation = arena.session ? readSessionPreparation(mockOwnerKey, arena.session.id) : null
+  const sessionPreparation = arena.session ? readSessionPreparation(preparationOwnerKey, arena.session.id) : null
   const sessionTimer = useSessionTimer(
     arena.session?.messages ?? [],
     arena.session?.timeLimitSeconds ?? 0,

@@ -44,6 +44,10 @@ export function completedPreparationSteps(draft: PreparationDraft): PreparationS
   })
 }
 
+export function preparationProgressPercent(draft: PreparationDraft): number {
+  return completedPreparationSteps(draft).length * 10
+}
+
 type MarkdownField = [label: string, value: string]
 
 function block(title: string, fields: MarkdownField[]): string | null {
@@ -106,6 +110,7 @@ export function parsePreparationDraft(value: unknown): PreparationDraft | null {
 
 const DRAFT_PREFIX = 'arena.preparation-draft.v2'
 const SNAPSHOT_PREFIX = 'arena.session-preparation.v2'
+const PREPARATION_STORAGE_PREFIXES = [DRAFT_PREFIX, SNAPSHOT_PREFIX] as const
 const memoryStorage = new Map<string, string>()
 
 function scopedStorageKey(prefix: string, ownerKey: string, entityId: string): string {
@@ -138,6 +143,34 @@ export function draftStorageKey(ownerKey: string, caseId: string, roleIndex: 0 |
 
 export function sessionPreparationStorageKey(ownerKey: string, sessionId: string): string {
   return scopedStorageKey(SNAPSHOT_PREFIX, ownerKey, sessionId)
+}
+
+export function migratePreparationStorageOwner(sourceOwnerKey: string, targetOwnerKey: string): void {
+  if (!sourceOwnerKey || !targetOwnerKey || sourceOwnerKey === targetOwnerKey) return
+
+  const sourcePrefixes = PREPARATION_STORAGE_PREFIXES.map((prefix) => (
+    `${prefix}.${encodeURIComponent(sourceOwnerKey)}.`
+  ))
+  const keys = new Set(memoryStorage.keys())
+
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (key) keys.add(key)
+    }
+  } catch {
+    // The in-memory fallback can still be migrated when localStorage is unavailable.
+  }
+
+  for (const key of keys) {
+    const sourcePrefix = sourcePrefixes.find((prefix) => key.startsWith(prefix))
+    if (!sourcePrefix) continue
+    const storagePrefix = PREPARATION_STORAGE_PREFIXES[sourcePrefixes.indexOf(sourcePrefix)]
+    const targetKey = `${storagePrefix}.${encodeURIComponent(targetOwnerKey)}.${key.slice(sourcePrefix.length)}`
+    if (readStoredValue(targetKey) !== null) continue
+    const value = readStoredValue(key)
+    if (value !== null) writeStoredValue(targetKey, value)
+  }
 }
 
 export function readPreparationDraft(ownerKey: string, caseId: string, roleIndex: 0 | 1): PreparationDraft {

@@ -73,12 +73,14 @@ export async function seedProtectedScreens(page: Page, seed: string): Promise<Se
     const [
       { AUTH_STORAGE_KEY },
       { deferProductTourPrompt },
+      { saveSessionPreparation },
       { MockAuthClient },
       { MockRuntime },
       { MockStorage, MOCK_DATA_STORAGE_KEY },
     ] = await Promise.all([
       import('/src/auth/storage.ts'),
       import('/src/features/product-tour/productTourStorage.ts'),
+      import('/src/features/preparation/preparation.ts'),
       import('/src/services/mock/mockAuthClient.ts'),
       import('/src/services/mock/mockRuntime.ts'),
       import('/src/services/mock/mockStorage.ts'),
@@ -113,6 +115,24 @@ export async function seedProtectedScreens(page: Page, seed: string): Promise<Se
       mode: 'text',
       clientCommandId: `active-${seedValue}`,
     })
+    const activePreparation = {
+      caseId: 'salary-review',
+      caseTitle: 'Пересмотр зарплаты',
+      userRole: 'Сотрудник',
+      opponentRole: 'Руководитель',
+      selectedRole: 0,
+      draft: {
+        rootConflict: 'Компенсация не соответствует вкладу.',
+        strategicGoal: 'Согласовать новые условия.',
+        proposals: '',
+        layers: { economic: 'Бюджет команды.', legal: '', technical: '', technological: '', emotional: '', psychological: '', aesthetic: '', ethical: '' },
+        swot: { strengths: '', weaknesses: '', opportunities: '', threats: '' },
+        negotiationGoal: '',
+        bargaining: { declared: '', desired: '', redLine: '' },
+        batna: '', scenario: '', opening: '',
+      },
+    }
+    saveSessionPreparation(ownerKey, activeSession.id, activePreparation)
     const finishedSession = await runtime.createSession(ownerKey, {
       caseId: 'salary-review',
       timeLimitSeconds: 15 * 60,
@@ -125,6 +145,7 @@ export async function seedProtectedScreens(page: Page, seed: string): Promise<Se
       mode: 'text',
       clientCommandId: `expired-${seedValue}`,
     })
+    saveSessionPreparation(ownerKey, expiredSession.id, activePreparation)
     await runtime.sendTextTurn(ownerKey, {
       sessionId: expiredSession.id,
       text: 'Начинаем переговоры.',

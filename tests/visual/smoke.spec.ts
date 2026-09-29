@@ -4,6 +4,7 @@ import {
   captureScreen,
   ensureArtifactsDirectory,
   seedProtectedScreens,
+  seedProductTourUser,
 } from './helpers'
 
 const viewports = [
@@ -54,6 +55,8 @@ for (const viewport of viewports) {
 
     await page.goto('/home')
     await expect(page.locator('#home-cases-title')).toBeVisible()
+    await expect(page.getByRole('meter', { name: 'Прогресс подготовки' })).toHaveAttribute('aria-valuenow', '30')
+    await expect(page.getByText('Подготовка:', { exact: false })).toContainText('30%')
     const caseCards = page.locator('.home-case-card')
     await expect(caseCards).toHaveCount(6)
     await expect(caseCards.first().locator('.home-case-card__description')).toHaveText('Вы считаете, что ваши результаты и выросшая ответственность заслуживают пересмотра зарплаты. Руководитель ценит ваш вклад, но бюджет команды ограничен и решение потребует убедительных аргументов.')
@@ -105,6 +108,98 @@ for (const viewport of viewports) {
     await captureScreen(page, 'result', viewport.name)
   })
 }
+
+test('home hides preparation progress before a training is started', async ({ page }) => {
+  await seedProductTourUser(page, 'home-without-session')
+  await page.goto('/home')
+  await expect(page.getByRole('heading', { name: 'Начать тренировку' })).toBeVisible()
+  await expect(page.locator('.arena-home__preparation')).toHaveCount(0)
+})
+
+test('home shows zero progress when an active session has no local preparation snapshot', async ({ page }) => {
+  await seedProtectedScreens(page, 'home-without-preparation')
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('arena.session-preparation.v2.')) localStorage.removeItem(key)
+    }
+  })
+  await page.goto('/home')
+  await expect(page.getByRole('meter', { name: 'Прогресс подготовки' })).toHaveAttribute('aria-valuenow', '0')
+  await expect(page.getByText('Подготовка:', { exact: false })).toContainText('0%')
+})
+
+test('preparation remains available after signing in again in the same browser profile', async ({ page }) => {
+  const email = 'preparation-owner@example.com'
+  const password = 'strong-password'
+  const expectedConflict = 'Сохранённый конфликт владельца.'
+  await page.goto('/')
+  await page.evaluate(async ({ emailValue, expectedValue, passwordValue }) => {
+    const [
+      { AUTH_STORAGE_KEY },
+      { createTourOwnerKey },
+      { createEmptyPreparation, savePreparationDraft },
+      { MockAuthClient },
+      { MockStorage, MOCK_DATA_STORAGE_KEY },
+    ] = await Promise.all([
+      import('/src/auth/storage.ts'),
+      import('/src/auth/tourOwnerIdentity.ts'),
+      import('/src/features/preparation/preparation.ts'),
+      import('/src/services/mock/mockAuthClient.ts'),
+      import('/src/services/mock/mockStorage.ts'),
+    ])
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    localStorage.removeItem(MOCK_DATA_STORAGE_KEY)
+    const storage = new MockStorage(localStorage)
+    const auth = new MockAuthClient(storage, 0)
+    const registered = await auth.register({
+      email: emailValue,
+      first_name: 'Preparation',
+      last_name: 'Owner',
+      password: passwordValue,
+    })
+    const tokens = await auth.activate(registered.demo_activation_code ?? '')
+    const stableOwnerKey = await createTourOwnerKey('mock', emailValue)
+    const legacyOwnerKey = 'legacy-preparation-owner'
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+      tokens,
+      source: 'mock',
+      mockOwnerKey: legacyOwnerKey,
+      tourOwnerKey: stableOwnerKey,
+    }))
+    savePreparationDraft(legacyOwnerKey, 'salary-review', 0, {
+      ...createEmptyPreparation(),
+      rootConflict: expectedValue,
+    })
+    storage.dispose()
+  }, { emailValue: email, expectedValue: expectedConflict, passwordValue: password })
+
+  const preparationUrl = '/cases/salary-review/preparation?role=0&mode=voice&section=analysis'
+  await page.goto(preparationUrl)
+  await expect(page.getByRole('textbox', { name: 'Корневой конфликт' })).toHaveValue(expectedConflict)
+
+  await page.evaluate(async ({ emailValue, passwordValue }) => {
+    const [
+      { AUTH_STORAGE_KEY, createStoredSession },
+      { createTourOwnerKey },
+      { MockAuthClient },
+      { MockStorage },
+    ] = await Promise.all([
+      import('/src/auth/storage.ts'),
+      import('/src/auth/tourOwnerIdentity.ts'),
+      import('/src/services/mock/mockAuthClient.ts'),
+      import('/src/services/mock/mockStorage.ts'),
+    ])
+    const storage = new MockStorage(localStorage)
+    const auth = new MockAuthClient(storage, 0)
+    const tokens = await auth.login({ email: emailValue, password: passwordValue })
+    const stableOwnerKey = await createTourOwnerKey('mock', emailValue)
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(createStoredSession(tokens, 'mock', stableOwnerKey)))
+    storage.dispose()
+  }, { emailValue: email, passwordValue: password })
+
+  await page.goto(preparationUrl)
+  await expect(page.getByRole('textbox', { name: 'Корневой конфликт' })).toHaveValue(expectedConflict)
+})
 
 test('an expired persisted session automatically starts evaluation after reload', async ({ page }) => {
   const state = await seedProtectedScreens(page, 'expired-session')

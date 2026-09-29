@@ -52,7 +52,6 @@
 .arena-home__preparation > div, .arena-home__bar { height: 17px; overflow: hidden; border-radius: 999px; background: #e8eef9; }
 .arena-home__preparation > div { margin-top: 8px; }
 .arena-home__preparation i, .arena-home__bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #1684f7, #075ae8); }
-.arena-home__preparation i { width: 65%; }
 .arena-home__primary-button { display: inline-flex; min-height: 58px; align-items: center; justify-content: center; gap: 20px; padding: 0 21px; border: 0; border-radius: 13px; color: #fff; background: linear-gradient(110deg, #0e7cf3, #0757e8); cursor: pointer; font-size: 17px; font-weight: 730; text-align: center; transition: box-shadow .2s ease, transform .2s ease, filter .2s ease; }
 .arena-home__primary-button:hover:not(:disabled) { box-shadow: 0 8px 20px rgba(9, 92, 224, .23); transform: translateY(-1px); }
 .arena-home__primary-button:active:not(:disabled) { transform: translateY(0); }

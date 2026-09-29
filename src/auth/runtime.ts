@@ -4,6 +4,7 @@ import type { RunAuthorized } from '@/services/serviceAdapters'
 
 export interface AuthRuntimeContextValue {
   mockOwnerKey: string | null
+  preparationOwnerKey: string | null
   tourOwnerKey: string | null
   runAuthorized: RunAuthorized
 }

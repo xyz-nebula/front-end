@@ -388,6 +388,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const runtimeValue = useMemo<AuthRuntimeContextValue>(() => ({
     mockOwnerKey,
+    preparationOwnerKey: tourOwnerKey ?? mockOwnerKey,
     tourOwnerKey,
     runAuthorized,
   }), [mockOwnerKey, runAuthorized, tourOwnerKey])

@@ -37,11 +37,12 @@ interface HomeOverviewProps {
   displayedCase?: TrainingCase
   historyCount: number
   historyLoading: boolean
+  preparationProgress?: number
   recommendedCase?: TrainingCase
   onCaseSelect: (item: TrainingCase) => void
 }
 
-export function HomeOverview({ activeSession, casesLoading, displayedCase, historyCount, historyLoading, recommendedCase, onCaseSelect }: HomeOverviewProps) {
+export function HomeOverview({ activeSession, casesLoading, displayedCase, historyCount, historyLoading, preparationProgress, recommendedCase, onCaseSelect }: HomeOverviewProps) {
   return <div className="arena-home__overview">
     <section className="arena-home__continue" aria-labelledby={historyLoading ? undefined : 'continue-title'} aria-label={historyLoading ? 'Тренировка' : undefined}>
       {historyLoading ? <div className="arena-home__continue-skeleton" role="status" aria-label="Загружаем тренировку"><span className="arena-home__skeleton-title" /><div><span className="arena-home__skeleton-image" /><span className="arena-home__skeleton-copy" /></div></div> : <>
@@ -51,7 +52,7 @@ export function HomeOverview({ activeSession, casesLoading, displayedCase, histo
           <div className="arena-home__continue-info">
             <h3>{displayedCase?.title ?? (casesLoading ? 'Загружаем кейс…' : 'Выберите кейс')}</h3>
             <p>{displayedCase ? `${displayedCase.category} · ${displayedCase.duration}` : 'Подготовьтесь и проведите переговоры с AI'}</p>
-            <div className="arena-home__preparation"><span>Подготовка: <strong>65%</strong></span><div role="meter" aria-label="Демо: прогресс подготовки" aria-valuenow={65} aria-valuemin={0} aria-valuemax={100}><i /></div></div>
+            {activeSession && preparationProgress !== undefined && <div className="arena-home__preparation"><span>Подготовка: <strong>{preparationProgress}%</strong></span><div role="meter" aria-label="Прогресс подготовки" aria-valuenow={preparationProgress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${preparationProgress}%` }} /></div></div>}
             {activeSession ? <Link className="arena-home__primary-button" to={`/arena/${activeSession.id}`}>Продолжить <span aria-hidden="true">→</span></Link> : <button className="arena-home__primary-button" type="button" disabled={!recommendedCase} onClick={() => recommendedCase && onCaseSelect(recommendedCase)}>Начать кейс <span aria-hidden="true">→</span></button>}
           </div>
         </div>
