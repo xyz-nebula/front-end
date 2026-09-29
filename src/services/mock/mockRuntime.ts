@@ -31,10 +31,27 @@ function findOwnedSession(data: MockData, ownerKey: string, sessionId: string): 
 }
 
 function toSession(record: MockSessionRecord): NegotiationSession {
-  const timeLimitSeconds = trainingCases.find((item) => item.id === record.caseId)?.timeLimitSeconds ?? 15 * 60
+  const trainingCase = trainingCases.find((item) => item.id === record.caseId)
+  const timeLimitSeconds = trainingCase?.timeLimitSeconds ?? 15 * 60
   return {
     id: record.id,
     caseId: record.caseId,
+    caseSnapshot: trainingCase ? {
+      id: trainingCase.id,
+      title: trainingCase.title,
+      description: trainingCase.description,
+      goal: trainingCase.goal,
+      timeLimitSeconds: trainingCase.timeLimitSeconds,
+      roles: trainingCase.roles,
+    } : {
+      id: record.caseId,
+      title: record.caseId,
+      description: '',
+      goal: '',
+      timeLimitSeconds,
+      roles: ['Участник', 'AI-оппонент'],
+    },
+    selectedRole: record.selectedRole ?? 0,
     mode: record.mode,
     status: record.status,
     startedAt: record.startedAt,
@@ -85,6 +102,7 @@ export class MockRuntime {
     caseId: string
     mode: 'text' | 'voice'
     clientCommandId: string
+    selectedRole?: 0 | 1
   }): Promise<NegotiationSession> {
     return this.storage.mutate((data) => {
       const existing = data.sessions.find(
@@ -96,6 +114,7 @@ export class MockRuntime {
         id: crypto.randomUUID(),
         ownerKey,
         caseId: input.caseId,
+        selectedRole: input.selectedRole ?? 0,
         mode: input.mode,
         status: 'active',
         startedAt: new Date().toISOString(),

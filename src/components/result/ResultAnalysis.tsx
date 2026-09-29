@@ -2,13 +2,11 @@ import { Link } from 'react-router-dom'
 
 import { ResultCoach, ResultJudges, ResultNextSteps, ResultOutcome, ResultPlan, ResultTranscript } from '@/components/result/ResultSections'
 import { AppButton } from '@/components/ui/AppButton'
-import type { DuelPreparation } from '@/mocks/duelPreparation'
 import type { NegotiationResult, NegotiationSession } from '@/types/negotiation'
 
 interface ResultAnalysisProps {
   result: NegotiationResult
   session: NegotiationSession
-  preparation: DuelPreparation | null
   isRestarting: boolean
   error: string | null
   onRepeat: () => void
@@ -22,10 +20,11 @@ function formatDuration(session: NegotiationSession): string | null {
   return `${Math.floor(totalSeconds / 60)}:${(totalSeconds % 60).toString().padStart(2, '0')}`
 }
 
-export function ResultAnalysis({ result, session, preparation, isRestarting, error, onRepeat }: ResultAnalysisProps) {
+export function ResultAnalysis({ result, session, isRestarting, error, onRepeat }: ResultAnalysisProps) {
   const duration = formatDuration(session)
-  const userRole = preparation?.userRole ?? 'Участник'
-  const opponentRole = preparation?.opponentRole ?? 'AI-оппонент'
+  const selectedRole = session.selectedRole ?? 0
+  const userRole = session.caseSnapshot.roles[selectedRole]
+  const opponentRole = session.caseSnapshot.roles[selectedRole === 0 ? 1 : 0]
 
   return <>
     <nav className="result-breadcrumbs" aria-label="Хлебные крошки"><Link to="/home">Кейсы</Link><span>/</span><span>Результат</span></nav>

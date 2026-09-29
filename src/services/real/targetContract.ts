@@ -67,6 +67,7 @@ export interface ParsedCase {
   difficulty: CaseDifficulty
   timeLimit: number
   synopsis: string
+  goal: string
   firstRole: string
   secondRole: string
 }
@@ -398,6 +399,7 @@ function parseCase(value: unknown, path: string): ParsedCase {
     difficulty: oneOf(dto.difficulty, ['easy', 'moderate', 'hard', 'insane'], `${path}.difficulty`),
     timeLimit: positiveInteger(dto.time_limit, `${path}.time_limit`),
     synopsis: stringValue(dto.synopsis, `${path}.synopsis`),
+    goal: stringValue(dto.goal, `${path}.goal`),
     firstRole: nonEmptyString(dto.first_role, `${path}.first_role`),
     secondRole: nonEmptyString(dto.second_role, `${path}.second_role`),
   }

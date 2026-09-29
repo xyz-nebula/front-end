@@ -13,29 +13,10 @@ import { useArenaSession } from '@/features/arena/useArenaSession'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
 import { useSessionTimer } from '@/features/arena/useSessionTimer'
 import { useProductTour } from '@/features/product-tour/useProductTour'
-import { getCasePresentation } from '@/features/cases/casePresentation'
-import { trainingCases } from '@/mocks/cases'
 import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { readSessionPreparation } from '@/features/preparation/preparation'
 import { useDomainServices } from '@/services/domainServices'
-import type { TrainingCase } from '@/types/case'
 import '@/styles/duel.css'
-
-function fallbackCase(title: string, timeLimitSeconds: number): TrainingCase {
-  return {
-    id: title,
-    title,
-    description: 'Голосовой разговор с AI. Сценарий и роль оппонента пока не привязаны к карточке.',
-    synopsis: 'Переговорная сессия из истории.',
-    category: 'Карьера',
-    duration: `${Math.ceil(timeLimitSeconds / 60)} мин`,
-    timeLimitSeconds,
-    difficulty: 'moderate',
-    opponent: 'AI-оппонент',
-    roles: ['Участник', 'AI-оппонент'],
-    presentation: getCasePresentation({ id: title, title }),
-  }
-}
 
 export function ArenaPage() {
   const { sessionId = '' } = useParams()
@@ -59,9 +40,7 @@ export function ArenaPage() {
   const [timeoutFinishFailed, setTimeoutFinishFailed] = useState(false)
   const finishButtonRef = useRef<HTMLButtonElement>(null)
   const timeoutFinishInFlightRef = useRef(false)
-  const trainingCase = trainingCases.find(
-    (item) => item.id === arena.session?.caseId || item.title === arena.session?.name,
-  ) ?? (arena.session ? fallbackCase(arena.session.name ?? 'Переговоры с AI', arena.session.timeLimitSeconds) : undefined)
+  const trainingCase = arena.session?.caseSnapshot
   const sessionPreparation = arena.session ? readSessionPreparation(mockOwnerKey, arena.session.id) : null
   const sessionTimer = useSessionTimer(
     arena.session?.messages ?? [],
@@ -169,6 +148,9 @@ export function ArenaPage() {
   const isSending = arena.turnState === 'sending' || arena.turnState === 'thinking'
   const isConnecting = audio.state === 'connecting' || audio.state === 'reconnecting'
   const preparation = getDuelPreparation(trainingCase.id)
+  const selectedRole = arena.session.selectedRole ?? 0
+  const userRole = trainingCase.roles[selectedRole]
+  const opponentRole = trainingCase.roles[selectedRole === 0 ? 1 : 0]
 
   const confirmFinish = async () => {
     if (isFinishing) return
@@ -208,8 +190,8 @@ export function ArenaPage() {
     <div className="arena-page">
       <ArenaHeader
         title={trainingCase.title}
-        userRole={sessionPreparation?.userRole ?? preparation?.userRole ?? 'Вы'}
-        opponentRole={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? trainingCase.opponent}
+        userRole={sessionPreparation?.userRole ?? preparation?.userRole ?? userRole}
+        opponentRole={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? opponentRole}
         remainingSeconds={sessionTimer.remainingSeconds}
         timerStarted={sessionTimer.started}
         timerExpired={sessionTimer.expired}
@@ -224,7 +206,7 @@ export function ArenaPage() {
       <main className="duel-shell arena-layout">
         <section className="arena-dialog-panel">
           <h2 className="arena-dialog-panel__title">Диалог</h2>
-          <ArenaConversation messages={arena.session.messages} opponent={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? trainingCase.opponent} isThinking={isSending} mode={arena.session.mode} partial={audio.partial} />
+          <ArenaConversation messages={arena.session.messages} opponent={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? opponentRole} isThinking={isSending} mode={arena.session.mode} partial={audio.partial} />
           {timeoutFinishFailed ? <div className="arena-inline-error" role="alert"><span>{arena.error ?? 'Не удалось завершить переговоры по таймеру.'}</span><button type="button" onClick={retryTimeoutFinish}>Повторить завершение</button></div> : arena.error && <div className="arena-inline-error" role="alert"><span>{arena.error}</span><button type="button" onClick={() => arena.turnState === 'error' ? void arena.sendTextTurn() : openFinishDialog()}>Повторить</button></div>}
         </section>
         <DuelPreparation data={preparation} description={trainingCase.description} isRealVoice={isRealVoice} snapshot={sessionPreparation} />

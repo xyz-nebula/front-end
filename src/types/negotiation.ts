@@ -10,9 +10,19 @@ export interface NegotiationMessage {
   createdAt: string
 }
 
+export interface NegotiationCaseSnapshot {
+  id: string
+  title: string
+  description: string
+  goal: string
+  timeLimitSeconds: number
+  roles: [string, string]
+}
+
 export interface NegotiationSession {
   id: string
   caseId: string
+  caseSnapshot: NegotiationCaseSnapshot
   name?: string
   mode: NegotiationMode
   status: NegotiationStatus

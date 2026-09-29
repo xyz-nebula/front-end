@@ -29,6 +29,7 @@ export interface TrainingCase {
   id: string
   title: string
   description: string
+  goal: string
   synopsis: string
   category: string
   duration: string
