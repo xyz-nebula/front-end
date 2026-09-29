@@ -131,7 +131,7 @@ export function ProductTourLayer() {
     let highlighted: Element | null = null
     let found = false
     const updateTarget = () => {
-      const next = document.querySelector(target)
+      const next = [...document.querySelectorAll(target)].find((element) => element.getClientRects().length > 0) ?? null
       if (highlighted !== next) {
         highlighted?.classList.remove('product-tour-target')
         next?.classList.add('product-tour-target')

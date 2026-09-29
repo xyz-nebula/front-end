@@ -64,14 +64,20 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await expectTargetAbovePanel(page, page.locator('[data-tour-id="voice-preparation"]'))
   await preparationButton.click()
   await expect(page).toHaveURL(/\/preparation\?.*section=analysis/)
+  await expectTargetAbovePanel(page, page.locator('.preparation-bottom__next'))
+  await captureScreen(page, 'product-tour-preparation', 'mobile')
 
-  for (const title of ['Разбери ситуацию', 'Собери стратегию', 'Продумай тактику']) {
-    await expect(page.locator('.product-tour-tooltip h2')).toHaveText(title)
-    await page.locator('.product-tour-tooltip').getByRole('button', { name: 'Далее' }).click()
-  }
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Разбери ситуацию')
+  await page.locator('.preparation-bottom__next').click()
+  await expect(page).toHaveURL(/section=strategy/)
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Собери стратегию')
+  await page.locator('.preparation-bottom__next').click()
+  await expect(page).toHaveURL(/section=tactics/)
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Продумай тактику')
+  await page.locator('.preparation-bottom__next').click()
 
   await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Выходи на поединок')
-  const startDuel = page.locator('[data-tour-id="start-duel"]')
+  const startDuel = page.locator('.preparation-bottom__next')
   await expectTargetAbovePanel(page, startDuel)
   await startDuel.click()
 
@@ -95,4 +101,26 @@ test('mobile product tour can be completed through primary controls', async ({ p
   await expectTargetAbovePanel(page, page.locator('[data-tour-id="result"]'))
   await page.locator('.product-tour-tooltip').getByRole('button', { name: 'Готово' }).click()
   await expect(page.locator('[data-product-tour-tooltip]')).toHaveCount(0)
+})
+
+test('paused role selection resumes with the selected case and role', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await openRoleSelection(page, 'resume-role')
+
+  const secondRole = page.locator('[data-tour-id="role-selector"]').getByRole('radio').nth(1)
+  await secondRole.click()
+  await page.getByRole('button', { name: 'Меню тура' }).click()
+  await expect(page.getByText('Продолжить можно из меню профиля.')).toBeVisible()
+  await page.getByRole('button', { name: 'Приостановить тур' }).click()
+  await expect(page.locator('[data-product-tour-tooltip]')).toHaveCount(0)
+
+  await page.reload()
+  await page.getByRole('button', { name: 'Меню профиля' }).click()
+  await page.getByRole('button', { name: 'Продолжить тур' }).click()
+
+  await expect(page.locator('.product-tour-tooltip h2')).toHaveText('Подготовься к голосовому разговору')
+  const restoredRoles = page.locator('[data-tour-id="role-selector"]').getByRole('radio')
+  await expect(restoredRoles.nth(1)).toBeChecked()
+  await expect(page.getByRole('button', { name: 'Начать подготовку' })).toBeEnabled()
 })
