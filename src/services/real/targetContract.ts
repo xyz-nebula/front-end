@@ -57,7 +57,6 @@ export interface ParsedChat extends ParsedChatListItem {
   status: ChatStatusDto
   createdAt: string
   selectedRole: 0 | 1
-  preparations: string
 }
 export interface ParsedCase {
   id: string
@@ -356,7 +355,6 @@ function parseChatBase(value: unknown, path: string): ParsedChat {
     selectedRole: dto.selected_role === 0 || dto.selected_role === 1
       ? dto.selected_role
       : invalidResponse(`${path}.selected_role`),
-    preparations: stringValue(dto.preparations, `${path}.preparations`),
   }
 }
 
@@ -387,10 +385,6 @@ export function parseChatWithMessages(value: unknown): ParsedChatWithMessages {
 
 function parseCase(value: unknown, path: string): ParsedCase {
   const dto = record(value, path)
-  // Role preparations are deliberately validated but not exposed: they contain
-  // hidden scenario context intended for the corresponding negotiation role.
-  stringValue(dto.first_role_preparations, `${path}.first_role_preparations`)
-  stringValue(dto.second_role_preparations, `${path}.second_role_preparations`)
   return {
     id: uuid(dto.uuid, `${path}.uuid`),
     name: nonEmptyString(dto.name, `${path}.name`),

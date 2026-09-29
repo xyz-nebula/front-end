@@ -13,7 +13,6 @@ import { useArenaSession } from '@/features/arena/useArenaSession'
 import { useArenaAudio } from '@/features/arena/useArenaAudio'
 import { useSessionTimer } from '@/features/arena/useSessionTimer'
 import { useProductTour } from '@/features/product-tour/useProductTour'
-import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { readSessionPreparation } from '@/features/preparation/preparation'
 import { useDomainServices } from '@/services/domainServices'
 import '@/styles/duel.css'
@@ -147,7 +146,6 @@ export function ArenaPage() {
   const interactionDisabled = isFinished || sessionTimer.expired
   const isSending = arena.turnState === 'sending' || arena.turnState === 'thinking'
   const isConnecting = audio.state === 'connecting' || audio.state === 'reconnecting'
-  const preparation = getDuelPreparation(trainingCase.id)
   const selectedRole = arena.session.selectedRole ?? 0
   const userRole = trainingCase.roles[selectedRole]
   const opponentRole = trainingCase.roles[selectedRole === 0 ? 1 : 0]
@@ -190,8 +188,8 @@ export function ArenaPage() {
     <div className="arena-page">
       <ArenaHeader
         title={trainingCase.title}
-        userRole={sessionPreparation?.userRole ?? preparation?.userRole ?? userRole}
-        opponentRole={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? opponentRole}
+        userRole={sessionPreparation?.userRole ?? userRole}
+        opponentRole={sessionPreparation?.opponentRole ?? opponentRole}
         remainingSeconds={sessionTimer.remainingSeconds}
         timerStarted={sessionTimer.started}
         timerExpired={sessionTimer.expired}
@@ -206,10 +204,10 @@ export function ArenaPage() {
       <main className="duel-shell arena-layout">
         <section className="arena-dialog-panel">
           <h2 className="arena-dialog-panel__title">Диалог</h2>
-          <ArenaConversation messages={arena.session.messages} opponent={sessionPreparation?.opponentRole ?? preparation?.opponentRole ?? opponentRole} isThinking={isSending} mode={arena.session.mode} partial={audio.partial} />
+          <ArenaConversation messages={arena.session.messages} opponent={sessionPreparation?.opponentRole ?? opponentRole} isThinking={isSending} mode={arena.session.mode} partial={audio.partial} />
           {timeoutFinishFailed ? <div className="arena-inline-error" role="alert"><span>{arena.error ?? 'Не удалось завершить переговоры по таймеру.'}</span><button type="button" onClick={retryTimeoutFinish}>Повторить завершение</button></div> : arena.error && <div className="arena-inline-error" role="alert"><span>{arena.error}</span><button type="button" onClick={() => arena.turnState === 'error' ? void arena.sendTextTurn() : openFinishDialog()}>Повторить</button></div>}
         </section>
-        <DuelPreparation data={preparation} description={trainingCase.description} isRealVoice={isRealVoice} snapshot={sessionPreparation} />
+        <DuelPreparation fallback={arena.session.preparationOverview} snapshot={sessionPreparation} />
         <div className="duel-controls">
           {isFinished ? (
             <div className="arena-finished" role="status"><div><strong>Переговоры завершены</strong><span>Открываем разбор…</span></div><Link to={`/result/${sessionId}`}>Посмотреть результат →</Link></div>

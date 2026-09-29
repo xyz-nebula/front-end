@@ -12,7 +12,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:unit": "node --test tests/unit/messageReconciliation.test.mjs tests/unit/sessionTimer.test.mjs",
+    "test:unit": "node --test tests/unit/*.test.mjs",
     "test": "npm run test:e2e --",
     "test:e2e": "node scripts/run-visual-smoke.mjs",
     "visual:smoke": "npm run test:e2e --",

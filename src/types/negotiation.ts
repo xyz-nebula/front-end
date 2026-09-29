@@ -28,7 +28,7 @@ export interface NegotiationSession {
   status: NegotiationStatus
   backendStatus?: 'ongoing' | 'evaluating' | 'evaluated' | 'victory' | 'defeat'
   selectedRole?: 0 | 1
-  preparations?: string
+  preparationOverview?: import('@/types/preparation').PreparationOverview
   startedAt: string
   timeLimitSeconds: number
   finishedAt?: string

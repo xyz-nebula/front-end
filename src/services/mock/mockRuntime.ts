@@ -1,6 +1,7 @@
 import { getMockAiResponse } from '@/mocks/negotiation-scenarios'
 import { trainingCases } from '@/mocks/cases'
 import { createMockResultFixture } from '@/mocks/resultFixtures'
+import { getDuelPreparation } from '@/mocks/duelPreparation'
 import { MockStorage, type MockData, type MockSessionRecord } from '@/services/mock/mockStorage'
 import type {
   AudioTicket,
@@ -32,6 +33,7 @@ function findOwnedSession(data: MockData, ownerKey: string, sessionId: string): 
 
 function toSession(record: MockSessionRecord): NegotiationSession {
   const trainingCase = trainingCases.find((item) => item.id === record.caseId)
+  const preparationOverview = getDuelPreparation(record.caseId)
   const timeLimitSeconds = trainingCase?.timeLimitSeconds ?? 15 * 60
   return {
     id: record.id,
@@ -52,6 +54,7 @@ function toSession(record: MockSessionRecord): NegotiationSession {
       roles: ['Участник', 'AI-оппонент'],
     },
     selectedRole: record.selectedRole ?? 0,
+    ...(preparationOverview ? { preparationOverview } : {}),
     mode: record.mode,
     status: record.status,
     startedAt: record.startedAt,
