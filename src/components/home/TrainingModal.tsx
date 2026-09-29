@@ -43,6 +43,10 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
 
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
   useEffect(() => {
+    const opponentImage = new Image()
+    opponentImage.src = opponentArtwork
+  }, [])
+  useEffect(() => {
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const backgroundElements = [...(backdropRef.current?.parentElement?.children ?? [])]
       .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== backdropRef.current)
@@ -175,7 +179,7 @@ export function TrainingModal({ item, onClose }: TrainingModalProps) {
                   setRole(roleIndex)
                   sendTourEvent({ type: 'role-selected', roleIndex })
                 }} />
-                {role !== null && <img src={role === index ? profileArtwork : opponentArtwork} alt="" width={400} height={400} loading="lazy" decoding="async" />}
+                {role !== null && <img src={role === index ? profileArtwork : opponentArtwork} alt="" width={400} height={400} decoding="async" />}
                 <span className="home-case-modal__role-copy">{role !== null && <span className="home-case-modal__role-badge">{role === index ? 'Ваша роль' : 'AI-оппонент'}</span>}<strong>{title}</strong>{role !== null && <small>{getRoleSummary(item, index, role)}</small>}</span>
                 <span className="home-case-modal__radio-mark" aria-hidden="true">{role === index ? '✓' : ''}</span>
               </label>)}
